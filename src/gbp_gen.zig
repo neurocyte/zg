@@ -2,26 +2,6 @@ const std = @import("std");
 
 const gbp = @import("ziglyph").grapheme_break;
 
-const Map = struct {
-    store: [12]Prop = [_]Prop{.none} ** 12,
-    len: u8 = 0,
-
-    fn getOrPut(self: *Map, prop: Prop) usize {
-        var index: ?usize = null;
-        for (0..self.store.len) |i| {
-            if (self.store[i] == prop) index = i;
-        }
-
-        if (index) |idx| {
-            return idx;
-        } else {
-            self.store[self.len] = prop;
-            self.len += 1;
-            return self.len - 1;
-        }
-    }
-};
-
 const Prop = enum {
     none,
 
@@ -54,21 +34,70 @@ const Prop = enum {
     }
 };
 
+const block_size = 256;
+const Block = [block_size]u4;
+
+const BlockMap = std.HashMap(
+    Block,
+    u16,
+    struct {
+        pub fn hash(_: @This(), k: Block) u64 {
+            var hasher = std.hash.Wyhash.init(0);
+            std.hash.autoHashStrat(&hasher, k, .DeepRecursive);
+            return hasher.final();
+        }
+
+        pub fn eql(_: @This(), a: Block, b: Block) bool {
+            return std.mem.eql(u4, &a, &b);
+        }
+    },
+    std.hash_map.default_max_load_percentage,
+);
+
 pub fn main() !void {
-    var stage_1: [4352]u21 = undefined;
-    var stage_2: [1_114_112]u4 = undefined;
-    var stage_3 = Map{};
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
-    var current_block_offset: u21 = 0;
+    var blocks_map = BlockMap.init(allocator);
+    defer blocks_map.deinit();
 
-    for (0..0x10ffff + 1) |i| {
-        const cp: u21 = @intCast(i);
-        const stage_1_index = cp >> 8;
-        const stage_2_index = current_block_offset + (cp & 0xff);
-        const stage_3_index = stage_3.getOrPut(Prop.forCodePoint(cp));
-        stage_1[stage_1_index] = current_block_offset;
-        stage_2[stage_2_index] = @intCast(stage_3_index);
-        if (cp & 0xff == 255) current_block_offset += 256;
+    var stage1 = std.ArrayList(u16).init(allocator);
+    defer stage1.deinit();
+    var stage2 = std.ArrayList(u4).init(allocator);
+    defer stage2.deinit();
+    var stage3 = std.ArrayList(Prop).init(allocator);
+    defer stage3.deinit();
+
+    var block: Block = undefined;
+    var block_len: u16 = 0;
+    for (0..0x10ffff + 1) |cp| {
+        const prop = Prop.forCodePoint(@intCast(cp));
+
+        const block_idx = blk: {
+            for (stage3.items, 0..) |item, i| {
+                if (item == prop) break :blk i;
+            }
+
+            const idx = stage3.items.len;
+            try stage3.append(prop);
+            break :blk idx;
+        };
+
+        block[block_len] = @intCast(block_idx);
+        block_len += 1;
+
+        if (block_len < block_size and cp != 0x10ffff) continue;
+        if (block_len < block_size) @memset(block[block_len..block_size], 0);
+
+        const gop = try blocks_map.getOrPut(block);
+        if (!gop.found_existing) {
+            gop.value_ptr.* = @intCast(stage2.items.len);
+            try stage2.appendSlice(block[0..block_len]);
+        }
+
+        try stage1.append(gop.value_ptr.*);
+        block_len = 0;
     }
 
     var args_iter = std.process.args();
@@ -101,24 +130,21 @@ pub fn main() !void {
 
     try writer.writeAll(prop_code);
 
-    try writer.writeAll("const stage_1 = [_]u21{");
-    for (stage_1, 0..) |v, i| {
-        if (i != 0) try writer.writeByte(',');
-        _ = try writer.print("{}", .{v});
+    try writer.print("const stage_1 = [{}]u16{{", .{stage1.items.len});
+    for (stage1.items) |v| {
+        _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
 
-    try writer.writeAll("const stage_2 = [_]u4{");
-    for (stage_2, 0..) |v, i| {
-        if (i != 0) try writer.writeByte(',');
-        _ = try writer.print("{}", .{v});
+    try writer.print("const stage_2 = [{}]u4{{", .{stage2.items.len});
+    for (stage2.items) |v| {
+        _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
 
-    try writer.writeAll("const stage_3 = [_]Prop{");
-    for (stage_3.store, 0..) |v, i| {
-        if (i != 0) try writer.writeByte(',');
-        _ = try writer.print(".{s}", .{@tagName(v)});
+    try writer.print("const stage_3 = [{}]Prop{{", .{stage3.items.len});
+    for (stage3.items) |v| {
+        _ = try writer.print(".{s},", .{@tagName(v)});
     }
     try writer.writeAll("};\n");
 
