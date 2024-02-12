@@ -5,8 +5,12 @@ const GraphemeIterator = @import("Grapheme.zig").GraphemeIterator;
 const input = @embedFile("lang_mix.txt");
 
 pub fn main() !void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
     var result: usize = 0;
-    var iter = GraphemeIterator.init(input);
+    var iter = try GraphemeIterator.init(allocator, input);
 
     var timer = try std.time.Timer.start();
 

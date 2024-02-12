@@ -1,13 +1,15 @@
 //! `Grapheme` represents a Unicode grapheme cluster by its length and offset in the source bytes.
 
 const std = @import("std");
+const mem = std.mem;
 const unicode = std.unicode;
 
 const CodePoint = @import("ziglyph").CodePoint;
 const CodePointIterator = CodePoint.CodePointIterator;
 const emoji = @import("ziglyph").emoji;
 
-const gbp = @import("gbp");
+// const gbp = @import("gbp");
+const gbp = @import("gbp.zig");
 
 pub const Grapheme = @This();
 
@@ -32,7 +34,8 @@ pub const GraphemeIterator = struct {
     const Self = @This();
 
     /// Assumes `src` is valid UTF-8.
-    pub fn init(str: []const u8) Self {
+    pub fn init(allocator: mem.Allocator, str: []const u8) !Self {
+        try gbp.init(allocator);
         var self = Self{ .cp_iter = CodePointIterator{ .bytes = str } };
         self.buf[1] = self.cp_iter.next();
 
