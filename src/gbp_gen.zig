@@ -2,26 +2,6 @@ const std = @import("std");
 
 const gbp = @import("ziglyph").grapheme_break;
 
-const Map = struct {
-    store: [12]Prop = [_]Prop{.none} ** 12,
-    len: u8 = 0,
-
-    fn getOrPut(self: *Map, prop: Prop) usize {
-        var index: ?usize = null;
-        for (0..self.store.len) |i| {
-            if (self.store[i] == prop) index = i;
-        }
-
-        if (index) |idx| {
-            return idx;
-        } else {
-            self.store[self.len] = prop;
-            self.len += 1;
-            return self.len - 1;
-        }
-    }
-};
-
 const Prop = enum {
     none,
 
@@ -55,21 +35,19 @@ const Prop = enum {
 };
 
 pub fn main() !void {
-    var stage_1: [4352]u21 = undefined;
-    var stage_2: [1_114_112]u4 = undefined;
-    var stage_3 = Map{};
+    var a = [_]?Prop{null} ** 1_114_112;
 
-    var current_block_offset: u21 = 0;
-
-    for (0..0x10ffff + 1) |i| {
+    // for ('\u{0}'..'\u{10ffff}') |i| {
+    for ('\u{0}'..'\u{10}') |i| {
         const cp: u21 = @intCast(i);
-        const stage_1_index = cp >> 8;
-        const stage_2_index = current_block_offset + (cp & 0xff);
-        const stage_3_index = stage_3.getOrPut(Prop.forCodePoint(cp));
-        stage_1[stage_1_index] = current_block_offset;
-        stage_2[stage_2_index] = @intCast(stage_3_index);
-        if (cp & 0xff == 255) current_block_offset += 256;
+        const prop = Prop.forCodePoint(cp);
+        if (prop == .none) continue;
+        a[cp] = prop;
     }
+
+    const cp = '\u{10ffff}';
+    const prop = Prop.forCodePoint(cp);
+    if (prop != .none) a[cp] = prop;
 
     var args_iter = std.process.args();
     _ = args_iter.skip();
@@ -101,33 +79,20 @@ pub fn main() !void {
 
     try writer.writeAll(prop_code);
 
-    try writer.writeAll("const stage_1 = [_]u21{");
-    for (stage_1, 0..) |v, i| {
+    try writer.writeAll("const array = [_]?Prop{");
+    for (&a, 0..) |v, i| {
         if (i != 0) try writer.writeByte(',');
-        _ = try writer.print("{}", .{v});
-    }
-    try writer.writeAll("};\n");
-
-    try writer.writeAll("const stage_2 = [_]u4{");
-    for (stage_2, 0..) |v, i| {
-        if (i != 0) try writer.writeByte(',');
-        _ = try writer.print("{}", .{v});
-    }
-    try writer.writeAll("};\n");
-
-    try writer.writeAll("const stage_3 = [_]Prop{");
-    for (stage_3.store, 0..) |v, i| {
-        if (i != 0) try writer.writeByte(',');
-        _ = try writer.print(".{s}", .{@tagName(v)});
+        if (v) |p| {
+            _ = try writer.print(".{s}", .{@tagName(p)});
+        } else {
+            try writer.writeAll("null");
+        }
     }
     try writer.writeAll("};\n");
 
     const code =
         \\inline fn getProp(cp: u21) Prop {
-        \\    const stage_1_index = cp >> 8;
-        \\    const stage_2_index = stage_1[stage_1_index] + (cp & 0xff);
-        \\    const stage_3_index = stage_2[stage_2_index];
-        \\    return stage_3[stage_3_index];
+        \\    return if (array[cp]) |prop| prop else .none;
         \\}
         \\
         \\pub inline fn isControl(cp: u21) bool {
