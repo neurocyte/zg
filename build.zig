@@ -6,15 +6,25 @@ pub fn build(b: *std.Build) void {
 
     const ziglyph = b.dependency("ziglyph", .{});
 
-    const gen_exe = b.addExecutable(.{
-        .name = "gen",
+    const gbp_gen_exe = b.addExecutable(.{
+        .name = "gbp_gen",
         .root_source_file = .{ .path = "src/gbp_gen.zig" },
         .target = target,
         .optimize = optimize,
     });
-    gen_exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    const run_gen_exe = b.addRunArtifact(gen_exe);
-    const gen_out = run_gen_exe.addOutputFileArg("gbp.zig");
+    gbp_gen_exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    const run_gbp_gen_exe = b.addRunArtifact(gbp_gen_exe);
+    const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.zig");
+
+    const emoji_gen_exe = b.addExecutable(.{
+        .name = "emoji_gen",
+        .root_source_file = .{ .path = "src/emoji_gen.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    emoji_gen_exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    const run_emoji_gen_exe = b.addRunArtifact(emoji_gen_exe);
+    const emoji_gen_out = run_emoji_gen_exe.addOutputFileArg("emoji.zig");
 
     const exe = b.addExecutable(.{
         .name = "zgbench",
@@ -23,7 +33,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    exe.root_module.addAnonymousImport("gbp", .{ .root_source_file = gen_out });
+    exe.root_module.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
+    exe.root_module.addAnonymousImport("emoji", .{ .root_source_file = emoji_gen_out });
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -39,7 +50,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    exe_unit_tests.root_module.addAnonymousImport("gbp", .{ .root_source_file = gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("emoji", .{ .root_source_file = emoji_gen_out });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 

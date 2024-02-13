@@ -7,9 +7,10 @@ const ziglyph = @import("ziglyph");
 const CodePoint = ziglyph.CodePoint;
 const CodePointIterator = CodePoint.CodePointIterator;
 const readCodePoint = CodePoint.readCodePoint;
-const emoji = ziglyph.emoji;
+// const emoji = ziglyph.emoji;
 // const gbp = ziglyph.grapheme_break;
 const gbp = @import("gbp");
+const emoji = @import("emoji");
 
 pub const Grapheme = @This();
 
