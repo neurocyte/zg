@@ -34,20 +34,81 @@ const Prop = enum {
     }
 };
 
+const block_size = 256;
+const Block = [block_size]u4;
+
+const BlockMap = std.HashMap(
+    Block,
+    u16,
+    struct {
+        pub fn hash(_: @This(), k: Block) u64 {
+            var hasher = std.hash.Wyhash.init(0);
+            std.hash.autoHashStrat(&hasher, k, .DeepRecursive);
+            return hasher.final();
+        }
+
+        pub fn eql(_: @This(), a: Block, b: Block) bool {
+            return std.mem.eql(u4, &a, &b);
+        }
+    },
+    std.hash_map.default_max_load_percentage,
+);
+
 pub fn main() !void {
-    var a = [_]?Prop{null} ** 1_114_112;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
-    // for ('\u{0}'..'\u{10ffff}') |i| {
-    for ('\u{0}'..'\u{10}') |i| {
-        const cp: u21 = @intCast(i);
-        const prop = Prop.forCodePoint(cp);
-        if (prop == .none) continue;
-        a[cp] = prop;
+    var blocks_map = BlockMap.init(allocator);
+    defer blocks_map.deinit();
+
+    const no_prop = std.math.maxInt(u16);
+
+    var stage1 = std.ArrayList(u16).init(allocator);
+    defer stage1.deinit();
+
+    var stage2 = std.ArrayList(u4).init(allocator);
+    defer stage2.deinit();
+
+    var stage3 = std.ArrayList(Prop).init(allocator);
+    defer stage3.deinit();
+
+    var block: Block = undefined;
+    var block_len: u16 = 0;
+
+    for (0..0x10ffff + 1) |cp| {
+        const prop = Prop.forCodePoint(@intCast(cp));
+
+        const block_idx = blk: {
+            for (stage3.items, 0..) |item, i| {
+                if (item == prop) break :blk i;
+            }
+
+            const idx = stage3.items.len;
+            try stage3.append(prop);
+            break :blk idx;
+        };
+
+        block[block_len] = @intCast(block_idx);
+        block_len += 1;
+
+        if (block_len < block_size and cp != 0x10ffff) continue;
+        if (block_len < block_size) @memset(block[block_len..block_size], 0);
+
+        const gop = try blocks_map.getOrPut(block);
+        if (!gop.found_existing) {
+            gop.value_ptr.* = @intCast(stage2.items.len);
+            try stage2.appendSlice(block[0..block_len]);
+        }
+
+        if (prop == .none) {
+            try stage1.append(no_prop);
+        } else {
+            try stage1.append(gop.value_ptr.*);
+        }
+
+        block_len = 0;
     }
-
-    const cp = '\u{10ffff}';
-    const prop = Prop.forCodePoint(cp);
-    if (prop != .none) a[cp] = prop;
 
     var args_iter = std.process.args();
     _ = args_iter.skip();
@@ -59,6 +120,8 @@ pub fn main() !void {
     const writer = out_buf.writer();
 
     const prop_code =
+        \\const std = @import("std");
+        \\
         \\const Prop = enum {
         \\    none,
         \\
@@ -79,20 +142,33 @@ pub fn main() !void {
 
     try writer.writeAll(prop_code);
 
-    try writer.writeAll("const array = [_]?Prop{");
-    for (&a, 0..) |v, i| {
-        if (i != 0) try writer.writeByte(',');
-        if (v) |p| {
-            _ = try writer.print(".{s}", .{@tagName(p)});
-        } else {
-            try writer.writeAll("null");
-        }
+    try writer.print("const stage_1 = [{}]u16{{", .{stage1.items.len});
+    for (stage1.items) |v| {
+        _ = try writer.print("{},", .{v});
+    }
+    try writer.writeAll("};\n");
+
+    try writer.print("const stage_2 = [{}]u4{{", .{stage2.items.len});
+    for (stage2.items) |v| {
+        _ = try writer.print("{},", .{v});
+    }
+    try writer.writeAll("};\n");
+
+    try writer.print("const stage_3 = [{}]Prop{{", .{stage3.items.len});
+    for (stage3.items) |v| {
+        _ = try writer.print(".{s},", .{@tagName(v)});
     }
     try writer.writeAll("};\n");
 
     const code =
+        \\const no_prop = std.math.maxInt(u16);
+        \\
         \\inline fn getProp(cp: u21) Prop {
-        \\    return if (array[cp]) |prop| prop else .none;
+        \\    const stage_1_index = cp >> 8;
+        \\    if (stage_1[stage_1_index] == no_prop) return .none;
+        \\    const stage_2_index = stage_1[stage_1_index] + (cp & 0xff);
+        \\    const stage_3_index = stage_2[stage_2_index];
+        \\    return stage_3[stage_3_index];
         \\}
         \\
         \\pub inline fn isControl(cp: u21) bool {
