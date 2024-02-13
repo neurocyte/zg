@@ -71,7 +71,7 @@ pub fn main() !void {
     var stage3 = std.ArrayList(Prop).init(allocator);
     defer stage3.deinit();
 
-    var block: Block = undefined;
+    var block: Block = [_]u4{0} ** block_size;
     var block_len: u16 = 0;
 
     for (0..0x10ffff + 1) |cp| {
@@ -91,12 +91,11 @@ pub fn main() !void {
         block_len += 1;
 
         if (block_len < block_size and cp != 0x10ffff) continue;
-        if (block_len < block_size) @memset(block[block_len..block_size], 0);
 
         const gop = try blocks_map.getOrPut(block);
         if (!gop.found_existing) {
             gop.value_ptr.* = @intCast(stage2.items.len);
-            try stage2.appendSlice(block[0..block_len]);
+            try stage2.appendSlice(&block);
         }
 
         try stage1.append(gop.value_ptr.*);
