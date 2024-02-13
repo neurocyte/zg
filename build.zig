@@ -38,6 +38,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    exe_unit_tests.root_module.addAnonymousImport("gbp", .{ .root_source_file = gen_out });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 

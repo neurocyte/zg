@@ -23,3 +23,7 @@ pub fn main() !void {
 
     std.debug.print("result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
 }
+
+test {
+    _ = @import("Grapheme.zig");
+}

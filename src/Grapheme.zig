@@ -3,10 +3,12 @@
 const std = @import("std");
 const unicode = std.unicode;
 
-const CodePoint = @import("ziglyph").CodePoint;
+const ziglyph = @import("ziglyph");
+const CodePoint = ziglyph.CodePoint;
 const CodePointIterator = CodePoint.CodePointIterator;
-const emoji = @import("ziglyph").emoji;
-
+const readCodePoint = CodePoint.readCodePoint;
+const emoji = ziglyph.emoji;
+// const gbp = ziglyph.grapheme_break;
 const gbp = @import("gbp");
 
 pub const Grapheme = @This();
@@ -78,6 +80,171 @@ pub const GraphemeIterator = struct {
     }
 };
 
+/// `StreamingGraphemeIterator` iterates a `std.io.Reader` one grapheme cluster at-a-time.
+/// Note that, given the steaming context, each grapheme cluster is returned as a slice of bytes.
+pub fn StreamingGraphemeIterator(comptime T: type) type {
+    return struct {
+        allocator: std.mem.Allocator,
+        buf: [2]?u21 = [_]?u21{ null, null },
+        reader: T,
+
+        const Self = @This();
+
+        pub fn init(allocator: std.mem.Allocator, reader: anytype) !Self {
+            var self = Self{ .allocator = allocator, .reader = reader };
+            self.buf[1] = try readCodePoint(self.reader);
+
+            return self;
+        }
+
+        /// Caller must free returned bytes with `allocator` passed to `init`.
+        pub fn next(self: *Self) !?[]u8 {
+            const code = (try self.advance()) orelse return null;
+
+            var all_bytes = std.ArrayList(u8).init(self.allocator);
+            errdefer all_bytes.deinit();
+
+            try encode_and_append(code, &all_bytes);
+
+            // If at end
+            if (self.buf[1] == null) return try all_bytes.toOwnedSlice();
+
+            // Instant breakers
+            // CR
+            if (code == '\x0d') {
+                if (self.buf[1].? == '\x0a') {
+                    // CRLF
+                    try encode_and_append(self.buf[1].?, &all_bytes);
+                    _ = self.advance() catch unreachable;
+                }
+
+                return try all_bytes.toOwnedSlice();
+            }
+            // LF
+            if (code == '\x0a') return try all_bytes.toOwnedSlice();
+            // Control
+            if (gbp.isControl(code)) return try all_bytes.toOwnedSlice();
+
+            // Common chars
+            if (code < 0xa9) {
+                // Extend / ignorables loop
+                while (self.buf[1]) |next_cp| {
+                    if (next_cp >= 0x300 and isIgnorable(next_cp)) {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                    } else {
+                        break;
+                    }
+                }
+
+                return try all_bytes.toOwnedSlice();
+            }
+
+            if (emoji.isExtendedPictographic(code)) {
+                var after_zwj = false;
+
+                // Extend / ignorables loop
+                while (self.buf[1]) |next_cp| {
+                    if (next_cp >= 0x300 and
+                        after_zwj and
+                        emoji.isExtendedPictographic(next_cp))
+                    {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                        after_zwj = false;
+                    } else if (next_cp >= 0x300 and isIgnorable(next_cp)) {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                        if (next_cp == '\u{200d}') after_zwj = true;
+                    } else {
+                        break;
+                    }
+                }
+
+                return try all_bytes.toOwnedSlice();
+            }
+
+            if (0x1100 <= code and code <= 0xd7c6) {
+                const next_cp = self.buf[1].?;
+
+                if (gbp.isL(code)) {
+                    if (next_cp >= 0x1100 and
+                        (gbp.isL(next_cp) or
+                        gbp.isV(next_cp) or
+                        gbp.isLv(next_cp) or
+                        gbp.isLvt(next_cp)))
+                    {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                    }
+                } else if (gbp.isLv(code) or gbp.isV(code)) {
+                    if (next_cp >= 0x1100 and
+                        (gbp.isV(next_cp) or
+                        gbp.isT(next_cp)))
+                    {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                    }
+                } else if (gbp.isLvt(code) or gbp.isT(code)) {
+                    if (next_cp >= 0x1100 and gbp.isT(next_cp)) {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                    }
+                }
+            } else if (0x600 <= code and code <= 0x11f02) {
+                if (gbp.isPrepend(code)) {
+                    const next_cp = self.buf[1].?;
+
+                    if (isBreaker(next_cp)) {
+                        return try all_bytes.toOwnedSlice();
+                    } else {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                    }
+                }
+            } else if (0x1f1e6 <= code and code <= 0x1f1ff) {
+                if (gbp.isRegionalIndicator(code)) {
+                    const next_cp = self.buf[1].?;
+
+                    if (next_cp >= 0x1f1e6 and gbp.isRegionalIndicator(next_cp)) {
+                        try encode_and_append(next_cp, &all_bytes);
+                        _ = self.advance() catch unreachable;
+                    }
+                }
+            }
+
+            // Extend / ignorables loop
+            while (self.buf[1]) |next_cp| {
+                if (next_cp >= 0x300 and isIgnorable(next_cp)) {
+                    try encode_and_append(next_cp, &all_bytes);
+                    _ = self.advance() catch unreachable;
+                } else {
+                    break;
+                }
+            }
+
+            return try all_bytes.toOwnedSlice();
+        }
+
+        fn advance(self: *Self) !?u21 {
+            self.buf[0] = self.buf[1];
+            self.buf[1] = try readCodePoint(self.reader);
+
+            return self.buf[0];
+        }
+
+        fn peek(self: Self) ?u21 {
+            return self.buf[1];
+        }
+
+        fn encode_and_append(cp: u21, list: *std.ArrayList(u8)) !void {
+            var tmp: [4]u8 = undefined;
+            const len = try unicode.utf8Encode(cp, &tmp);
+            try list.appendSlice(tmp[0..len]);
+        }
+    };
+}
+
 // Predicates
 fn isBreaker(cp: u21) bool {
     return cp == '\x0d' or cp == '\x0a' or gbp.isControl(cp);
@@ -98,6 +265,22 @@ test "Segmentation comptime GraphemeIterator" {
             try std.testing.expect(grapheme.eql(src, want[i]));
         }
     }
+}
+
+test "Simple StreamingGraphemeIterator" {
+    var buf = "abe\u{301}😹".*;
+    var fis = std.io.fixedBufferStream(&buf);
+    const reader = fis.reader();
+    var iter = try StreamingGraphemeIterator(@TypeOf(reader)).init(std.testing.allocator, reader);
+    const want = [_][]const u8{ "a", "b", "e\u{301}", "😹" };
+
+    for (want) |str| {
+        const gc = (try iter.next()).?;
+        defer std.testing.allocator.free(gc);
+        try std.testing.expectEqualStrings(gc, str);
+    }
+
+    try std.testing.expectEqual(@as(?[]u8, null), try iter.next());
 }
 
 test "Segmentation ZWJ and ZWSP emoji sequences" {
@@ -217,4 +400,63 @@ pub fn graphemeBreak(
     }
 
     return true;
+}
+
+test "Segmentation GraphemeIterator" {
+    const allocator = std.testing.allocator;
+    var file = try std.fs.cwd().openFile("GraphemeBreakTest.txt", .{});
+    defer file.close();
+    var buf_reader = std.io.bufferedReader(file.reader());
+    var input_stream = buf_reader.reader();
+
+    var buf: [4096]u8 = undefined;
+    var line_no: usize = 1;
+
+    while (try input_stream.readUntilDelimiterOrEof(&buf, '\n')) |raw| : (line_no += 1) {
+        // Skip comments or empty lines.
+        if (raw.len == 0 or raw[0] == '#' or raw[0] == '@') continue;
+
+        // Clean up.
+        var line = std.mem.trimLeft(u8, raw, "÷ ");
+        if (std.mem.indexOf(u8, line, " ÷\t#")) |octo| {
+            line = line[0..octo];
+        }
+        // Iterate over fields.
+        var want = std.ArrayList(Grapheme).init(allocator);
+        defer want.deinit();
+
+        var all_bytes = std.ArrayList(u8).init(allocator);
+        defer all_bytes.deinit();
+
+        var graphemes = std.mem.split(u8, line, " ÷ ");
+        var bytes_index: usize = 0;
+
+        while (graphemes.next()) |field| {
+            var code_points = std.mem.split(u8, field, " ");
+            var cp_buf: [4]u8 = undefined;
+            var cp_index: usize = 0;
+            var gc_len: usize = 0;
+
+            while (code_points.next()) |code_point| {
+                if (std.mem.eql(u8, code_point, "×")) continue;
+                const cp: u21 = try std.fmt.parseInt(u21, code_point, 16);
+                const len = try unicode.utf8Encode(cp, &cp_buf);
+                try all_bytes.appendSlice(cp_buf[0..len]);
+                cp_index += len;
+                gc_len += len;
+            }
+
+            try want.append(Grapheme{ .len = gc_len, .offset = bytes_index });
+            bytes_index += cp_index;
+        }
+
+        // std.debug.print("\nline {}: {s}\n", .{ line_no, all_bytes.items });
+        var iter = GraphemeIterator.init(all_bytes.items);
+
+        // Chaeck.
+        for (want.items) |w| {
+            const g = (iter.next()).?;
+            try std.testing.expect(w.eql(all_bytes.items, all_bytes.items[g.offset .. g.offset + g.len]));
+        }
+    }
 }
