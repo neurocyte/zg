@@ -1,10 +1,16 @@
 const std = @import("std");
 
-// const GraphemeIterator = @import("ziglyph").GraphemeIterator;
-const GraphemeIterator = @import("Grapheme.zig").GraphemeIterator;
-const input = @embedFile("lang_mix.txt");
+const GraphemeIterator = @import("ziglyph").GraphemeIterator;
+// const GraphemeIterator = @import("Grapheme.zig").GraphemeIterator;
 
 pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    const input = try std.fs.cwd().readFileAlloc(allocator, "lang_mix.txt", std.math.maxInt(u32));
+    defer allocator.free(input);
+
     var result: usize = 0;
     var iter = GraphemeIterator.init(input);
 
