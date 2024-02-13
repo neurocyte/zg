@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const GraphemeIterator = @import("ziglyph").GraphemeIterator;
-// const GraphemeIterator = @import("Grapheme.zig").GraphemeIterator;
+// const GraphemeIterator = @import("ziglyph").GraphemeIterator;
+const GraphemeIterator = @import("Grapheme.zig").GraphemeIterator;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

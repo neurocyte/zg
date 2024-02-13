@@ -62,15 +62,20 @@ pub fn main() !void {
     var blocks_map = BlockMap.init(allocator);
     defer blocks_map.deinit();
 
+    const no_prop = std.math.maxInt(u16);
+
     var stage1 = std.ArrayList(u16).init(allocator);
     defer stage1.deinit();
+
     var stage2 = std.ArrayList(u4).init(allocator);
     defer stage2.deinit();
+
     var stage3 = std.ArrayList(Prop).init(allocator);
     defer stage3.deinit();
 
     var block: Block = undefined;
     var block_len: u16 = 0;
+
     for (0..0x10ffff + 1) |cp| {
         const prop = Prop.forCodePoint(@intCast(cp));
 
@@ -96,7 +101,12 @@ pub fn main() !void {
             try stage2.appendSlice(block[0..block_len]);
         }
 
-        try stage1.append(gop.value_ptr.*);
+        if (prop == .none) {
+            try stage1.append(no_prop);
+        } else {
+            try stage1.append(gop.value_ptr.*);
+        }
+
         block_len = 0;
     }
 
@@ -110,6 +120,8 @@ pub fn main() !void {
     const writer = out_buf.writer();
 
     const prop_code =
+        \\const std = @import("std");
+        \\
         \\const Prop = enum {
         \\    none,
         \\
@@ -149,8 +161,11 @@ pub fn main() !void {
     try writer.writeAll("};\n");
 
     const code =
+        \\const no_prop = std.math.maxInt(u16);
+        \\
         \\inline fn getProp(cp: u21) Prop {
         \\    const stage_1_index = cp >> 8;
+        \\    if (stage_1[stage_1_index] == no_prop) return .none;
         \\    const stage_2_index = stage_1[stage_1_index] + (cp & 0xff);
         \\    const stage_3_index = stage_2[stage_2_index];
         \\    return stage_3[stage_3_index];
