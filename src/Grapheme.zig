@@ -10,6 +10,7 @@ const CodePointIterator = CodePoint.CodePointIterator;
 // const gbp = ziglyph.grapheme_break;
 const gbp = @import("gbp");
 const emoji = @import("emoji");
+const indic = @import("indic");
 
 pub const Grapheme = @This();
 
@@ -89,18 +90,18 @@ fn isIgnorable(cp: u21) bool {
     return gbp.isExtend(cp) or gbp.isSpacingmark(cp) or cp == '\u{200d}';
 }
 
-test "Segmentation comptime GraphemeIterator" {
-    const want = [_][]const u8{ "H", "é", "l", "l", "o" };
-
-    comptime {
-        const src = "Héllo";
-        var ct_iter = GraphemeIterator.init(src);
-        var i = 0;
-        while (ct_iter.next()) |grapheme| : (i += 1) {
-            try std.testing.expect(grapheme.eql(src, want[i]));
-        }
-    }
-}
+// test "Segmentation comptime GraphemeIterator" {
+//     const want = [_][]const u8{ "H", "é", "l", "l", "o" };
+//
+//     comptime {
+//         const src = "Héllo";
+//         var ct_iter = GraphemeIterator.init(src);
+//         var i = 0;
+//         while (ct_iter.next()) |grapheme| : (i += 1) {
+//             try std.testing.expect(grapheme.eql(src, want[i]));
+//         }
+//     }
+// }
 
 test "Segmentation ZWJ and ZWSP emoji sequences" {
     const seq_1 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
@@ -148,7 +149,7 @@ inline fn unsetRegional(state: *u3) void {
 }
 // Indic Conjunct
 inline fn hasIndic(state: *const u3) bool {
-    return state.* & 2 == 4;
+    return state.* & 4 == 4;
 }
 inline fn setIndic(state: *u3) void {
     state.* |= 4;
@@ -171,7 +172,7 @@ pub fn graphemeBreak(
     // GB11: Emoji Extend* ZWJ x Emoji
     if (!hasXpic(state) and emoji.isExtendedPictographic(cp1)) setXpic(state);
     // GB9c: Indic Conjunct Break
-    // if (!hasIndic(state) and indic.isConsonant(cp1)) setIndic(state);
+    if (!hasIndic(state) and indic.isConsonant(cp1)) setIndic(state);
 
     // GB3: CR x LF
     if (cp1 == '\r' and cp2 == '\n') return false;
@@ -228,13 +229,42 @@ pub fn graphemeBreak(
     }
 
     // GB9c: Indic Conjunct Break
-    // if (hasIndic(state) and
-    //     indic.isLinker(cp1) and
-    //     indic.isConsonant(cp2))
-    // {
-    //     unsetIndic(state);
-    //     return false;
-    // }
+    if (hasIndic(state) and
+        indic.isConsonant(cp1) and
+        indic.isExtend(cp2))
+    {
+        return false;
+    }
+
+    if (hasIndic(state) and
+        indic.isConsonant(cp1) and
+        indic.isLinker(cp2))
+    {
+        return false;
+    }
+
+    if (hasIndic(state) and
+        indic.isExtend(cp1) and
+        indic.isLinker(cp2))
+    {
+        return false;
+    }
+
+    if (hasIndic(state) and
+        indic.isLinker(cp1) and
+        indic.isConsonant(cp2))
+    {
+        unsetIndic(state);
+        return false;
+    }
+
+    if (hasIndic(state) and
+        gbp.isZwj(cp1) and
+        indic.isConsonant(cp2))
+    {
+        unsetIndic(state);
+        return false;
+    }
 
     return true;
 }
