@@ -116,7 +116,7 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
                 if (self.buf[1].? == '\x0a') {
                     // CRLF
                     try encode_and_append(self.buf[1].?, &all_bytes);
-                    _ = self.advance() catch unreachable;
+                    _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                 }
 
                 return try all_bytes.toOwnedSlice();
@@ -132,7 +132,7 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
                 while (self.buf[1]) |next_cp| {
                     if (next_cp >= 0x300 and isIgnorable(next_cp)) {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                     } else {
                         break;
                     }
@@ -151,11 +151,11 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
                         emoji.isExtendedPictographic(next_cp))
                     {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                         after_zwj = false;
                     } else if (next_cp >= 0x300 and isIgnorable(next_cp)) {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                         if (next_cp == '\u{200d}') after_zwj = true;
                     } else {
                         break;
@@ -176,7 +176,7 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
                         gbp.isLvt(next_cp)))
                     {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                     }
                 } else if (gbp.isLv(code) or gbp.isV(code)) {
                     if (next_cp >= 0x1100 and
@@ -184,12 +184,12 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
                         gbp.isT(next_cp)))
                     {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                     }
                 } else if (gbp.isLvt(code) or gbp.isT(code)) {
                     if (next_cp >= 0x1100 and gbp.isT(next_cp)) {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                     }
                 }
             } else if (0x600 <= code and code <= 0x11f02) {
@@ -200,7 +200,7 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
                         return try all_bytes.toOwnedSlice();
                     } else {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                     }
                 }
             } else if (0x1f1e6 <= code and code <= 0x1f1ff) {
@@ -209,7 +209,7 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
 
                     if (next_cp >= 0x1f1e6 and gbp.isRegionalIndicator(next_cp)) {
                         try encode_and_append(next_cp, &all_bytes);
-                        _ = self.advance() catch unreachable;
+                        _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                     }
                 }
             }
@@ -218,7 +218,7 @@ pub fn StreamingGraphemeIterator(comptime T: type) type {
             while (self.buf[1]) |next_cp| {
                 if (next_cp >= 0x300 and isIgnorable(next_cp)) {
                     try encode_and_append(next_cp, &all_bytes);
-                    _ = self.advance() catch unreachable;
+                    _ = self.advance() catch @panic("GraphemeIterator.advance failed.");
                 } else {
                     break;
                 }
