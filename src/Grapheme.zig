@@ -4,7 +4,7 @@ const std = @import("std");
 const unicode = std.unicode;
 
 const ziglyph = @import("ziglyph");
-const CodePoint = ziglyph.CodePoint;
+const CodePoint = @import("CodePoint.zig");
 const CodePointIterator = CodePoint.CodePointIterator;
 const readCodePoint = CodePoint.readCodePoint;
 // const emoji = ziglyph.emoji;
