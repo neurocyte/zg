@@ -16,14 +16,15 @@ pub fn main() !void {
 
     var timer = try std.time.Timer.start();
 
-    for (0..50) |_| {
-        while (iter.next()) |_| result += 1;
-        iter.cp_iter.i = 0;
-    }
+    // for (0..50) |_| {
+    while (iter.next()) |_| result += 1;
+    iter.cp_iter.i = 0;
+    // }
 
     std.debug.print("result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
 }
 
 test {
+    _ = @import("CodePoint.zig");
     _ = @import("Grapheme.zig");
 }

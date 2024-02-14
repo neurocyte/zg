@@ -308,28 +308,35 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
 }
 
 // Grapheme break state.
-fn hasXpic(state: *const u3) bool {
+// Extended Pictographic (emoji)
+inline fn hasXpic(state: *const u3) bool {
     return state.* & 1 == 1;
 }
-
-fn setXpic(state: *u3) void {
+inline fn setXpic(state: *u3) void {
     state.* |= 1;
 }
-
-fn unsetXpic(state: *u3) void {
+inline fn unsetXpic(state: *u3) void {
     state.* ^= 1;
 }
-
-fn hasRegional(state: *const u3) bool {
+// Regional Indicatior (flags)
+inline fn hasRegional(state: *const u3) bool {
     return state.* & 2 == 2;
 }
-
-fn setRegional(state: *u3) void {
+inline fn setRegional(state: *u3) void {
     state.* |= 2;
 }
-
-fn unsetRegional(state: *u3) void {
+inline fn unsetRegional(state: *u3) void {
     state.* ^= 2;
+}
+// Indic Conjunct
+inline fn hasIndic(state: *const u3) bool {
+    return state.* & 2 == 4;
+}
+inline fn setIndic(state: *u3) void {
+    state.* |= 4;
+}
+inline fn unsetIndic(state: *u3) void {
+    state.* ^= 4;
 }
 
 /// `graphemeBreak` returns true only if a grapheme break point is required
@@ -345,6 +352,8 @@ pub fn graphemeBreak(
 ) bool {
     // GB11: Emoji Extend* ZWJ x Emoji
     if (!hasXpic(state) and emoji.isExtendedPictographic(cp1)) setXpic(state);
+    // GB9c: Indic Conjunct Break
+    // if (!hasIndic(state) and indic.isConsonant(cp1)) setIndic(state);
 
     // GB3: CR x LF
     if (cp1 == '\r' and cp2 == '\n') return false;
@@ -399,6 +408,15 @@ pub fn graphemeBreak(
         unsetXpic(state);
         return false;
     }
+
+    // GB9c: Indic Conjunct Break
+    // if (hasIndic(state) and
+    //     indic.isLinker(cp1) and
+    //     indic.isConsonant(cp2))
+    // {
+    //     unsetIndic(state);
+    //     return false;
+    // }
 
     return true;
 }
