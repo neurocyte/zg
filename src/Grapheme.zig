@@ -6,11 +6,7 @@ const unicode = std.unicode;
 const ziglyph = @import("ziglyph");
 const CodePoint = @import("CodePoint.zig");
 const CodePointIterator = CodePoint.CodePointIterator;
-// const emoji = ziglyph.emoji;
-// const gbp = ziglyph.grapheme_break;
 const gbp = @import("gbp");
-const emoji = @import("emoji");
-const indic = @import("indic");
 
 pub const Grapheme = @This();
 
@@ -83,7 +79,10 @@ pub const GraphemeIterator = struct {
 
 // Predicates
 inline fn isBreaker(cp: u21) bool {
-    return cp == '\x0d' or cp == '\x0a' or gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]] == .control;
+    // Extract relevant properties.
+    const cp_props_byte = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]];
+    const cp_gbp_prop: gbp.Gbp = @enumFromInt(cp_props_byte >> 4);
+    return cp == '\x0d' or cp == '\x0a' or cp_gbp_prop == .Control;
 }
 
 inline fn isIgnorable(cp: u21) bool {
@@ -170,13 +169,20 @@ pub fn graphemeBreak(
     cp2: u21,
     state: *u3,
 ) bool {
+    // Extract relevant properties.
+    const cp1_props_byte = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp1 >> 8] + (cp1 & 0xff)]];
+    const cp1_gbp_prop: gbp.Gbp = @enumFromInt(cp1_props_byte >> 4);
+    const cp1_indic_prop: gbp.Indic = @enumFromInt((cp1_props_byte >> 1) & 0x7);
+    const cp1_is_emoji = cp1_props_byte & 1 == 1;
+
+    const cp2_props_byte = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp2 >> 8] + (cp2 & 0xff)]];
+    const cp2_gbp_prop: gbp.Gbp = @enumFromInt(cp2_props_byte >> 4);
+    const cp2_indic_prop: gbp.Indic = @enumFromInt((cp2_props_byte >> 1) & 0x7);
+    const cp2_is_emoji = cp2_props_byte & 1 == 1;
+
     // GB11: Emoji Extend* ZWJ x Emoji
-    const cp1_is_emoji = emoji.stage_2[emoji.stage_1[cp1 >> 8] + (cp1 & 0xff)];
-    const cp2_is_emoji = emoji.stage_2[emoji.stage_1[cp2 >> 8] + (cp2 & 0xff)];
     if (!hasXpic(state) and cp1_is_emoji) setXpic(state);
     // GB9c: Indic Conjunct Break
-    const cp1_indic_prop = indic.stage_3[indic.stage_2[indic.stage_1[cp1 >> 8] + (cp1 & 0xff)]];
-    const cp2_indic_prop = indic.stage_3[indic.stage_2[indic.stage_1[cp2 >> 8] + (cp2 & 0xff)]];
     if (!hasIndic(state) and cp1_indic_prop == .Consonant) setIndic(state);
 
     // GB3: CR x LF
@@ -186,37 +192,35 @@ pub fn graphemeBreak(
     if (isBreaker(cp1)) return true;
 
     // GB6: Hangul L x (L|V|LV|VT)
-    const cp1_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp1 >> 8] + (cp1 & 0xff)]];
-    const cp2_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp2 >> 8] + (cp2 & 0xff)]];
-    if (cp1_gbp_prop == .hangul_l) {
-        if (cp2_gbp_prop == .hangul_l or
-            cp2_gbp_prop == .hangul_v or
-            cp2_gbp_prop == .hangul_lv or
-            cp2_gbp_prop == .hangul_lvt) return false;
+    if (cp1_gbp_prop == .L) {
+        if (cp2_gbp_prop == .L or
+            cp2_gbp_prop == .V or
+            cp2_gbp_prop == .LV or
+            cp2_gbp_prop == .LVT) return false;
     }
 
     // GB7: Hangul (LV | V) x (V | T)
-    if (cp1_gbp_prop == .hangul_lv or cp1_gbp_prop == .hangul_v) {
-        if (cp2_gbp_prop == .hangul_v or
-            cp2_gbp_prop == .hangul_t) return false;
+    if (cp1_gbp_prop == .LV or cp1_gbp_prop == .V) {
+        if (cp2_gbp_prop == .V or
+            cp2_gbp_prop == .T) return false;
     }
 
     // GB8: Hangul (LVT | T) x T
-    if (cp1_gbp_prop == .hangul_lvt or cp1_gbp_prop == .hangul_t) {
-        if (cp2_gbp_prop == .hangul_t) return false;
+    if (cp1_gbp_prop == .LVT or cp1_gbp_prop == .T) {
+        if (cp2_gbp_prop == .T) return false;
     }
 
     // GB9b: x (Extend | ZWJ)
-    if (cp2_gbp_prop == .extend or cp2_gbp_prop == .zwj) return false;
+    if (cp2_gbp_prop == .Extend or cp2_gbp_prop == .ZWJ) return false;
 
     // GB9a: x Spacing
-    if (cp2_gbp_prop == .spacing) return false;
+    if (cp2_gbp_prop == .SpacingMark) return false;
 
     // GB9b: Prepend x
-    if (cp1_gbp_prop == .prepend and !isBreaker(cp2)) return false;
+    if (cp1_gbp_prop == .Prepend and !isBreaker(cp2)) return false;
 
     // GB12, GB13: RI x RI
-    if (cp1_gbp_prop == .regional and cp2_gbp_prop == .regional) {
+    if (cp1_gbp_prop == .Regional_Indicator and cp2_gbp_prop == .Regional_Indicator) {
         if (hasRegional(state)) {
             unsetRegional(state);
             return true;
@@ -228,7 +232,7 @@ pub fn graphemeBreak(
 
     // GB11: Emoji Extend* ZWJ x Emoji
     if (hasXpic(state) and
-        cp1_gbp_prop == .zwj and
+        cp1_gbp_prop == .ZWJ and
         cp2_is_emoji)
     {
         unsetXpic(state);
@@ -251,7 +255,7 @@ pub fn graphemeBreak(
     }
 
     if (hasIndic(state) and
-        (cp1_indic_prop == .Linker or cp1_gbp_prop == .zwj) and
+        (cp1_indic_prop == .Linker or cp1_gbp_prop == .ZWJ) and
         cp2_indic_prop == .Consonant)
     {
         unsetIndic(state);
