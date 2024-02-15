@@ -82,26 +82,27 @@ pub const GraphemeIterator = struct {
 };
 
 // Predicates
-fn isBreaker(cp: u21) bool {
-    return cp == '\x0d' or cp == '\x0a' or gbp.isControl(cp);
+inline fn isBreaker(cp: u21) bool {
+    return cp == '\x0d' or cp == '\x0a' or gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]] == .control;
 }
 
-fn isIgnorable(cp: u21) bool {
-    return gbp.isExtend(cp) or gbp.isSpacingmark(cp) or cp == '\u{200d}';
+inline fn isIgnorable(cp: u21) bool {
+    const cp_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]];
+    return cp_gbp_prop == .extend or cp_gbp_prop == .spacing or cp == '\u{200d}';
 }
 
-// test "Segmentation comptime GraphemeIterator" {
-//     const want = [_][]const u8{ "H", "é", "l", "l", "o" };
-//
-//     comptime {
-//         const src = "Héllo";
-//         var ct_iter = GraphemeIterator.init(src);
-//         var i = 0;
-//         while (ct_iter.next()) |grapheme| : (i += 1) {
-//             try std.testing.expect(grapheme.eql(src, want[i]));
-//         }
-//     }
-// }
+test "Segmentation comptime GraphemeIterator" {
+    const want = [_][]const u8{ "H", "é", "l", "l", "o" };
+
+    comptime {
+        const src = "Héllo";
+        var ct_iter = GraphemeIterator.init(src);
+        var i = 0;
+        while (ct_iter.next()) |grapheme| : (i += 1) {
+            try std.testing.expect(grapheme.eql(src, want[i]));
+        }
+    }
+}
 
 test "Segmentation ZWJ and ZWSP emoji sequences" {
     const seq_1 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
@@ -172,7 +173,9 @@ pub fn graphemeBreak(
     // GB11: Emoji Extend* ZWJ x Emoji
     if (!hasXpic(state) and emoji.isExtendedPictographic(cp1)) setXpic(state);
     // GB9c: Indic Conjunct Break
-    if (!hasIndic(state) and indic.isConsonant(cp1)) setIndic(state);
+    const cp1_indic_prop = indic.stage_3[indic.stage_2[indic.stage_1[cp1 >> 8] + (cp1 & 0xff)]];
+    const cp2_indic_prop = indic.stage_3[indic.stage_2[indic.stage_1[cp2 >> 8] + (cp2 & 0xff)]];
+    if (!hasIndic(state) and cp1_indic_prop == .Consonant) setIndic(state);
 
     // GB3: CR x LF
     if (cp1 == '\r' and cp2 == '\n') return false;
@@ -181,35 +184,37 @@ pub fn graphemeBreak(
     if (isBreaker(cp1)) return true;
 
     // GB6: Hangul L x (L|V|LV|VT)
-    if (gbp.isL(cp1)) {
-        if (gbp.isL(cp2) or
-            gbp.isV(cp2) or
-            gbp.isLv(cp2) or
-            gbp.isLvt(cp2)) return false;
+    const cp1_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp1 >> 8] + (cp1 & 0xff)]];
+    const cp2_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp2 >> 8] + (cp2 & 0xff)]];
+    if (cp1_gbp_prop == .hangul_l) {
+        if (cp2_gbp_prop == .hangul_l or
+            cp2_gbp_prop == .hangul_v or
+            cp2_gbp_prop == .hangul_lv or
+            cp2_gbp_prop == .hangul_lvt) return false;
     }
 
     // GB7: Hangul (LV | V) x (V | T)
-    if (gbp.isLv(cp1) or gbp.isV(cp1)) {
-        if (gbp.isV(cp2) or
-            gbp.isT(cp2)) return false;
+    if (cp1_gbp_prop == .hangul_lv or cp1_gbp_prop == .hangul_v) {
+        if (cp2_gbp_prop == .hangul_v or
+            cp2_gbp_prop == .hangul_t) return false;
     }
 
     // GB8: Hangul (LVT | T) x T
-    if (gbp.isLvt(cp1) or gbp.isT(cp1)) {
-        if (gbp.isT(cp2)) return false;
+    if (cp1_gbp_prop == .hangul_lvt or cp1_gbp_prop == .hangul_t) {
+        if (cp2_gbp_prop == .hangul_t) return false;
     }
 
     // GB9b: x (Extend | ZWJ)
-    if (gbp.isExtend(cp2) or gbp.isZwj(cp2)) return false;
+    if (cp2_gbp_prop == .extend or cp2_gbp_prop == .zwj) return false;
 
     // GB9a: x Spacing
-    if (gbp.isSpacingmark(cp2)) return false;
+    if (cp2_gbp_prop == .spacing) return false;
 
     // GB9b: Prepend x
-    if (gbp.isPrepend(cp1) and !isBreaker(cp2)) return false;
+    if (cp1_gbp_prop == .prepend and !isBreaker(cp2)) return false;
 
     // GB12, GB13: RI x RI
-    if (gbp.isRegionalIndicator(cp1) and gbp.isRegionalIndicator(cp2)) {
+    if (cp1_gbp_prop == .regional and cp2_gbp_prop == .regional) {
         if (hasRegional(state)) {
             unsetRegional(state);
             return true;
@@ -221,7 +226,7 @@ pub fn graphemeBreak(
 
     // GB11: Emoji Extend* ZWJ x Emoji
     if (hasXpic(state) and
-        gbp.isZwj(cp1) and
+        cp1_gbp_prop == .zwj and
         emoji.isExtendedPictographic(cp2))
     {
         unsetXpic(state);
@@ -230,37 +235,37 @@ pub fn graphemeBreak(
 
     // GB9c: Indic Conjunct Break
     if (hasIndic(state) and
-        indic.isConsonant(cp1) and
-        indic.isExtend(cp2))
+        cp1_indic_prop == .Consonant and
+        cp2_indic_prop == .Extend)
     {
         return false;
     }
 
     if (hasIndic(state) and
-        indic.isConsonant(cp1) and
-        indic.isLinker(cp2))
+        cp1_indic_prop == .Consonant and
+        cp2_indic_prop == .Linker)
     {
         return false;
     }
 
     if (hasIndic(state) and
-        indic.isExtend(cp1) and
-        indic.isLinker(cp2))
+        cp1_indic_prop == .Extend and
+        cp2_indic_prop == .Linker)
     {
         return false;
     }
 
     if (hasIndic(state) and
-        indic.isLinker(cp1) and
-        indic.isConsonant(cp2))
+        cp1_indic_prop == .Linker and
+        cp2_indic_prop == .Consonant)
     {
         unsetIndic(state);
         return false;
     }
 
     if (hasIndic(state) and
-        gbp.isZwj(cp1) and
-        indic.isConsonant(cp2))
+        cp1_gbp_prop == .zwj and
+        cp2_indic_prop == .Consonant)
     {
         unsetIndic(state);
         return false;

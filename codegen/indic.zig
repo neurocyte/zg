@@ -130,7 +130,7 @@ pub fn main() !void {
     const writer = out_buf.writer();
 
     const prop_code =
-        \\const Prop = enum {
+        \\pub const Prop = enum {
         \\    none,
         \\
         \\    Consonant,
@@ -142,47 +142,23 @@ pub fn main() !void {
 
     try writer.writeAll(prop_code);
 
-    try writer.print("const stage_1 = [{}]u16{{", .{stage1.items.len});
+    try writer.print("pub const stage_1 = [{}]u16{{", .{stage1.items.len});
     for (stage1.items) |v| {
         _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
 
-    try writer.print("const stage_2 = [{}]u3{{", .{stage2.items.len});
+    try writer.print("pub const stage_2 = [{}]u3{{", .{stage2.items.len});
     for (stage2.items) |v| {
         _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
 
-    try writer.print("const stage_3 = [{}]Prop{{", .{stage3.items.len});
+    try writer.print("pub const stage_3 = [{}]Prop{{", .{stage3.items.len});
     for (stage3.items) |v| {
         _ = try writer.print(".{s},", .{@tagName(v)});
     }
     try writer.writeAll("};\n");
-
-    const code =
-        \\inline fn getProp(cp: u21) Prop {
-        \\    const stage_1_index = cp >> 8;
-        \\    const stage_2_index = stage_1[stage_1_index] + (cp & 0xff);
-        \\    const stage_3_index = stage_2[stage_2_index];
-        \\    return stage_3[stage_3_index];
-        \\}
-        \\
-        \\pub inline fn isConsonant(cp: u21) bool {
-        \\    return getProp(cp) == .Consonant;
-        \\}
-        \\
-        \\pub inline fn isExtend(cp: u21) bool {
-        \\    return getProp(cp) == .Extend;
-        \\}
-        \\
-        \\pub inline fn isLinker(cp: u21) bool {
-        \\    return getProp(cp) == .Linker;
-        \\}
-        \\
-    ;
-
-    try writer.writeAll(code);
 
     try out_buf.flush();
 }

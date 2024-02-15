@@ -112,7 +112,7 @@ pub fn main() !void {
     const writer = out_buf.writer();
 
     const prop_code =
-        \\const Prop = enum {
+        \\pub const Prop = enum {
         \\    none,
         \\
         \\    control,
@@ -132,75 +132,23 @@ pub fn main() !void {
 
     try writer.writeAll(prop_code);
 
-    try writer.print("const stage_1 = [{}]u16{{", .{stage1.items.len});
+    try writer.print("pub const stage_1 = [{}]u16{{", .{stage1.items.len});
     for (stage1.items) |v| {
         _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
 
-    try writer.print("const stage_2 = [{}]u4{{", .{stage2.items.len});
+    try writer.print("pub const stage_2 = [{}]u4{{", .{stage2.items.len});
     for (stage2.items) |v| {
         _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
 
-    try writer.print("const stage_3 = [{}]Prop{{", .{stage3.items.len});
+    try writer.print("pub const stage_3 = [{}]Prop{{", .{stage3.items.len});
     for (stage3.items) |v| {
         _ = try writer.print(".{s},", .{@tagName(v)});
     }
     try writer.writeAll("};\n");
-
-    const code =
-        \\inline fn getProp(cp: u21) Prop {
-        \\    const stage_1_index = cp >> 8;
-        \\    const stage_2_index = stage_1[stage_1_index] + (cp & 0xff);
-        \\    const stage_3_index = stage_2[stage_2_index];
-        \\    return stage_3[stage_3_index];
-        \\}
-        \\
-        \\pub inline fn isControl(cp: u21) bool {
-        \\    return getProp(cp) == .control;
-        \\}
-        \\
-        \\pub inline fn isExtend(cp: u21) bool {
-        \\    return getProp(cp) == .extend;
-        \\}
-        \\
-        \\pub inline fn isL(cp: u21) bool {
-        \\    return getProp(cp) == .hangul_l;
-        \\}
-        \\pub inline fn isLv(cp: u21) bool {
-        \\    return getProp(cp) == .hangul_lv;
-        \\}
-        \\pub inline fn isLvt(cp: u21) bool {
-        \\    return getProp(cp) == .hangul_lvt;
-        \\}
-        \\pub inline fn isV(cp: u21) bool {
-        \\    return getProp(cp) == .hangul_v;
-        \\}
-        \\pub inline fn isT(cp: u21) bool {
-        \\    return getProp(cp) == .hangul_t;
-        \\}
-        \\
-        \\pub inline fn isPrepend(cp: u21) bool {
-        \\    return getProp(cp) == .prepend;
-        \\}
-        \\
-        \\pub inline fn isRegionalIndicator(cp: u21) bool {
-        \\    return getProp(cp) == .regional;
-        \\}
-        \\
-        \\pub inline fn isSpacingmark(cp: u21) bool {
-        \\    return getProp(cp) == .spacing;
-        \\}
-        \\
-        \\pub inline fn isZwj(cp: u21) bool {
-        \\    return getProp(cp) == .zwj;
-        \\}
-        \\
-    ;
-
-    try writer.writeAll(code);
 
     try out_buf.flush();
 }
