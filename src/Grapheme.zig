@@ -78,14 +78,14 @@ pub const GraphemeIterator = struct {
 };
 
 // Predicates
-inline fn isBreaker(cp: u21) bool {
+fn isBreaker(cp: u21) bool {
     // Extract relevant properties.
     const cp_props_byte = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]];
     const cp_gbp_prop: gbp.Gbp = @enumFromInt(cp_props_byte >> 4);
     return cp == '\x0d' or cp == '\x0a' or cp_gbp_prop == .Control;
 }
 
-inline fn isIgnorable(cp: u21) bool {
+fn isIgnorable(cp: u21) bool {
     const cp_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]];
     return cp_gbp_prop == .extend or cp_gbp_prop == .spacing or cp == '\u{200d}';
 }
@@ -128,33 +128,33 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
 
 // Grapheme break state.
 // Extended Pictographic (emoji)
-inline fn hasXpic(state: *const u3) bool {
+fn hasXpic(state: *const u3) bool {
     return state.* & 1 == 1;
 }
-inline fn setXpic(state: *u3) void {
+fn setXpic(state: *u3) void {
     state.* |= 1;
 }
-inline fn unsetXpic(state: *u3) void {
+fn unsetXpic(state: *u3) void {
     state.* ^= 1;
 }
 // Regional Indicatior (flags)
-inline fn hasRegional(state: *const u3) bool {
+fn hasRegional(state: *const u3) bool {
     return state.* & 2 == 2;
 }
-inline fn setRegional(state: *u3) void {
+fn setRegional(state: *u3) void {
     state.* |= 2;
 }
-inline fn unsetRegional(state: *u3) void {
+fn unsetRegional(state: *u3) void {
     state.* ^= 2;
 }
 // Indic Conjunct
-inline fn hasIndic(state: *const u3) bool {
+fn hasIndic(state: *const u3) bool {
     return state.* & 4 == 4;
 }
-inline fn setIndic(state: *u3) void {
+fn setIndic(state: *u3) void {
     state.* |= 4;
 }
-inline fn unsetIndic(state: *u3) void {
+fn unsetIndic(state: *u3) void {
     state.* ^= 4;
 }
 
