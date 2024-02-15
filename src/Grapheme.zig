@@ -238,14 +238,7 @@ pub fn graphemeBreak(
     // GB9c: Indic Conjunct Break
     if (hasIndic(state) and
         cp1_indic_prop == .Consonant and
-        cp2_indic_prop == .Extend)
-    {
-        return false;
-    }
-
-    if (hasIndic(state) and
-        cp1_indic_prop == .Consonant and
-        cp2_indic_prop == .Linker)
+        (cp2_indic_prop == .Extend or cp2_indic_prop == .Linker))
     {
         return false;
     }
@@ -258,15 +251,7 @@ pub fn graphemeBreak(
     }
 
     if (hasIndic(state) and
-        cp1_indic_prop == .Linker and
-        cp2_indic_prop == .Consonant)
-    {
-        unsetIndic(state);
-        return false;
-    }
-
-    if (hasIndic(state) and
-        cp1_gbp_prop == .zwj and
+        (cp1_indic_prop == .Linker or cp1_gbp_prop == .zwj) and
         cp2_indic_prop == .Consonant)
     {
         unsetIndic(state);
