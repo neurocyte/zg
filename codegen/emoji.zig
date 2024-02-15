@@ -66,28 +66,17 @@ pub fn main() !void {
     var out_buf = std.io.bufferedWriter(out_file.writer());
     const writer = out_buf.writer();
 
-    try writer.print("const stage_1 = [{}]u16{{", .{stage1.items.len});
+    try writer.print("pub const stage_1 = [{}]u16{{", .{stage1.items.len});
     for (stage1.items) |v| {
         _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
 
-    try writer.print("const stage_2 = [{}]bool{{", .{stage2.items.len});
+    try writer.print("pub const stage_2 = [{}]bool{{", .{stage2.items.len});
     for (stage2.items) |v| {
         _ = try writer.print("{},", .{v});
     }
     try writer.writeAll("};\n");
-
-    const code =
-        \\pub inline fn isExtendedPictographic(cp: u21) bool {
-        \\    const stage_1_index = cp >> 8;
-        \\    const stage_2_index = stage_1[stage_1_index] + (cp & 0xff);
-        \\    return stage_2[stage_2_index];
-        \\}
-        \\
-    ;
-
-    try writer.writeAll(code);
 
     try out_buf.flush();
 }

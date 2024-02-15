@@ -171,7 +171,9 @@ pub fn graphemeBreak(
     state: *u3,
 ) bool {
     // GB11: Emoji Extend* ZWJ x Emoji
-    if (!hasXpic(state) and emoji.isExtendedPictographic(cp1)) setXpic(state);
+    const cp1_is_emoji = emoji.stage_2[emoji.stage_1[cp1 >> 8] + (cp1 & 0xff)];
+    const cp2_is_emoji = emoji.stage_2[emoji.stage_1[cp2 >> 8] + (cp2 & 0xff)];
+    if (!hasXpic(state) and cp1_is_emoji) setXpic(state);
     // GB9c: Indic Conjunct Break
     const cp1_indic_prop = indic.stage_3[indic.stage_2[indic.stage_1[cp1 >> 8] + (cp1 & 0xff)]];
     const cp2_indic_prop = indic.stage_3[indic.stage_2[indic.stage_1[cp2 >> 8] + (cp2 & 0xff)]];
@@ -227,7 +229,7 @@ pub fn graphemeBreak(
     // GB11: Emoji Extend* ZWJ x Emoji
     if (hasXpic(state) and
         cp1_gbp_prop == .zwj and
-        emoji.isExtendedPictographic(cp2))
+        cp2_is_emoji)
     {
         unsetXpic(state);
         return false;
