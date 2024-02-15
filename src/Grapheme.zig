@@ -3,8 +3,7 @@
 const std = @import("std");
 const unicode = std.unicode;
 
-const ziglyph = @import("ziglyph");
-const CodePoint = @import("CodePoint.zig");
+const CodePoint = @import("CodePoint");
 const CodePointIterator = CodePoint.CodePointIterator;
 const gbp = @import("gbp");
 

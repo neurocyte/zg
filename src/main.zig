@@ -1,7 +1,7 @@
 const std = @import("std");
 
 // const GraphemeIterator = @import("ziglyph").GraphemeIterator;
-const GraphemeIterator = @import("Grapheme.zig").GraphemeIterator;
+const GraphemeIterator = @import("Grapheme").GraphemeIterator;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -22,9 +22,4 @@ pub fn main() !void {
     // }
 
     std.debug.print("result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
-}
-
-test {
-    _ = @import("CodePoint.zig");
-    _ = @import("Grapheme.zig");
 }
