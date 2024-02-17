@@ -45,9 +45,14 @@ pub const GraphemeIterator = struct {
     pub fn next(self: *Self) ?Grapheme {
         self.advance();
 
-        // If at end
+        // If no more
         if (self.buf[0] == null) return null;
+        // If last one
         if (self.buf[1] == null) return Grapheme{ .len = self.buf[0].?.len, .offset = self.buf[0].?.offset };
+        // If ASCII
+        if (self.buf[0].?.code != '\r' and self.buf[0].?.code < 128 and self.buf[1].?.code < 128) {
+            return Grapheme{ .len = self.buf[0].?.len, .offset = self.buf[0].?.offset };
+        }
 
         const gc_start = self.buf[0].?.offset;
         var gc_len: usize = self.buf[0].?.len;
@@ -87,42 +92,6 @@ fn isBreaker(cp: u21) bool {
 fn isIgnorable(cp: u21) bool {
     const cp_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]];
     return cp_gbp_prop == .extend or cp_gbp_prop == .spacing or cp == '\u{200d}';
-}
-
-test "Segmentation comptime GraphemeIterator" {
-    const want = [_][]const u8{ "H", "é", "l", "l", "o" };
-
-    comptime {
-        const src = "Héllo";
-        var ct_iter = GraphemeIterator.init(src);
-        var i = 0;
-        while (ct_iter.next()) |grapheme| : (i += 1) {
-            try std.testing.expect(grapheme.eql(src, want[i]));
-        }
-    }
-}
-
-test "Segmentation ZWJ and ZWSP emoji sequences" {
-    const seq_1 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
-    const seq_2 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
-    const with_zwj = seq_1 ++ "\u{200D}" ++ seq_2;
-    const with_zwsp = seq_1 ++ "\u{200B}" ++ seq_2;
-    const no_joiner = seq_1 ++ seq_2;
-
-    var ct_iter = GraphemeIterator.init(with_zwj);
-    var i: usize = 0;
-    while (ct_iter.next()) |_| : (i += 1) {}
-    try std.testing.expectEqual(@as(usize, 1), i);
-
-    ct_iter = GraphemeIterator.init(with_zwsp);
-    i = 0;
-    while (ct_iter.next()) |_| : (i += 1) {}
-    try std.testing.expectEqual(@as(usize, 3), i);
-
-    ct_iter = GraphemeIterator.init(no_joiner);
-    i = 0;
-    while (ct_iter.next()) |_| : (i += 1) {}
-    try std.testing.expectEqual(@as(usize, 2), i);
 }
 
 // Grapheme break state.
@@ -321,4 +290,40 @@ test "Segmentation GraphemeIterator" {
             try std.testing.expect(w.eql(all_bytes.items, all_bytes.items[g.offset .. g.offset + g.len]));
         }
     }
+}
+
+test "Segmentation comptime GraphemeIterator" {
+    const want = [_][]const u8{ "H", "é", "l", "l", "o" };
+
+    comptime {
+        const src = "Héllo";
+        var ct_iter = GraphemeIterator.init(src);
+        var i = 0;
+        while (ct_iter.next()) |grapheme| : (i += 1) {
+            try std.testing.expect(grapheme.eql(src, want[i]));
+        }
+    }
+}
+
+test "Segmentation ZWJ and ZWSP emoji sequences" {
+    const seq_1 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
+    const seq_2 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
+    const with_zwj = seq_1 ++ "\u{200D}" ++ seq_2;
+    const with_zwsp = seq_1 ++ "\u{200B}" ++ seq_2;
+    const no_joiner = seq_1 ++ seq_2;
+
+    var ct_iter = GraphemeIterator.init(with_zwj);
+    var i: usize = 0;
+    while (ct_iter.next()) |_| : (i += 1) {}
+    try std.testing.expectEqual(@as(usize, 1), i);
+
+    ct_iter = GraphemeIterator.init(with_zwsp);
+    i = 0;
+    while (ct_iter.next()) |_| : (i += 1) {}
+    try std.testing.expectEqual(@as(usize, 3), i);
+
+    ct_iter = GraphemeIterator.init(no_joiner);
+    i = 0;
+    while (ct_iter.next()) |_| : (i += 1) {}
+    try std.testing.expectEqual(@as(usize, 2), i);
 }

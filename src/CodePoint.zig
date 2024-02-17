@@ -18,26 +18,29 @@ pub const CodePointIterator = struct {
 
         if (self.bytes[self.i] < 128) {
             // ASCII fast path
-            const cp = CodePoint{
+            defer self.i += 1;
+            return .{
                 .code = self.bytes[self.i],
                 .len = 1,
                 .offset = self.i,
             };
-
-            self.i += 1;
-
-            return cp;
         }
 
         var cp = CodePoint{
             .code = undefined,
-            .len = blk: {
-                break :blk switch (self.bytes[self.i]) {
-                    0b1100_0000...0b1101_1111 => 2,
-                    0b1110_0000...0b1110_1111 => 3,
-                    0b1111_0000...0b1111_0111 => 4,
-                    else => @panic("CodePointIterator.next: Ivalid code point start byte."),
-                };
+            .len = switch (self.bytes[self.i]) {
+                0b1100_0000...0b1101_1111 => 2,
+                0b1110_0000...0b1110_1111 => 3,
+                0b1111_0000...0b1111_0111 => 4,
+                else => {
+                    self.i += 1;
+                    // Unicode replacement code point.
+                    return .{
+                        .code = 0xfffd,
+                        .len = 1,
+                        .offset = self.i - 1,
+                    };
+                },
             },
             .offset = self.i,
         };

@@ -1,12 +1,12 @@
 const std = @import("std");
 
 // const GraphemeIterator = @import("ziglyph").GraphemeIterator;
-// const GraphemeIterator = @import("Grapheme").GraphemeIterator;
+const GraphemeIterator = @import("Grapheme").GraphemeIterator;
 // const codePointWidth = @import("ziglyph").display_width.codePointWidth;
 // const codePointWidth = @import("display_width").codePointWidth;
 // const strWidth = @import("ziglyph").display_width.strWidth;
-const strWidth = @import("display_width").strWidth;
-const CodePointIterator = @import("CodePoint").CodePointIterator;
+// const strWidth = @import("display_width").strWidth;
+// const CodePointIterator = @import("CodePoint").CodePointIterator;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -17,15 +17,16 @@ pub fn main() !void {
     defer allocator.free(input);
 
     var result: usize = 0;
-    // var iter = GraphemeIterator.init(input);
+    var iter = GraphemeIterator.init(input);
     // var iter = CodePointIterator{ .bytes = input };
-    var iter = std.mem.splitScalar(u8, input, '\n');
+    // var iter = std.mem.splitScalar(u8, input, '\n');
 
     var timer = try std.time.Timer.start();
 
     // for (0..50) |_| {
     // while (iter.next()) |cp| result += codePointWidth(@intCast(cp.code));
-    while (iter.next()) |line| result += strWidth(line);
+    while (iter.next()) |_| result += 1;
+    // while (iter.next()) |line| result += strWidth(line);
     // iter.cp_iter.i = 0;
     // }
 

@@ -72,12 +72,13 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/display_width.zig" },
+        .root_source_file = .{ .path = "src/Grapheme.zig" },
         .target = target,
         .optimize = optimize,
     });
     exe_unit_tests.root_module.addImport("CodePoint", code_point);
     exe_unit_tests.root_module.addImport("Grapheme", grapheme);
+    exe_unit_tests.root_module.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
     exe_unit_tests.root_module.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
