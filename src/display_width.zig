@@ -42,17 +42,10 @@ fn isAsciiOnly(str: []const u8) bool {
 pub fn strWidth(str: []const u8) usize {
     var total: isize = 0;
 
+    // ASCII fast path
     if (isAsciiOnly(str)) {
-        for (str) |b| {
-            // Backspace and delete
-            if (b == 0x8 or b == 0x7f) {
-                total -= 1;
-            } else if (b >= 0x20) {
-                total += 1;
-            }
-        }
-
-        return if (total > 0) @intCast(total) else 0;
+        for (str) |b| total += codePointWidth(b);
+        return @intCast(@max(0, total));
     }
 
     var giter = GraphemeIterator.init(str);
@@ -72,14 +65,17 @@ pub fn strWidth(str: []const u8) usize {
                 }
 
                 // Only adding width of first non-zero-width code point.
-                if (gc_total == 0) gc_total = w;
+                if (gc_total == 0) {
+                    gc_total = w;
+                    break;
+                }
             }
         }
 
         total += gc_total;
     }
 
-    return if (total > 0) @intCast(total) else 0;
+    return @intCast(@max(0, total));
 }
 
 test "display_width Width" {
@@ -147,4 +143,14 @@ test "display_width Width" {
     // The following passes but as a mere coincidence.
     const kannada_2 = "\u{0cb0}\u{0cbc}\u{0ccd}\u{0c9a}";
     try testing.expectEqual(@as(usize, 2), strWidth(kannada_2));
+
+    // From Rust https://github.com/jameslanska/unicode-display-width
+    try testing.expectEqual(@as(usize, 15), strWidth("🔥🗡🍩👩🏻‍🚀⏰💃🏼🔦👍🏻"));
+    try testing.expectEqual(@as(usize, 2), strWidth("🦀"));
+    try testing.expectEqual(@as(usize, 2), strWidth("👨‍👩‍👧‍👧"));
+    try testing.expectEqual(@as(usize, 2), strWidth("👩‍🔬"));
+    try testing.expectEqual(@as(usize, 9), strWidth("sane text"));
+    try testing.expectEqual(@as(usize, 9), strWidth("Ẓ̌á̲l͔̝̞̄̑͌g̖̘̘̔̔͢͞͝o̪̔T̢̙̫̈̍͞e̬͈͕͌̏͑x̺̍ṭ̓̓ͅ"));
+    try testing.expectEqual(@as(usize, 17), strWidth("슬라바 우크라이나"));
+    try testing.expectEqual(@as(usize, 1), strWidth("\u{378}"));
 }
