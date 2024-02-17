@@ -15,8 +15,12 @@ pub fn codePointWidth(cp: u21) i3 {
     return dwp.stage_2[dwp.stage_1[cp >> 8] + (cp & 0xff)];
 }
 
+// Returns true if `str` only contains ASCII bytes. Uses SIMD if possible.
 fn isAsciiOnly(str: []const u8) bool {
-    const vec_len = simd.suggestVectorLength(u8) orelse @panic("No SIMD support.");
+    const vec_len = simd.suggestVectorLength(u8) orelse return for (str) |b| {
+        if (b > 127) break false;
+    } else true;
+
     const Vec = @Vector(vec_len, u8);
     var i: usize = 0;
 
@@ -25,7 +29,7 @@ fn isAsciiOnly(str: []const u8) bool {
             if (b > 127) break false;
         } else true;
 
-        const v1 = str[i..].ptr[0..vec_len].*;
+        const v1 = str[0..vec_len].*;
         const v2: Vec = @splat(127);
         if (@reduce(.Or, v1 > v2)) return false;
     }
