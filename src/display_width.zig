@@ -22,16 +22,17 @@ fn isAsciiOnly(str: []const u8) bool {
     } else true;
 
     const Vec = @Vector(vec_len, u8);
-    var i: usize = 0;
+    var remaining = str;
 
-    while (i < str.len) : (i += vec_len) {
-        if (str[i..].len < vec_len) return for (str[i..]) |b| {
+    while (true) {
+        if (remaining.len < vec_len) return for (remaining) |b| {
             if (b > 127) break false;
         } else true;
 
-        const v1 = str[0..vec_len].*;
+        const v1 = remaining[0..vec_len].*;
         const v2: Vec = @splat(127);
         if (@reduce(.Or, v1 > v2)) return false;
+        remaining = remaining[vec_len..];
     }
 
     return true;

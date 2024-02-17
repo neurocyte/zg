@@ -6,7 +6,7 @@ const std = @import("std");
 // const codePointWidth = @import("display_width").codePointWidth;
 // const strWidth = @import("ziglyph").display_width.strWidth;
 const strWidth = @import("display_width").strWidth;
-const CodePointIterator = @import("CodePoint").CodePointIterator;
+// const CodePointIterator = @import("CodePoint").CodePointIterator;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -16,12 +16,12 @@ pub fn main() !void {
     const input = try std.fs.cwd().readFileAlloc(allocator, "lang_mix.txt", std.math.maxInt(u32));
     defer allocator.free(input);
 
-    var result: usize = 0;
-    // var result: isize = 0;
     // var iter = GraphemeIterator.init(input);
     // var iter = CodePointIterator{ .bytes = input };
     var iter = std.mem.splitScalar(u8, input, '\n');
 
+    var result: usize = 0;
+    // var result: isize = 0;
     var timer = try std.time.Timer.start();
 
     // for (0..50) |_| {

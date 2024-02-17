@@ -18,11 +18,11 @@ pub const CodePointIterator = struct {
 
         if (self.bytes[self.i] < 128) {
             // ASCII fast path
-            defer self.i += 1;
+            self.i += 1;
             return .{
-                .code = self.bytes[self.i],
+                .code = self.bytes[self.i - 1],
                 .len = 1,
-                .offset = self.i,
+                .offset = self.i - 1,
             };
         }
 
