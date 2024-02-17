@@ -1,4 +1,5 @@
 const std = @import("std");
+const simd = std.simd;
 const testing = std.testing;
 
 const CodePointIterator = @import("CodePoint").CodePointIterator;
@@ -14,8 +15,42 @@ pub fn codePointWidth(cp: u21) i3 {
     return dwp.stage_2[dwp.stage_1[cp >> 8] + (cp & 0xff)];
 }
 
-fn strWidth(str: []const u8) usize {
+fn isAsciiOnly(str: []const u8) bool {
+    const vec_len = simd.suggestVectorLength(u8) orelse @panic("No SIMD support.");
+    const Vec = @Vector(vec_len, u8);
+    var i: usize = 0;
+
+    while (i < str.len) : (i += vec_len) {
+        if (str[i..].len < vec_len) return for (str[i..]) |b| {
+            if (b > 127) break false;
+        } else true;
+
+        const v1 = str[i..].ptr[0..vec_len].*;
+        const v2: Vec = @splat(127);
+        if (@reduce(.Or, v1 > v2)) return false;
+    }
+
+    return true;
+}
+
+/// strWidth returns the total display width of `str` as the number of cells
+/// required in a fixed-pitch font (i.e. a terminal screen).
+pub fn strWidth(str: []const u8) usize {
     var total: isize = 0;
+
+    if (isAsciiOnly(str)) {
+        for (str) |b| {
+            // Backspace and delete
+            if (b == 0x8 or b == 0x7f) {
+                total -= 1;
+            } else if (b >= 0x20) {
+                total += 1;
+            }
+        }
+
+        return if (total > 0) @intCast(total) else 0;
+    }
+
     var giter = GraphemeIterator.init(str);
 
     while (giter.next()) |gc| {
