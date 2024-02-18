@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) void {
 
     // Modules we provide
     const code_point = b.addModule("code_point", .{
-        .root_source_file = .{ .path = "src/code_point.zig" },
+        .root_source_file = .{ .path = "src/cp2.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -72,7 +72,7 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/grapheme.zig" },
+        .root_source_file = .{ .path = "src/display_width.zig" },
         .target = target,
         .optimize = optimize,
     });

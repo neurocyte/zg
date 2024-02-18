@@ -1,6 +1,7 @@
 const std = @import("std");
 const unicode = std.unicode;
 
+const CodePoint = @import("code_point").CodePoint;
 const CodePointIterator = @import("code_point").Iterator;
 const gbp = @import("gbp");
 
@@ -14,13 +15,6 @@ pub const Grapheme = struct {
     pub fn bytes(self: Grapheme, src: []const u8) []const u8 {
         return src[self.offset..][0..self.len];
     }
-};
-
-// We need the code as a u21.
-const CodePoint = struct {
-    code: u21,
-    len: u3,
-    offset: u32,
 };
 
 /// `Iterator` iterates a sting of UTF-8 encoded bytes one grapheme cluster at-a-time.
@@ -39,13 +33,7 @@ pub const Iterator = struct {
 
     fn advance(self: *Self) void {
         self.buf[0] = self.buf[1];
-
-        const maybe_cp = self.cp_iter.next();
-        self.buf[1] = if (maybe_cp) |cp| .{
-            .code = cp.code(self.cp_iter.bytes),
-            .len = cp.len,
-            .offset = cp.offset,
-        } else null;
+        self.buf[1] = self.cp_iter.next();
     }
 
     pub fn next(self: *Self) ?Grapheme {
