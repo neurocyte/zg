@@ -34,12 +34,14 @@ pub fn build(b: *std.Build) void {
     const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.zig");
 
     // Modules we provide
+    // Code points
     const code_point = b.addModule("code_point", .{
         .root_source_file = .{ .path = "src/code_point.zig" },
         .target = target,
         .optimize = optimize,
     });
 
+    // Grapheme clusters
     const grapheme = b.addModule("grapheme", .{
         .root_source_file = .{ .path = "src/grapheme.zig" },
         .target = target,
@@ -48,11 +50,20 @@ pub fn build(b: *std.Build) void {
     grapheme.addImport("code_point", code_point);
     grapheme.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
 
+    // ASCII utilities
+    const ascii = b.addModule("ascii", .{
+        .root_source_file = .{ .path = "src/ascii.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    // Fixed pitch font display width
     const display_width = b.addModule("display_width", .{
         .root_source_file = .{ .path = "src/display_width.zig" },
         .target = target,
         .optimize = optimize,
     });
+    display_width.addImport("ascii", ascii);
     display_width.addImport("code_point", code_point);
     display_width.addImport("grapheme", grapheme);
     display_width.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
@@ -79,10 +90,11 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/display_width.zig" },
+        .root_source_file = .{ .path = "src/grapheme.zig" },
         .target = target,
         .optimize = optimize,
     });
+    exe_unit_tests.root_module.addImport("ascii", ascii);
     exe_unit_tests.root_module.addImport("code_point", code_point);
     exe_unit_tests.root_module.addImport("grapheme", grapheme);
     exe_unit_tests.root_module.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });

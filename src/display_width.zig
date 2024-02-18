@@ -1,10 +1,12 @@
 const std = @import("std");
 const simd = std.simd;
+const mem = std.mem;
 const testing = std.testing;
 
+const ascii = @import("ascii");
 const CodePointIterator = @import("code_point").Iterator;
-const GraphemeIterator = @import("grapheme").Iterator;
 const dwp = @import("dwp");
+const GraphemeIterator = @import("grapheme").Iterator;
 
 /// codePointWidth returns the number of cells `cp` requires when rendered
 /// in a fixed-pitch font (i.e. a terminal screen). This can range from -1 to
@@ -15,27 +17,31 @@ pub fn codePointWidth(cp: u21) i3 {
     return dwp.stage_2[dwp.stage_1[cp >> 8] + (cp & 0xff)];
 }
 
-// Returns true if `str` only contains ASCII bytes. Uses SIMD if possible.
-fn isAsciiOnly(str: []const u8) bool {
-    const vec_len = simd.suggestVectorLength(u8) orelse return for (str) |b| {
-        if (b > 127) break false;
-    } else true;
+test "codePointWidth" {
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x0000)); // null
+    try testing.expectEqual(@as(i3, -1), codePointWidth(0x8)); // \b
+    try testing.expectEqual(@as(i3, -1), codePointWidth(0x7f)); // DEL
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x0005)); // Cf
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x0007)); // \a BEL
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000A)); // \n LF
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000B)); // \v VT
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000C)); // \f FF
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000D)); // \r CR
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000E)); // SQ
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000F)); // SI
 
-    const Vec = @Vector(vec_len, u8);
-    var remaining = str;
+    try testing.expectEqual(@as(i3, 0), codePointWidth(0x070F)); // Cf
+    try testing.expectEqual(@as(i3, 1), codePointWidth(0x0603)); // Cf Arabic
 
-    while (true) {
-        if (remaining.len < vec_len) return for (remaining) |b| {
-            if (b > 127) break false;
-        } else true;
+    try testing.expectEqual(@as(i3, 1), codePointWidth(0x00AD)); // soft-hyphen
+    try testing.expectEqual(@as(i3, 2), codePointWidth(0x2E3A)); // two-em dash
+    try testing.expectEqual(@as(i3, 3), codePointWidth(0x2E3B)); // three-em dash
 
-        const v1 = remaining[0..vec_len].*;
-        const v2: Vec = @splat(127);
-        if (@reduce(.Or, v1 > v2)) return false;
-        remaining = remaining[vec_len..];
-    }
+    try testing.expectEqual(@as(i3, 1), codePointWidth(0x00BD)); // ambiguous halfwidth
 
-    return true;
+    try testing.expectEqual(@as(i3, 1), codePointWidth('é'));
+    try testing.expectEqual(@as(i3, 2), codePointWidth('😊'));
+    try testing.expectEqual(@as(i3, 2), codePointWidth('统'));
 }
 
 /// strWidth returns the total display width of `str` as the number of cells
@@ -44,7 +50,7 @@ pub fn strWidth(str: []const u8) usize {
     var total: isize = 0;
 
     // ASCII fast path
-    if (isAsciiOnly(str)) {
+    if (ascii.isAsciiOnly(str)) {
         for (str) |b| total += codePointWidth(b);
         return @intCast(@max(0, total));
     }
@@ -79,32 +85,7 @@ pub fn strWidth(str: []const u8) usize {
     return @intCast(@max(0, total));
 }
 
-test "display_width Width" {
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x0000)); // null
-    try testing.expectEqual(@as(i3, -1), codePointWidth(0x8)); // \b
-    try testing.expectEqual(@as(i3, -1), codePointWidth(0x7f)); // DEL
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x0005)); // Cf
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x0007)); // \a BEL
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000A)); // \n LF
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000B)); // \v VT
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000C)); // \f FF
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000D)); // \r CR
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000E)); // SQ
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x000F)); // SI
-
-    try testing.expectEqual(@as(i3, 0), codePointWidth(0x070F)); // Cf
-    try testing.expectEqual(@as(i3, 1), codePointWidth(0x0603)); // Cf Arabic
-
-    try testing.expectEqual(@as(i3, 1), codePointWidth(0x00AD)); // soft-hyphen
-    try testing.expectEqual(@as(i3, 2), codePointWidth(0x2E3A)); // two-em dash
-    try testing.expectEqual(@as(i3, 3), codePointWidth(0x2E3B)); // three-em dash
-
-    try testing.expectEqual(@as(i3, 1), codePointWidth(0x00BD)); // ambiguous halfwidth
-
-    try testing.expectEqual(@as(i3, 1), codePointWidth('é'));
-    try testing.expectEqual(@as(i3, 2), codePointWidth('😊'));
-    try testing.expectEqual(@as(i3, 2), codePointWidth('统'));
-
+test "strWidth" {
     try testing.expectEqual(@as(usize, 5), strWidth("Hello\r\n"));
     try testing.expectEqual(@as(usize, 1), strWidth("\u{0065}\u{0301}"));
     try testing.expectEqual(@as(usize, 2), strWidth("\u{1F476}\u{1F3FF}\u{0308}\u{200D}\u{1F476}\u{1F3FF}"));
@@ -154,4 +135,226 @@ test "display_width Width" {
     try testing.expectEqual(@as(usize, 9), strWidth("Ẓ̌á̲l͔̝̞̄̑͌g̖̘̘̔̔͢͞͝o̪̔T̢̙̫̈̍͞e̬͈͕͌̏͑x̺̍ṭ̓̓ͅ"));
     try testing.expectEqual(@as(usize, 17), strWidth("슬라바 우크라이나"));
     try testing.expectEqual(@as(usize, 1), strWidth("\u{378}"));
+}
+
+/// centers `str` in a new string of width `total_width` (in display cells) using `pad` as padding.
+/// If the length of `str` and `total_width` have different parity, the right side of `str` will
+/// receive one additional pad. This makes sure the returned string fills the requested width.
+/// Caller must free returned bytes with `allocator`.
+pub fn center(
+    allocator: mem.Allocator,
+    str: []const u8,
+    total_width: usize,
+    pad: []const u8,
+) ![]u8 {
+    const str_width = strWidth(str);
+    if (str_width > total_width) return error.StrTooLong;
+    if (str_width == total_width) return try allocator.dupe(u8, str);
+
+    const pad_width = strWidth(pad);
+    if (pad_width > total_width or str_width + pad_width > total_width) return error.PadTooLong;
+
+    const margin_width = @divFloor((total_width - str_width), 2);
+    if (pad_width > margin_width) return error.PadTooLong;
+    const extra_pad: usize = if (total_width % 2 != str_width % 2) 1 else 0;
+    const pads = @divFloor(margin_width, pad_width) * 2 + extra_pad;
+
+    var result = try allocator.alloc(u8, pads * pad.len + str.len);
+    var bytes_index: usize = 0;
+    var pads_index: usize = 0;
+
+    while (pads_index < pads / 2) : (pads_index += 1) {
+        @memcpy(result[bytes_index..][0..pad.len], pad);
+        bytes_index += pad.len;
+    }
+
+    @memcpy(result[bytes_index..][0..str.len], str);
+    bytes_index += str.len;
+
+    pads_index = 0;
+    while (pads_index < pads / 2 + extra_pad) : (pads_index += 1) {
+        @memcpy(result[bytes_index..][0..pad.len], pad);
+        bytes_index += pad.len;
+    }
+
+    return result;
+}
+
+test "center" {
+    var allocator = std.testing.allocator;
+
+    // Input and width both have odd length
+    var centered = try center(allocator, "abc", 9, "*");
+    try testing.expectEqualSlices(u8, "***abc***", centered);
+
+    // Input and width both have even length
+    allocator.free(centered);
+    centered = try center(allocator, "w😊w", 10, "-");
+    try testing.expectEqualSlices(u8, "---w😊w---", centered);
+
+    // Input has even length, width has odd length
+    allocator.free(centered);
+    centered = try center(allocator, "1234", 9, "-");
+    try testing.expectEqualSlices(u8, "--1234---", centered);
+
+    // Input has odd length, width has even length
+    allocator.free(centered);
+    centered = try center(allocator, "123", 8, "-");
+    try testing.expectEqualSlices(u8, "--123---", centered);
+
+    // Input is the same length as the width
+    allocator.free(centered);
+    centered = try center(allocator, "123", 3, "-");
+    try testing.expectEqualSlices(u8, "123", centered);
+
+    // Input is empty
+    allocator.free(centered);
+    centered = try center(allocator, "", 3, "-");
+    try testing.expectEqualSlices(u8, "---", centered);
+
+    // Input is empty and width is zero
+    allocator.free(centered);
+    centered = try center(allocator, "", 0, "-");
+    try testing.expectEqualSlices(u8, "", centered);
+
+    // Input is longer than the width, which is an error
+    allocator.free(centered);
+    try testing.expectError(error.StrTooLong, center(allocator, "123", 2, "-"));
+}
+
+/// padLeft returns a new string of width `total_width` (in display cells) using `pad` as padding
+/// on the left side. Caller must free returned bytes with `allocator`.
+pub fn padLeft(
+    allocator: std.mem.Allocator,
+    str: []const u8,
+    total_width: usize,
+    pad: []const u8,
+) ![]u8 {
+    const str_width = strWidth(str);
+    if (str_width > total_width) return error.StrTooLong;
+
+    const pad_width = strWidth(pad);
+    if (pad_width > total_width or str_width + pad_width > total_width) return error.PadTooLong;
+
+    const margin_width = total_width - str_width;
+    if (pad_width > margin_width) return error.PadTooLong;
+
+    const pads = @divFloor(margin_width, pad_width);
+
+    var result = try allocator.alloc(u8, pads * pad.len + str.len);
+    var bytes_index: usize = 0;
+    var pads_index: usize = 0;
+
+    while (pads_index < pads) : (pads_index += 1) {
+        @memcpy(result[bytes_index..][0..pad.len], pad);
+        bytes_index += pad.len;
+    }
+
+    @memcpy(result[bytes_index..][0..str.len], str);
+
+    return result;
+}
+
+test "padLeft" {
+    var allocator = std.testing.allocator;
+
+    var right_aligned = try padLeft(allocator, "abc", 9, "*");
+    defer allocator.free(right_aligned);
+    try testing.expectEqualSlices(u8, "******abc", right_aligned);
+
+    allocator.free(right_aligned);
+    right_aligned = try padLeft(allocator, "w😊w", 10, "-");
+    try testing.expectEqualSlices(u8, "------w😊w", right_aligned);
+}
+
+/// padRight returns a new string of width `total_width` (in display cells) using `pad` as padding
+/// on the right side.  Caller must free returned bytes with `allocator`.
+pub fn padRight(
+    allocator: std.mem.Allocator,
+    str: []const u8,
+    total_width: usize,
+    pad: []const u8,
+) ![]u8 {
+    const str_width = strWidth(str);
+    if (str_width > total_width) return error.StrTooLong;
+
+    const pad_width = strWidth(pad);
+    if (pad_width > total_width or str_width + pad_width > total_width) return error.PadTooLong;
+
+    const margin_width = total_width - str_width;
+    if (pad_width > margin_width) return error.PadTooLong;
+
+    const pads = @divFloor(margin_width, pad_width);
+
+    var result = try allocator.alloc(u8, pads * pad.len + str.len);
+    var bytes_index: usize = 0;
+    var pads_index: usize = 0;
+
+    @memcpy(result[bytes_index..][0..str.len], str);
+    bytes_index += str.len;
+
+    while (pads_index < pads) : (pads_index += 1) {
+        @memcpy(result[bytes_index..][0..pad.len], pad);
+        bytes_index += pad.len;
+    }
+
+    return result;
+}
+
+test "padRight" {
+    var allocator = std.testing.allocator;
+
+    var left_aligned = try padRight(allocator, "abc", 9, "*");
+    defer allocator.free(left_aligned);
+    try testing.expectEqualSlices(u8, "abc******", left_aligned);
+
+    allocator.free(left_aligned);
+    left_aligned = try padRight(allocator, "w😊w", 10, "-");
+    try testing.expectEqualSlices(u8, "w😊w------", left_aligned);
+}
+
+/// Wraps a string approximately at the given number of colums per line.
+/// `threshold` defines how far the last column of the last word can be
+/// from the edge. Caller must free returned bytes with `allocator`.
+pub fn wrap(
+    allocator: std.mem.Allocator,
+    str: []const u8,
+    columns: usize,
+    threshold: usize,
+) ![]u8 {
+    var result = std.ArrayList(u8).init(allocator);
+    defer result.deinit();
+
+    var line_iter = mem.tokenizeAny(u8, str, "\r\n");
+    var line_width: usize = 0;
+
+    while (line_iter.next()) |line| {
+        var word_iter = mem.tokenizeScalar(u8, line, ' ');
+
+        while (word_iter.next()) |word| {
+            try result.appendSlice(word);
+            try result.append(' ');
+            line_width += strWidth(word) + 1;
+
+            if (line_width > columns or columns - line_width <= threshold) {
+                try result.append('\n');
+                line_width = 0;
+            }
+        }
+    }
+
+    // Remove trailing space and newline.
+    _ = result.pop();
+    _ = result.pop();
+
+    return try result.toOwnedSlice();
+}
+
+test "wrap" {
+    var allocator = std.testing.allocator;
+    const input = "The quick brown fox\r\njumped over the lazy dog!";
+    const got = try wrap(allocator, input, 10, 3);
+    defer allocator.free(got);
+    const want = "The quick \nbrown fox \njumped \nover the \nlazy dog!";
+    try testing.expectEqualStrings(want, got);
 }
