@@ -221,7 +221,8 @@ pub fn main() !void {
         block_len = 0;
     }
 
-    var args_iter = std.process.args();
+    var args_iter = try std.process.argsWithAllocator(allocator);
+    defer args_iter.deinit();
     _ = args_iter.skip();
     const output_path = args_iter.next() orelse @panic("No output file arg!");
 
