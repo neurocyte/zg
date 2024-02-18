@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const options = @import("options");
+
 const block_size = 256;
 const Block = [block_size]i3;
 
@@ -75,7 +77,10 @@ pub fn main() !void {
                 },
                 1 => {
                     // Width
-                    if (std.mem.eql(u8, field, "W") or std.mem.eql(u8, field, "F")) {
+                    if (std.mem.eql(u8, field, "W") or
+                        std.mem.eql(u8, field, "F") or
+                        (options.cjk and std.mem.eql(u8, field, "A")))
+                    {
                         for (current_code[0]..current_code[1] + 1) |cp| try flat_map.put(@intCast(cp), 2);
                     }
                 },

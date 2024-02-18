@@ -8,6 +8,7 @@ pub fn build(b: *std.Build) void {
     const ziglyph = b.dependency("ziglyph", .{});
 
     // Code generation
+    // Grapheme break
     const gbp_gen_exe = b.addExecutable(.{
         .name = "gbp",
         .root_source_file = .{ .path = "codegen/gbp.zig" },
@@ -17,12 +18,18 @@ pub fn build(b: *std.Build) void {
     const run_gbp_gen_exe = b.addRunArtifact(gbp_gen_exe);
     const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.zig");
 
+    // Display width
+    const cjk = b.option(bool, "cjk", "Ambiguouse code points are wide (display width: 2).") orelse false;
+    const options = b.addOptions();
+    options.addOption(bool, "cjk", cjk);
+
     const dwp_gen_exe = b.addExecutable(.{
         .name = "dwp",
         .root_source_file = .{ .path = "codegen/dwp.zig" },
         .target = b.host,
         .optimize = .Debug,
     });
+    dwp_gen_exe.root_module.addOptions("options", options);
     const run_dwp_gen_exe = b.addRunArtifact(dwp_gen_exe);
     const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.zig");
 
