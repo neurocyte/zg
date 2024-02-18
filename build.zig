@@ -27,18 +27,18 @@ pub fn build(b: *std.Build) void {
     const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.zig");
 
     // Modules we provide
-    const code_point = b.addModule("CodePoint", .{
-        .root_source_file = .{ .path = "src/CodePoint.zig" },
+    const code_point = b.addModule("code_point", .{
+        .root_source_file = .{ .path = "src/code_point.zig" },
         .target = target,
         .optimize = optimize,
     });
 
-    const grapheme = b.addModule("Grapheme", .{
-        .root_source_file = .{ .path = "src/Grapheme.zig" },
+    const grapheme = b.addModule("grapheme", .{
+        .root_source_file = .{ .path = "src/grapheme.zig" },
         .target = target,
         .optimize = optimize,
     });
-    grapheme.addImport("CodePoint", code_point);
+    grapheme.addImport("code_point", code_point);
     grapheme.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
 
     const display_width = b.addModule("display_width", .{
@@ -46,8 +46,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    display_width.addImport("CodePoint", code_point);
-    display_width.addImport("Grapheme", grapheme);
+    display_width.addImport("code_point", code_point);
+    display_width.addImport("grapheme", grapheme);
     display_width.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
 
     // Benchmark rig
@@ -58,8 +58,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    exe.root_module.addImport("CodePoint", code_point);
-    exe.root_module.addImport("Grapheme", grapheme);
+    exe.root_module.addImport("code_point", code_point);
+    exe.root_module.addImport("grapheme", grapheme);
     exe.root_module.addImport("display_width", display_width);
     b.installArtifact(exe);
 
@@ -72,12 +72,12 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/Grapheme.zig" },
+        .root_source_file = .{ .path = "src/grapheme.zig" },
         .target = target,
         .optimize = optimize,
     });
-    exe_unit_tests.root_module.addImport("CodePoint", code_point);
-    exe_unit_tests.root_module.addImport("Grapheme", grapheme);
+    exe_unit_tests.root_module.addImport("code_point", code_point);
+    exe_unit_tests.root_module.addImport("grapheme", grapheme);
     exe_unit_tests.root_module.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
     exe_unit_tests.root_module.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
 

@@ -2,8 +2,8 @@ const std = @import("std");
 const simd = std.simd;
 const testing = std.testing;
 
-const CodePointIterator = @import("CodePoint").CodePointIterator;
-const GraphemeIterator = @import("Grapheme").GraphemeIterator;
+const CodePointIterator = @import("code_point").Iterator;
+const GraphemeIterator = @import("grapheme").Iterator;
 const dwp = @import("dwp");
 
 /// codePointWidth returns the number of cells `cp` requires when rendered

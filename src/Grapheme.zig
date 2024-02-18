@@ -1,30 +1,25 @@
-//! `Grapheme` represents a Unicode grapheme cluster by its length and offset in the source bytes.
-
 const std = @import("std");
 const unicode = std.unicode;
 
-const CodePoint = @import("CodePoint");
-const CodePointIterator = CodePoint.CodePointIterator;
+const CodePoint = @import("code_point").CodePoint;
+const CodePointIterator = @import("code_point").Iterator;
 const gbp = @import("gbp");
 
-pub const Grapheme = @This();
+/// `Grapheme` represents a Unicode grapheme cluster by its length and offset in the source bytes.
+pub const Grapheme = struct {
+    len: u8,
+    offset: u32,
 
-len: usize,
-offset: usize,
+    /// `bytes` returns the slice of bytes that correspond to
+    /// this grapheme cluster in `src`.
+    pub fn bytes(self: Grapheme, src: []const u8) []const u8 {
+        return src[self.offset..][0..self.len];
+    }
+};
 
-/// `eql` comparse `str` with the bytes of this grapheme cluster in `src` for equality.
-pub fn eql(self: Grapheme, src: []const u8, other: []const u8) bool {
-    return std.mem.eql(u8, src[self.offset .. self.offset + self.len], other);
-}
-
-/// `slice` returns the bytes that correspond to this grapheme cluster in `src`.
-pub fn slice(self: Grapheme, src: []const u8) []const u8 {
-    return src[self.offset .. self.offset + self.len];
-}
-
-/// `GraphemeIterator` iterates a sting of UTF-8 encoded bytes one grapheme cluster at-a-time.
-pub const GraphemeIterator = struct {
-    buf: [2]?CodePoint = [_]?CodePoint{ null, null },
+/// `Iterator` iterates a sting of UTF-8 encoded bytes one grapheme cluster at-a-time.
+pub const Iterator = struct {
+    buf: [2]?CodePoint = .{ null, null },
     cp_iter: CodePointIterator,
 
     const Self = @This();
@@ -32,8 +27,7 @@ pub const GraphemeIterator = struct {
     /// Assumes `src` is valid UTF-8.
     pub fn init(str: []const u8) Self {
         var self = Self{ .cp_iter = CodePointIterator{ .bytes = str } };
-        self.buf[1] = self.cp_iter.next();
-
+        self.advance();
         return self;
     }
 
@@ -55,7 +49,7 @@ pub const GraphemeIterator = struct {
         }
 
         const gc_start = self.buf[0].?.offset;
-        var gc_len: usize = self.buf[0].?.len;
+        var gc_len: u8 = self.buf[0].?.len;
         var state = State{};
 
         if (graphemeBreak(
@@ -266,13 +260,13 @@ test "Segmentation GraphemeIterator" {
         defer all_bytes.deinit();
 
         var graphemes = std.mem.split(u8, line, " ÷ ");
-        var bytes_index: usize = 0;
+        var bytes_index: u32 = 0;
 
         while (graphemes.next()) |field| {
             var code_points = std.mem.split(u8, field, " ");
             var cp_buf: [4]u8 = undefined;
-            var cp_index: usize = 0;
-            var gc_len: usize = 0;
+            var cp_index: u32 = 0;
+            var gc_len: u8 = 0;
 
             while (code_points.next()) |code_point| {
                 if (std.mem.eql(u8, code_point, "×")) continue;
@@ -288,12 +282,15 @@ test "Segmentation GraphemeIterator" {
         }
 
         // std.debug.print("\nline {}: {s}\n", .{ line_no, all_bytes.items });
-        var iter = GraphemeIterator.init(all_bytes.items);
+        var iter = Iterator.init(all_bytes.items);
 
         // Chaeck.
-        for (want.items) |w| {
-            const g = (iter.next()).?;
-            try std.testing.expect(w.eql(all_bytes.items, all_bytes.items[g.offset .. g.offset + g.len]));
+        for (want.items) |want_gc| {
+            const got_gc = (iter.next()).?;
+            try std.testing.expectEqualStrings(
+                want_gc.bytes(all_bytes.items),
+                got_gc.bytes(all_bytes.items),
+            );
         }
     }
 }
@@ -303,10 +300,10 @@ test "Segmentation comptime GraphemeIterator" {
 
     comptime {
         const src = "Héllo";
-        var ct_iter = GraphemeIterator.init(src);
+        var ct_iter = Iterator.init(src);
         var i = 0;
         while (ct_iter.next()) |grapheme| : (i += 1) {
-            try std.testing.expect(grapheme.eql(src, want[i]));
+            try std.testing.expectEqualStrings(grapheme.bytes(src), want[i]);
         }
     }
 }
@@ -318,17 +315,17 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
     const with_zwsp = seq_1 ++ "\u{200B}" ++ seq_2;
     const no_joiner = seq_1 ++ seq_2;
 
-    var ct_iter = GraphemeIterator.init(with_zwj);
+    var ct_iter = Iterator.init(with_zwj);
     var i: usize = 0;
     while (ct_iter.next()) |_| : (i += 1) {}
     try std.testing.expectEqual(@as(usize, 1), i);
 
-    ct_iter = GraphemeIterator.init(with_zwsp);
+    ct_iter = Iterator.init(with_zwsp);
     i = 0;
     while (ct_iter.next()) |_| : (i += 1) {}
     try std.testing.expectEqual(@as(usize, 3), i);
 
-    ct_iter = GraphemeIterator.init(no_joiner);
+    ct_iter = Iterator.init(no_joiner);
     i = 0;
     while (ct_iter.next()) |_| : (i += 1) {}
     try std.testing.expectEqual(@as(usize, 2), i);

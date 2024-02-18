@@ -1,28 +1,29 @@
-//! `CodePoint` represents a Unicode code point by its code, length, and offset in the source bytes.
-
 const std = @import("std");
 
-code: u21,
-len: u3,
-offset: usize,
+/// `CodePoint` represents a Unicode code point by its code,
+/// length, and offset in the source bytes.
+pub const CodePoint = struct {
+    code: u21,
+    len: u3,
+    offset: u32,
+};
 
-const CodePoint = @This();
-
-/// `CodePointIterator` iterates a string one `CodePoint` at-a-time.
-pub const CodePointIterator = struct {
+/// `Iterator` iterates a string one `CodePoint` at-a-time.
+pub const Iterator = struct {
     bytes: []const u8,
-    i: usize = 0,
+    i: u32 = 0,
 
-    pub fn next(self: *CodePointIterator) ?CodePoint {
+    pub fn next(self: *Iterator) ?CodePoint {
         if (self.i >= self.bytes.len) return null;
 
         if (self.bytes[self.i] < 128) {
             // ASCII fast path
-            self.i += 1;
+            defer self.i += 1;
+
             return .{
-                .code = self.bytes[self.i - 1],
+                .code = self.bytes[self.i],
                 .len = 1,
-                .offset = self.i - 1,
+                .offset = self.i,
             };
         }
 
@@ -33,12 +34,12 @@ pub const CodePointIterator = struct {
                 0b1110_0000...0b1110_1111 => 3,
                 0b1111_0000...0b1111_0111 => 4,
                 else => {
-                    self.i += 1;
+                    defer self.i += 1;
                     // Unicode replacement code point.
                     return .{
                         .code = 0xfffd,
                         .len = 1,
-                        .offset = self.i - 1,
+                        .offset = self.i,
                     };
                 },
             },
@@ -66,15 +67,15 @@ pub const CodePointIterator = struct {
         return cp;
     }
 
-    pub fn peek(self: *CodePointIterator) ?CodePoint {
+    pub fn peek(self: *Iterator) ?CodePoint {
         const saved_i = self.i;
         defer self.i = saved_i;
         return self.next();
     }
 };
 
-test "CodePointIterator peek" {
-    var iter = CodePointIterator{ .bytes = "Hi" };
+test "peek" {
+    var iter = Iterator{ .bytes = "Hi" };
 
     try std.testing.expectEqual(@as(u21, 'H'), iter.next().?.code);
     try std.testing.expectEqual(@as(u21, 'i'), iter.peek().?.code);
