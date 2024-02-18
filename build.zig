@@ -52,7 +52,7 @@ pub fn build(b: *std.Build) void {
 
     // Benchmark rig
     const exe = b.addExecutable(.{
-        .name = "zgbench",
+        .name = "zg",
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
