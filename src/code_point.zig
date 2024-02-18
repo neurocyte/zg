@@ -3,9 +3,29 @@ const std = @import("std");
 /// `CodePoint` represents a Unicode code point by its code,
 /// length, and offset in the source bytes.
 pub const CodePoint = struct {
-    code: u21,
     len: u3,
     offset: u32,
+
+    pub fn code(self: CodePoint, src: []const u8) u21 {
+        const cp_bytes = src[self.offset..][0..self.len];
+
+        return switch (self.len) {
+            1 => cp_bytes[0],
+
+            2 => (@as(u21, (cp_bytes[0] & 0b00011111)) << 6) | (cp_bytes[1] & 0b00111111),
+
+            3 => (((@as(u21, (cp_bytes[0] & 0b00001111)) << 6) |
+                (cp_bytes[1] & 0b00111111)) << 6) |
+                (cp_bytes[2] & 0b00111111),
+
+            4 => (((((@as(u21, (cp_bytes[0] & 0b00000111)) << 6) |
+                (cp_bytes[1] & 0b00111111)) << 6) |
+                (cp_bytes[2] & 0b00111111)) << 6) |
+                (cp_bytes[3] & 0b00111111),
+
+            else => @panic("code_point.CodePoint.code: Invalid code point length."),
+        };
+    }
 };
 
 /// `Iterator` iterates a string one `CodePoint` at-a-time.
@@ -19,51 +39,20 @@ pub const Iterator = struct {
         if (self.bytes[self.i] < 128) {
             // ASCII fast path
             defer self.i += 1;
-
-            return .{
-                .code = self.bytes[self.i],
-                .len = 1,
-                .offset = self.i,
-            };
+            return .{ .len = 1, .offset = self.i };
         }
 
-        var cp = CodePoint{
-            .code = undefined,
+        const cp = CodePoint{
             .len = switch (self.bytes[self.i]) {
                 0b1100_0000...0b1101_1111 => 2,
                 0b1110_0000...0b1110_1111 => 3,
                 0b1111_0000...0b1111_0111 => 4,
-                else => {
-                    defer self.i += 1;
-                    // Unicode replacement code point.
-                    return .{
-                        .code = 0xfffd,
-                        .len = 1,
-                        .offset = self.i,
-                    };
-                },
+                else => @panic("code_point.Iterator.next: Invalid start byte."),
             },
             .offset = self.i,
         };
 
-        const cp_bytes = self.bytes[self.i..][0..cp.len];
         self.i += cp.len;
-
-        cp.code = switch (cp.len) {
-            2 => (@as(u21, (cp_bytes[0] & 0b00011111)) << 6) | (cp_bytes[1] & 0b00111111),
-
-            3 => (((@as(u21, (cp_bytes[0] & 0b00001111)) << 6) |
-                (cp_bytes[1] & 0b00111111)) << 6) |
-                (cp_bytes[2] & 0b00111111),
-
-            4 => (((((@as(u21, (cp_bytes[0] & 0b00000111)) << 6) |
-                (cp_bytes[1] & 0b00111111)) << 6) |
-                (cp_bytes[2] & 0b00111111)) << 6) |
-                (cp_bytes[3] & 0b00111111),
-
-            else => @panic("CodePointIterator.next invalid code point length."),
-        };
-
         return cp;
     }
 
@@ -75,11 +64,12 @@ pub const Iterator = struct {
 };
 
 test "peek" {
-    var iter = Iterator{ .bytes = "Hi" };
+    const src = "Hi";
+    var iter = Iterator{ .bytes = src };
 
-    try std.testing.expectEqual(@as(u21, 'H'), iter.next().?.code);
-    try std.testing.expectEqual(@as(u21, 'i'), iter.peek().?.code);
-    try std.testing.expectEqual(@as(u21, 'i'), iter.next().?.code);
+    try std.testing.expectEqual(@as(u21, 'H'), iter.next().?.code(src));
+    try std.testing.expectEqual(@as(u21, 'i'), iter.peek().?.code(src));
+    try std.testing.expectEqual(@as(u21, 'i'), iter.next().?.code(src));
     try std.testing.expectEqual(@as(?CodePoint, null), iter.peek());
     try std.testing.expectEqual(@as(?CodePoint, null), iter.next());
 }

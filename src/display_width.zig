@@ -52,17 +52,18 @@ pub fn strWidth(str: []const u8) usize {
     var giter = GraphemeIterator.init(str);
 
     while (giter.next()) |gc| {
-        var cp_iter = CodePointIterator{ .bytes = str[gc.offset..][0..gc.len] };
+        const gc_bytes = gc.bytes(str);
+        var cp_iter = CodePointIterator{ .bytes = gc_bytes };
         var gc_total: isize = 0;
 
         while (cp_iter.next()) |cp| {
-            var w = codePointWidth(cp.code);
+            var w = codePointWidth(cp.code(gc_bytes));
 
             if (w != 0) {
                 // Handle text emoji sequence.
                 if (cp_iter.next()) |ncp| {
                     // emoji text sequence.
-                    if (ncp.code == 0xFE0E) w = 1;
+                    if (ncp.code(gc_bytes) == 0xFE0E) w = 1;
                 }
 
                 // Only adding width of first non-zero-width code point.
