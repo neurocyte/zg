@@ -28,7 +28,7 @@ pub fn build(b: *std.Build) void {
 
     // Modules we provide
     const code_point = b.addModule("code_point", .{
-        .root_source_file = .{ .path = "src/cp2.zig" },
+        .root_source_file = .{ .path = "src/code_point.zig" },
         .target = target,
         .optimize = optimize,
     });
