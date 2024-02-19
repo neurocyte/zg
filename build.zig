@@ -76,6 +76,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    exe.root_module.addImport("ascii", ascii);
     exe.root_module.addImport("code_point", code_point);
     exe.root_module.addImport("grapheme", grapheme);
     exe.root_module.addImport("display_width", display_width);
