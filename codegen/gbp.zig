@@ -63,7 +63,7 @@ pub fn main() !void {
     var line_buf: [4096]u8 = undefined;
 
     // Process Indic
-    var indic_file = try std.fs.cwd().openFile("unicode/DerivedCoreProperties.txt", .{});
+    var indic_file = try std.fs.cwd().openFile("data/unicode/DerivedCoreProperties.txt", .{});
     defer indic_file.close();
     var indic_buf = std.io.bufferedReader(indic_file.reader());
     const indic_reader = indic_buf.reader();
@@ -102,7 +102,7 @@ pub fn main() !void {
     }
 
     // Process GBP
-    var gbp_file = try std.fs.cwd().openFile("unicode/auxiliary/GraphemeBreakProperty.txt", .{});
+    var gbp_file = try std.fs.cwd().openFile("data/unicode/auxiliary/GraphemeBreakProperty.txt", .{});
     defer gbp_file.close();
     var gbp_buf = std.io.bufferedReader(gbp_file.reader());
     const gbp_reader = gbp_buf.reader();
@@ -140,7 +140,7 @@ pub fn main() !void {
     }
 
     // Process Emoji
-    var emoji_file = try std.fs.cwd().openFile("unicode/emoji/emoji-data.txt", .{});
+    var emoji_file = try std.fs.cwd().openFile("data/unicode/emoji/emoji-data.txt", .{});
     defer emoji_file.close();
     var emoji_buf = std.io.bufferedReader(emoji_file.reader());
     const emoji_reader = emoji_buf.reader();

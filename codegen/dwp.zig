@@ -33,7 +33,7 @@ pub fn main() !void {
     var line_buf: [4096]u8 = undefined;
 
     // Process DerivedEastAsianWidth.txt
-    var deaw_file = try std.fs.cwd().openFile("unicode/extracted/DerivedEastAsianWidth.txt", .{});
+    var deaw_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedEastAsianWidth.txt", .{});
     defer deaw_file.close();
     var deaw_buf = std.io.bufferedReader(deaw_file.reader());
     const deaw_reader = deaw_buf.reader();
@@ -90,7 +90,7 @@ pub fn main() !void {
     }
 
     // Process DerivedGeneralCategory.txt
-    var dgc_file = try std.fs.cwd().openFile("unicode/extracted/DerivedGeneralCategory.txt", .{});
+    var dgc_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedGeneralCategory.txt", .{});
     defer dgc_file.close();
     var dgc_buf = std.io.bufferedReader(dgc_file.reader());
     const dgc_reader = dgc_buf.reader();

@@ -235,7 +235,7 @@ pub fn graphemeBreak(
 
 test "Segmentation GraphemeIterator" {
     const allocator = std.testing.allocator;
-    var file = try std.fs.cwd().openFile("GraphemeBreakTest.txt", .{});
+    var file = try std.fs.cwd().openFile("data/unicode/auxiliary/GraphemeBreakTest.txt", .{});
     defer file.close();
     var buf_reader = std.io.bufferedReader(file.reader());
     var input_stream = buf_reader.reader();
