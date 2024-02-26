@@ -1,6 +1,5 @@
 const std = @import("std");
-
-const options = @import("options");
+const builtin = @import("builtin");
 
 const block_size = 256;
 const Block = [block_size]u8;
@@ -108,21 +107,19 @@ pub fn main() !void {
     _ = args_iter.skip();
     const output_path = args_iter.next() orelse @panic("No output file arg!");
 
+    const compressor = std.compress.deflate.compressor;
     var out_file = try std.fs.cwd().createFile(output_path, .{});
     defer out_file.close();
-    var out_buf = std.io.bufferedWriter(out_file.writer());
-    const writer = out_buf.writer();
+    var out_comp = try compressor(allocator, out_file.writer(), .{ .level = .best_compression });
+    defer out_comp.deinit();
+    const writer = out_comp.writer();
 
-    try writer.writeAll("const std = @import(\"std\");\n");
+    const endian = builtin.cpu.arch.endian();
+    try writer.writeInt(u16, @intCast(stage1.items.len), endian);
+    for (stage1.items) |i| try writer.writeInt(u16, i, endian);
 
-    try writer.print("const Stage2Int = std.math.IntFittingRange(0, {});\n", .{stage2.items.len});
-    try writer.print("pub const stage_1 = [{}]Stage2Int{{", .{stage1.items.len});
-    for (stage1.items) |v| try writer.print("{},", .{v});
-    try writer.writeAll("};\n");
+    try writer.writeInt(u16, @intCast(stage2.items.len), endian);
+    try writer.writeAll(stage2.items);
 
-    try writer.print("pub const stage_2 = [{}]u8{{", .{stage2.items.len});
-    for (stage2.items) |v| try writer.print("{},", .{v});
-    try writer.writeAll("};\n");
-
-    try out_buf.flush();
+    try out_comp.flush();
 }

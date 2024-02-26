@@ -1,9 +1,10 @@
 const std = @import("std");
+const mem = std.mem;
 const unicode = std.unicode;
 
 const CodePoint = @import("code_point").CodePoint;
 const CodePointIterator = @import("code_point").Iterator;
-const gbp = @import("gbp");
+pub const Data = @import("GraphemeData");
 
 /// `Grapheme` represents a Unicode grapheme cluster by its length and offset in the source bytes.
 pub const Grapheme = struct {
@@ -21,12 +22,13 @@ pub const Grapheme = struct {
 pub const Iterator = struct {
     buf: [2]?CodePoint = .{ null, null },
     cp_iter: CodePointIterator,
+    data: *Data,
 
     const Self = @This();
 
     /// Assumes `src` is valid UTF-8.
-    pub fn init(str: []const u8) Self {
-        var self = Self{ .cp_iter = CodePointIterator{ .bytes = str } };
+    pub fn init(str: []const u8, data: *Data) Self {
+        var self = Self{ .cp_iter = .{ .bytes = str }, .data = data };
         self.advance();
         return self;
     }
@@ -55,6 +57,7 @@ pub const Iterator = struct {
         if (graphemeBreak(
             self.buf[0].?.code,
             self.buf[1].?.code,
+            self.data,
             &state,
         )) return Grapheme{ .len = gc_len, .offset = gc_start };
 
@@ -67,6 +70,7 @@ pub const Iterator = struct {
             if (graphemeBreak(
                 self.buf[0].?.code,
                 if (self.buf[1]) |ncp| ncp.code else 0,
+                self.data,
                 &state,
             )) break;
         }
@@ -76,16 +80,10 @@ pub const Iterator = struct {
 };
 
 // Predicates
-fn isBreaker(cp: u21) bool {
+fn isBreaker(cp: u21, data: *Data) bool {
     // Extract relevant properties.
-    const cp_props_byte = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]];
-    const cp_gbp_prop: gbp.Gbp = @enumFromInt(cp_props_byte >> 4);
+    const cp_gbp_prop = data.gbp(cp);
     return cp == '\x0d' or cp == '\x0a' or cp_gbp_prop == .Control;
-}
-
-fn isIgnorable(cp: u21) bool {
-    const cp_gbp_prop = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp >> 8] + (cp & 0xff)]];
-    return cp_gbp_prop == .extend or cp_gbp_prop == .spacing or cp == '\u{200d}';
 }
 
 // Grapheme break state.
@@ -135,18 +133,17 @@ const State = struct {
 pub fn graphemeBreak(
     cp1: u21,
     cp2: u21,
+    data: *Data,
     state: *State,
 ) bool {
     // Extract relevant properties.
-    const cp1_props_byte = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp1 >> 8] + (cp1 & 0xff)]];
-    const cp1_gbp_prop: gbp.Gbp = @enumFromInt(cp1_props_byte >> 4);
-    const cp1_indic_prop: gbp.Indic = @enumFromInt((cp1_props_byte >> 1) & 0x7);
-    const cp1_is_emoji = cp1_props_byte & 1 == 1;
+    const cp1_gbp_prop = data.gbp(cp1);
+    const cp1_indic_prop = data.indic(cp1);
+    const cp1_is_emoji = data.isEmoji(cp1);
 
-    const cp2_props_byte = gbp.stage_3[gbp.stage_2[gbp.stage_1[cp2 >> 8] + (cp2 & 0xff)]];
-    const cp2_gbp_prop: gbp.Gbp = @enumFromInt(cp2_props_byte >> 4);
-    const cp2_indic_prop: gbp.Indic = @enumFromInt((cp2_props_byte >> 1) & 0x7);
-    const cp2_is_emoji = cp2_props_byte & 1 == 1;
+    const cp2_gbp_prop = data.gbp(cp2);
+    const cp2_indic_prop = data.indic(cp2);
+    const cp2_is_emoji = data.isEmoji(cp2);
 
     // GB11: Emoji Extend* ZWJ x Emoji
     if (!state.hasXpic() and cp1_is_emoji) state.setXpic();
@@ -157,7 +154,7 @@ pub fn graphemeBreak(
     if (cp1 == '\r' and cp2 == '\n') return false;
 
     // GB4: Control
-    if (isBreaker(cp1)) return true;
+    if (isBreaker(cp1, data)) return true;
 
     // GB11: Emoji Extend* ZWJ x Emoji
     if (state.hasXpic() and
@@ -175,7 +172,7 @@ pub fn graphemeBreak(
     if (cp2_gbp_prop == .SpacingMark) return false;
 
     // GB9b: Prepend x
-    if (cp1_gbp_prop == .Prepend and !isBreaker(cp2)) return false;
+    if (cp1_gbp_prop == .Prepend and !isBreaker(cp2, data)) return false;
 
     // GB12, GB13: RI x RI
     if (cp1_gbp_prop == .Regional_Indicator and cp2_gbp_prop == .Regional_Indicator) {
@@ -240,6 +237,9 @@ test "Segmentation GraphemeIterator" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var input_stream = buf_reader.reader();
 
+    var data = try Data.init(allocator);
+    defer data.deinit();
+
     var buf: [4096]u8 = undefined;
     var line_no: usize = 1;
 
@@ -282,7 +282,7 @@ test "Segmentation GraphemeIterator" {
         }
 
         // std.debug.print("\nline {}: {s}\n", .{ line_no, all_bytes.items });
-        var iter = Iterator.init(all_bytes.items);
+        var iter = Iterator.init(all_bytes.items, &data);
 
         // Chaeck.
         for (want.items) |want_gc| {
@@ -295,19 +295,6 @@ test "Segmentation GraphemeIterator" {
     }
 }
 
-test "Segmentation comptime GraphemeIterator" {
-    const want = [_][]const u8{ "H", "é", "l", "l", "o" };
-
-    comptime {
-        const src = "Héllo";
-        var ct_iter = Iterator.init(src);
-        var i = 0;
-        while (ct_iter.next()) |grapheme| : (i += 1) {
-            try std.testing.expectEqualStrings(grapheme.bytes(src), want[i]);
-        }
-    }
-}
-
 test "Segmentation ZWJ and ZWSP emoji sequences" {
     const seq_1 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
     const seq_2 = "\u{1F43B}\u{200D}\u{2744}\u{FE0F}";
@@ -315,18 +302,22 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
     const with_zwsp = seq_1 ++ "\u{200B}" ++ seq_2;
     const no_joiner = seq_1 ++ seq_2;
 
-    var ct_iter = Iterator.init(with_zwj);
+    var data = try Data.init(std.testing.allocator);
+    defer data.deinit();
+
+    var iter = Iterator.init(with_zwj, &data);
+
     var i: usize = 0;
-    while (ct_iter.next()) |_| : (i += 1) {}
+    while (iter.next()) |_| : (i += 1) {}
     try std.testing.expectEqual(@as(usize, 1), i);
 
-    ct_iter = Iterator.init(with_zwsp);
+    iter = Iterator.init(with_zwsp, &data);
     i = 0;
-    while (ct_iter.next()) |_| : (i += 1) {}
+    while (iter.next()) |_| : (i += 1) {}
     try std.testing.expectEqual(@as(usize, 3), i);
 
-    ct_iter = Iterator.init(no_joiner);
+    iter = Iterator.init(no_joiner, &data);
     i = 0;
-    while (ct_iter.next()) |_| : (i += 1) {}
+    while (iter.next()) |_| : (i += 1) {}
     try std.testing.expectEqual(@as(usize, 2), i);
 }

@@ -8,16 +8,18 @@ const CodePointIterator = @import("code_point").Iterator;
 const case_fold_map = @import("ziglyph").case_folding;
 const hangul_map = @import("ziglyph").hangul;
 const norm_props = @import("ziglyph").normalization_props;
-const normp = @import("normp");
+pub const Data = @import("CombiningClassData");
 
-const Self = @This();
-
+ccc_data: *Data,
 nfc_map: std.AutoHashMap([2]u21, u21),
 nfd_map: std.AutoHashMap(u21, [2]u21),
 nfkd_map: std.AutoHashMap(u21, [18]u21),
 
-pub fn init(allocator: std.mem.Allocator) !Self {
+const Self = @This();
+
+pub fn init(allocator: std.mem.Allocator, data: *Data) !Self {
     var self = Self{
+        .ccc_data = data,
         .nfc_map = std.AutoHashMap([2]u21, u21).init(allocator),
         .nfd_map = std.AutoHashMap(u21, [2]u21).init(allocator),
         .nfkd_map = std.AutoHashMap(u21, [18]u21).init(allocator),
@@ -95,7 +97,9 @@ pub fn deinit(self: *Self) void {
 }
 
 test "init / deinit" {
-    var n = try init(std.testing.allocator);
+    var data = try Data.init(std.testing.allocator);
+    defer data.deinit();
+    var n = try init(std.testing.allocator, &data);
     defer n.deinit();
 }
 
@@ -241,7 +245,9 @@ pub fn decompose(self: Self, cp: u21, form: Form) Decomp {
 
 test "decompose" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var dc = n.decompose('é', .nfd);
@@ -307,19 +313,17 @@ pub const Result = struct {
 };
 
 // Compares code points by Canonical Combining Class order.
-fn cccLess(_: void, lhs: u21, rhs: u21) bool {
-    const lcc = normp.stage_2[normp.stage_1[lhs >> 8] + (lhs & 0xff)];
-    const rcc = normp.stage_2[normp.stage_1[rhs >> 8] + (rhs & 0xff)];
-    return lcc < rcc;
+fn cccLess(self: Self, lhs: u21, rhs: u21) bool {
+    return self.ccc_data.ccc(lhs) < self.ccc_data.ccc(rhs);
 }
 
 // Applies the Canonical Sorting Algorithm.
-fn canonicalSort(cps: []u21) void {
+fn canonicalSort(self: Self, cps: []u21) void {
     var i: usize = 0;
     while (i < cps.len) : (i += 1) {
         const start: usize = i;
-        while (i < cps.len and normp.stage_2[normp.stage_1[cps[i] >> 8] + (cps[i] & 0xff)] != 0) : (i += 1) {}
-        std.mem.sort(u21, cps[start..i], {}, cccLess);
+        while (i < cps.len and self.ccc_data.ccc(cps[i]) != 0) : (i += 1) {}
+        std.mem.sort(u21, cps[start..i], self, cccLess);
     }
 }
 
@@ -349,7 +353,7 @@ fn nfxd(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
         try dcp_list.appendSlice(slice);
     }
 
-    canonicalSort(dcp_list.items);
+    self.canonicalSort(dcp_list.items);
 
     var dstr_list = try std.ArrayList(u8).initCapacity(allocator, dcp_list.items.len * 4);
     defer dstr_list.deinit();
@@ -365,7 +369,9 @@ fn nfxd(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 
 test "nfd ASCII / no-alloc" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var result = try n.nfd(allocator, "Hello World!");
@@ -376,7 +382,9 @@ test "nfd ASCII / no-alloc" {
 
 test "nfd !ASCII / alloc" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var result = try n.nfd(allocator, "Héllo World! \u{3d3}");
@@ -387,7 +395,9 @@ test "nfd !ASCII / alloc" {
 
 test "nfkd ASCII / no-alloc" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var result = try n.nfkd(allocator, "Hello World!");
@@ -398,7 +408,9 @@ test "nfkd ASCII / no-alloc" {
 
 test "nfkd !ASCII / alloc" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
@@ -413,16 +425,8 @@ fn isHangul(cp: u21) bool {
     return cp >= 0x1100 and hangul_map.syllableType(cp) != null;
 }
 
-fn isStarter(cp: u21) bool {
-    return normp.stage_2[normp.stage_1[cp >> 8] + (cp & 0xff)] == 0;
-}
-
-fn isCombining(cp: u21) bool {
-    return normp.stage_2[normp.stage_1[cp >> 8] + (cp & 0xff)] != 0;
-}
-
-fn isNonHangulStarter(cp: u21) bool {
-    return !isHangul(cp) and isStarter(cp);
+fn isNonHangulStarter(self: Self, cp: u21) bool {
+    return !isHangul(cp) and self.ccc_data.isStarter(cp);
 }
 
 /// Normalizes `str` to NFC.
@@ -464,7 +468,7 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 
         block_check: while (i < d_list.items.len) : (i += 1) {
             const C = d_list.items[i];
-            const cc_C = normp.stage_2[normp.stage_1[C >> 8] + (C & 0xff)];
+            const cc_C = self.ccc_data.ccc(C);
             var starter_index: ?usize = null;
             var j: usize = i;
 
@@ -472,14 +476,14 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
                 j -= 1;
 
                 // Check for starter.
-                if (isStarter(d_list.items[j])) {
+                if (self.ccc_data.isStarter(d_list.items[j])) {
                     if (i - j > 1) { // If there's distance between the starting point and the current position.
                         for (d_list.items[(j + 1)..i]) |B| {
+                            const cc_B = self.ccc_data.ccc(B);
                             // Check for blocking conditions.
                             if (isHangul(C)) {
-                                if (isCombining(B) or isNonHangulStarter(B)) continue :block_check;
+                                if (cc_B != 0 or self.isNonHangulStarter(B)) continue :block_check;
                             }
-                            const cc_B = normp.stage_2[normp.stage_1[B >> 8] + (B & 0xff)];
                             if (cc_B >= cc_C) continue :block_check;
                         }
                     }
@@ -560,7 +564,9 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 
 test "nfc" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
@@ -571,7 +577,9 @@ test "nfc" {
 
 test "nfkc" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
@@ -630,7 +638,9 @@ pub fn eql(self: Self, allocator: std.mem.Allocator, a: []const u8, b: []const u
 
 test "eql" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     try std.testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
@@ -697,7 +707,9 @@ pub fn eqlCaseless(self: Self, allocator: std.mem.Allocator, a: []const u8, b: [
 
 test "eqlCaseless" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     try std.testing.expect(try n.eqlCaseless(allocator, "Foϓ", "fo\u{03D2}\u{0301}"));
@@ -707,7 +719,7 @@ test "eqlCaseless" {
 // FCD
 fn getLeadCcc(self: Self, cp: u21) u8 {
     const dc = self.mapping(cp, .nfd);
-    return normp.stage_2[normp.stage_1[dc.cps[0] >> 8] + (dc.cps[0] & 0xff)];
+    return self.ccc_data.ccc(dc.cps[0]);
 }
 
 fn getTrailCcc(self: Self, cp: u21) u8 {
@@ -715,8 +727,7 @@ fn getTrailCcc(self: Self, cp: u21) u8 {
     const len = for (dc.cps, 0..) |dcp, i| {
         if (dcp == 0) break i;
     } else dc.cps.len;
-    const tcp = dc.cps[len -| 1];
-    return normp.stage_2[normp.stage_1[tcp >> 8] + (tcp & 0xff)];
+    return self.ccc_data.ccc(dc.cps[len - 1]);
 }
 
 /// Fast check to detect if a string is already in NFC or NFD form.
@@ -733,7 +744,9 @@ pub fn isFcd(self: Self, str: []const u8) bool {
 
 test "isFcd" {
     const allocator = std.testing.allocator;
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     const is_nfc = "José \u{3D3}";
@@ -751,7 +764,9 @@ test "Unicode normalization tests" {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var n = try init(allocator);
+    var data = try Data.init(allocator);
+    defer data.deinit();
+    var n = try init(allocator, &data);
     defer n.deinit();
 
     var file = try std.fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});

@@ -16,7 +16,7 @@ pub fn build(b: *std.Build) void {
         .optimize = .Debug,
     });
     const run_gbp_gen_exe = b.addRunArtifact(gbp_gen_exe);
-    const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.zig");
+    const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.bin.z");
 
     // Display width
     const cjk = b.option(bool, "cjk", "Ambiguouse code points are wide (display width: 2).") orelse false;
@@ -31,17 +31,17 @@ pub fn build(b: *std.Build) void {
     });
     dwp_gen_exe.root_module.addOptions("options", options);
     const run_dwp_gen_exe = b.addRunArtifact(dwp_gen_exe);
-    const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.zig");
+    const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.bin.z");
 
     // Normalization properties
-    const normp_gen_exe = b.addExecutable(.{
-        .name = "normp",
-        .root_source_file = .{ .path = "codegen/normp.zig" },
+    const ccc_gen_exe = b.addExecutable(.{
+        .name = "ccc",
+        .root_source_file = .{ .path = "codegen/ccc.zig" },
         .target = b.host,
         .optimize = .Debug,
     });
-    const run_normp_gen_exe = b.addRunArtifact(normp_gen_exe);
-    const normp_gen_out = run_normp_gen_exe.addOutputFileArg("normp.zig");
+    const run_ccc_gen_exe = b.addRunArtifact(ccc_gen_exe);
+    const ccc_gen_out = run_ccc_gen_exe.addOutputFileArg("ccc.bin.z");
 
     // Modules we provide
     // Code points
@@ -52,13 +52,20 @@ pub fn build(b: *std.Build) void {
     });
 
     // Grapheme clusters
+    const grapheme_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/GraphemeData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    grapheme_data.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
+
     const grapheme = b.addModule("grapheme", .{
         .root_source_file = .{ .path = "src/grapheme.zig" },
         .target = target,
         .optimize = optimize,
     });
     grapheme.addImport("code_point", code_point);
-    grapheme.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
+    grapheme.addImport("GraphemeData", grapheme_data);
 
     // ASCII utilities
     const ascii = b.addModule("ascii", .{
@@ -68,17 +75,32 @@ pub fn build(b: *std.Build) void {
     });
 
     // Fixed pitch font display width
-    const display_width = b.addModule("display_width", .{
-        .root_source_file = .{ .path = "src/display_width.zig" },
+    const dw_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/DisplayWidthData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    dw_data.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
+    dw_data.addImport("GraphemeData", grapheme_data);
+
+    const display_width = b.addModule("DisplayWidth", .{
+        .root_source_file = .{ .path = "src/DisplayWidth.zig" },
         .target = target,
         .optimize = optimize,
     });
     display_width.addImport("ascii", ascii);
     display_width.addImport("code_point", code_point);
     display_width.addImport("grapheme", grapheme);
-    display_width.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
+    display_width.addImport("DisplayWidthData", dw_data);
 
     // Normalization
+    const ccc_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/CombiningClassData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    ccc_data.addAnonymousImport("ccc", .{ .root_source_file = ccc_gen_out });
+
     const norm = b.addModule("Normalizer", .{
         .root_source_file = .{ .path = "src/Normalizer.zig" },
         .target = target,
@@ -86,7 +108,7 @@ pub fn build(b: *std.Build) void {
     });
     norm.addImport("code_point", code_point);
     norm.addImport("ziglyph", ziglyph.module("ziglyph"));
-    norm.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
+    norm.addImport("CombiningClassData", ccc_data);
 
     // Benchmark rig
     const exe = b.addExecutable(.{
@@ -95,11 +117,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    exe.root_module.addImport("ascii", ascii);
-    exe.root_module.addImport("code_point", code_point);
-    exe.root_module.addImport("grapheme", grapheme);
-    exe.root_module.addImport("display_width", display_width);
+    // exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    // exe.root_module.addImport("ascii", ascii);
+    // exe.root_module.addImport("code_point", code_point);
+    // exe.root_module.addImport("grapheme", grapheme);
+    // exe.root_module.addImport("DisplayWidth", display_width);
     exe.root_module.addImport("Normalizer", norm);
     b.installArtifact(exe);
 
@@ -112,17 +134,18 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/Normalizer.zig" },
+        .root_source_file = .{ .path = "src/DisplayWidth.zig" },
         .target = target,
         .optimize = optimize,
     });
-    // exe_unit_tests.root_module.addImport("ascii", ascii);
+    exe_unit_tests.root_module.addImport("ascii", ascii);
     exe_unit_tests.root_module.addImport("code_point", code_point);
-    // exe_unit_tests.root_module.addImport("grapheme", grapheme);
-    // exe_unit_tests.root_module.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
-    // exe_unit_tests.root_module.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
-    exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
+    // exe_unit_tests.root_module.addImport("GraphemeData", grapheme_data);
+    exe_unit_tests.root_module.addImport("grapheme", grapheme);
+    // exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    // exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
+    exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
+    // exe_unit_tests.root_module.addImport("CombiningClassData", ccc_data);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 

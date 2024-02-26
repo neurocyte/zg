@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const Indic = enum {
     none,
@@ -226,56 +227,23 @@ pub fn main() !void {
     _ = args_iter.skip();
     const output_path = args_iter.next() orelse @panic("No output file arg!");
 
+    const compressor = std.compress.deflate.compressor;
     var out_file = try std.fs.cwd().createFile(output_path, .{});
     defer out_file.close();
-    var out_buf = std.io.bufferedWriter(out_file.writer());
-    const writer = out_buf.writer();
+    var out_comp = try compressor(allocator, out_file.writer(), .{ .level = .best_compression });
+    defer out_comp.deinit();
+    const writer = out_comp.writer();
 
-    const prop_code =
-        \\const std = @import("std");
-        \\
-        \\pub const Indic = enum {
-        \\    none,
-        \\
-        \\    Consonant,
-        \\    Extend,
-        \\    Linker,
-        \\};
-        \\
-        \\pub const Gbp = enum {
-        \\    none,
-        \\    Control,
-        \\    CR,
-        \\    Extend,
-        \\    L,
-        \\    LF,
-        \\    LV,
-        \\    LVT,
-        \\    Prepend,
-        \\    Regional_Indicator,
-        \\    SpacingMark,
-        \\    T,
-        \\    V,
-        \\    ZWJ,
-        \\};
-        \\
-    ;
+    const endian = builtin.cpu.arch.endian();
+    try writer.writeInt(u16, @intCast(stage1.items.len), endian);
+    for (stage1.items) |i| try writer.writeInt(u16, i, endian);
 
-    try writer.writeAll(prop_code);
+    try writer.writeInt(u16, @intCast(stage2.items.len), endian);
+    for (stage2.items) |i| try writer.writeInt(u16, i, endian);
 
-    try writer.print("const Stage2Int = std.math.IntFittingRange(0, {});\n", .{stage2.items.len});
-    try writer.print("pub const stage_1 = [{}]Stage2Int{{", .{stage1.items.len});
-    for (stage1.items) |v| try writer.print("{},", .{v});
-    try writer.writeAll("};\n");
+    const props_bytes = stage3.keys();
+    try writer.writeInt(u16, @intCast(props_bytes.len), endian);
+    try writer.writeAll(props_bytes);
 
-    try writer.print("const Stage3Int = std.math.IntFittingRange(0, {});\n", .{stage3_len});
-    try writer.print("pub const stage_2 = [{}]Stage3Int{{", .{stage2.items.len});
-    for (stage2.items) |v| try writer.print("{},", .{v});
-    try writer.writeAll("};\n");
-
-    try writer.print("pub const stage_3 = [{}]u8{{", .{stage3_len});
-    for (stage3.keys()) |v| try writer.print("{},", .{v});
-    try writer.writeAll("};\n");
-
-    try out_buf.flush();
+    try out_comp.flush();
 }
