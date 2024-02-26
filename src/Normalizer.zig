@@ -12,7 +12,6 @@ const norm_props = @import("ziglyph").normalization_props;
 
 pub const NormData = @import("NormData");
 
-nfc_map: std.AutoHashMap([2]u21, u21),
 nfkd_map: std.AutoHashMap(u21, [18]u21),
 norm_data: *NormData,
 
@@ -20,40 +19,20 @@ const Self = @This();
 
 pub fn init(allocator: std.mem.Allocator, norm_data: *NormData) !Self {
     var self = Self{
-        .nfc_map = std.AutoHashMap([2]u21, u21).init(allocator),
         .nfkd_map = std.AutoHashMap(u21, [18]u21).init(allocator),
         .norm_data = norm_data,
     };
     errdefer self.deinit();
 
-    // Canonical compositions
-    const decompressor = std.compress.deflate.decompressor;
-    const comp_file = @embedFile("autogen/canonical_compositions.txt.deflate");
-    var comp_stream = std.io.fixedBufferStream(comp_file);
-    var comp_decomp = try decompressor(allocator, comp_stream.reader(), null);
-    defer comp_decomp.deinit();
-
-    var comp_buf = std.io.bufferedReader(comp_decomp.reader());
-    const comp_reader = comp_buf.reader();
-    var buf: [4096]u8 = undefined;
-
-    while (try comp_reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        if (line.len == 0) continue;
-        var fields = std.mem.split(u8, line, ";");
-        const cp_a = try std.fmt.parseInt(u21, fields.next().?, 16);
-        const cp_b = try std.fmt.parseInt(u21, fields.next().?, 16);
-        const cp_c = try std.fmt.parseInt(u21, fields.next().?, 16);
-        try self.nfc_map.put(.{ cp_a, cp_b }, cp_c);
-    }
-
     // Compatibility decompositions
     const dekomp_file = @embedFile("autogen/compatibility_decompositions.txt.deflate");
     var dekomp_stream = std.io.fixedBufferStream(dekomp_file);
-    var dekomp_decomp = try decompressor(allocator, dekomp_stream.reader(), null);
+    var dekomp_decomp = try std.compress.deflate.decompressor(allocator, dekomp_stream.reader(), null);
     defer dekomp_decomp.deinit();
 
     var dekomp_buf = std.io.bufferedReader(dekomp_decomp.reader());
     const dekomp_reader = dekomp_buf.reader();
+    var buf: [4096]u8 = undefined;
 
     while (try dekomp_reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
         if (line.len == 0) continue;
@@ -73,7 +52,6 @@ pub fn init(allocator: std.mem.Allocator, norm_data: *NormData) !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.nfc_map.deinit();
     self.nfkd_map.deinit();
 }
 
@@ -510,7 +488,7 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 
                 if (!processed_hangul) {
                     // L -> C not Hangul.
-                    if (self.nfc_map.get(.{ L, C })) |P| {
+                    if (self.norm_data.canon_data.toNfc(.{ L, C })) |P| {
                         if (!norm_props.isFcx(P)) {
                             d_list.items[sidx] = P;
                             d_list.items[i] = tombstone; // Mark for deletion.
