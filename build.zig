@@ -34,6 +34,15 @@ pub fn build(b: *std.Build) void {
     const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.bin.z");
 
     // Normalization properties
+    const canon_gen_exe = b.addExecutable(.{
+        .name = "canon",
+        .root_source_file = .{ .path = "codegen/canon.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_canon_gen_exe = b.addRunArtifact(canon_gen_exe);
+    const canon_gen_out = run_canon_gen_exe.addOutputFileArg("canon.bin.z");
+
     const ccc_gen_exe = b.addExecutable(.{
         .name = "ccc",
         .root_source_file = .{ .path = "codegen/ccc.zig" },
@@ -101,6 +110,21 @@ pub fn build(b: *std.Build) void {
     });
     ccc_data.addAnonymousImport("ccc", .{ .root_source_file = ccc_gen_out });
 
+    const canon_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/Canonical.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    canon_data.addAnonymousImport("canon", .{ .root_source_file = canon_gen_out });
+
+    const norm_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/NormData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    norm_data.addImport("CanonicalData", canon_data);
+    norm_data.addImport("CombiningClassData", ccc_data);
+
     const norm = b.addModule("Normalizer", .{
         .root_source_file = .{ .path = "src/Normalizer.zig" },
         .target = target,
@@ -108,7 +132,7 @@ pub fn build(b: *std.Build) void {
     });
     norm.addImport("code_point", code_point);
     norm.addImport("ziglyph", ziglyph.module("ziglyph"));
-    norm.addImport("CombiningClassData", ccc_data);
+    norm.addImport("NormData", norm_data);
 
     // Benchmark rig
     const exe = b.addExecutable(.{
@@ -134,18 +158,18 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/DisplayWidth.zig" },
+        .root_source_file = .{ .path = "src/Normalizer.zig" },
         .target = target,
         .optimize = optimize,
     });
-    exe_unit_tests.root_module.addImport("ascii", ascii);
+    // exe_unit_tests.root_module.addImport("ascii", ascii);
     exe_unit_tests.root_module.addImport("code_point", code_point);
     // exe_unit_tests.root_module.addImport("GraphemeData", grapheme_data);
-    exe_unit_tests.root_module.addImport("grapheme", grapheme);
-    // exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    // exe_unit_tests.root_module.addImport("grapheme", grapheme);
+    exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
     // exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
-    exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
-    // exe_unit_tests.root_module.addImport("CombiningClassData", ccc_data);
+    // exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
+    exe_unit_tests.root_module.addImport("NormData", norm_data);
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 

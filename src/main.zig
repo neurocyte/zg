@@ -17,7 +17,7 @@ const std = @import("std");
 // const ascii = std.ascii;
 
 // const norm = @import("ziglyph").Normalizer;
-const Data = @import("Normalizer").Data;
+const NormData = @import("Normalizer").NormData;
 const norm = @import("Normalizer");
 
 pub fn main() !void {
@@ -32,10 +32,9 @@ pub fn main() !void {
     const input = try std.fs.cwd().readFileAlloc(allocator, in_path, std.math.maxInt(u32));
     defer allocator.free(input);
 
-    var data = try Data.init(allocator);
-    defer data.deinit();
-
-    var n = try norm.init(allocator, &data);
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try norm.init(allocator, &norm_data);
     defer n.deinit();
     // var n = try norm.init(allocator);
     // defer n.deinit();
@@ -53,7 +52,7 @@ pub fn main() !void {
     // while (iter.next()) |_| result += 1;
     // while (iter.next()) |line| result += strWidth(line, &data);
     while (iter.next()) |line| {
-        var nfc = try n.nfc(allocator, line);
+        var nfc = try n.nfd(allocator, line);
         result += nfc.slice.len;
         nfc.deinit();
     }

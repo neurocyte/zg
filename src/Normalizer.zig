@@ -3,26 +3,26 @@
 //! string equality under different parameters related to normalization (see `eql`, `eqlCaseless`, `eqlIdentifiers`).
 
 const std = @import("std");
+const testing = std.testing;
 
 const CodePointIterator = @import("code_point").Iterator;
 const case_fold_map = @import("ziglyph").case_folding;
 const hangul_map = @import("ziglyph").hangul;
 const norm_props = @import("ziglyph").normalization_props;
-pub const Data = @import("CombiningClassData");
 
-ccc_data: *Data,
+pub const NormData = @import("NormData");
+
 nfc_map: std.AutoHashMap([2]u21, u21),
-nfd_map: std.AutoHashMap(u21, [2]u21),
 nfkd_map: std.AutoHashMap(u21, [18]u21),
+norm_data: *NormData,
 
 const Self = @This();
 
-pub fn init(allocator: std.mem.Allocator, data: *Data) !Self {
+pub fn init(allocator: std.mem.Allocator, norm_data: *NormData) !Self {
     var self = Self{
-        .ccc_data = data,
         .nfc_map = std.AutoHashMap([2]u21, u21).init(allocator),
-        .nfd_map = std.AutoHashMap(u21, [2]u21).init(allocator),
         .nfkd_map = std.AutoHashMap(u21, [18]u21).init(allocator),
+        .norm_data = norm_data,
     };
     errdefer self.deinit();
 
@@ -44,24 +44,6 @@ pub fn init(allocator: std.mem.Allocator, data: *Data) !Self {
         const cp_b = try std.fmt.parseInt(u21, fields.next().?, 16);
         const cp_c = try std.fmt.parseInt(u21, fields.next().?, 16);
         try self.nfc_map.put(.{ cp_a, cp_b }, cp_c);
-    }
-
-    // Canonical decompositions
-    const decomp_file = @embedFile("autogen/canonical_decompositions.txt.deflate");
-    var decomp_stream = std.io.fixedBufferStream(decomp_file);
-    var decomp_decomp = try decompressor(allocator, decomp_stream.reader(), null);
-    defer decomp_decomp.deinit();
-
-    var decomp_buf = std.io.bufferedReader(decomp_decomp.reader());
-    const decomp_reader = decomp_buf.reader();
-
-    while (try decomp_reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        if (line.len == 0) continue;
-        var fields = std.mem.split(u8, line, ";");
-        const cp_a = try std.fmt.parseInt(u21, fields.next().?, 16);
-        const cp_b = try std.fmt.parseInt(u21, fields.next().?, 16);
-        const cp_c = try std.fmt.parseInt(u21, fields.next().?, 16);
-        try self.nfd_map.put(cp_a, .{ cp_b, cp_c });
     }
 
     // Compatibility decompositions
@@ -92,14 +74,14 @@ pub fn init(allocator: std.mem.Allocator, data: *Data) !Self {
 
 pub fn deinit(self: *Self) void {
     self.nfc_map.deinit();
-    self.nfd_map.deinit();
     self.nfkd_map.deinit();
 }
 
 test "init / deinit" {
-    var data = try Data.init(std.testing.allocator);
-    defer data.deinit();
-    var n = try init(std.testing.allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 }
 
@@ -169,17 +151,22 @@ const Decomp = struct {
 pub fn mapping(self: Self, cp: u21, form: Form) Decomp {
     std.debug.assert(form == .nfd or form == .nfkd);
 
-    var dc = Decomp{ .form = .same };
-    dc.cps[0] = cp;
+    var dc = Decomp{ .form = .nfd };
+    const canon_dc = self.norm_data.canon_data.toNfd(cp);
+    const len: usize = if (canon_dc[1] == 0) 1 else 2;
+
+    if (len == 1 and canon_dc[0] == cp) {
+        dc.form = .same;
+        dc.cps[0] = cp;
+    } else {
+        @memcpy(dc.cps[0..len], canon_dc[0..len]);
+    }
 
     if (self.nfkd_map.get(cp)) |array| {
         if (form != .nfd) {
             dc.form = .nfkd;
             @memcpy(dc.cps[0..array.len], &array);
         }
-    } else if (self.nfd_map.get(cp)) |array| {
-        dc.form = .nfd;
-        @memcpy(dc.cps[0..array.len], &array);
     }
 
     return dc;
@@ -244,10 +231,10 @@ pub fn decompose(self: Self, cp: u21, form: Form) Decomp {
 }
 
 test "decompose" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var dc = n.decompose('é', .nfd);
@@ -314,7 +301,7 @@ pub const Result = struct {
 
 // Compares code points by Canonical Combining Class order.
 fn cccLess(self: Self, lhs: u21, rhs: u21) bool {
-    return self.ccc_data.ccc(lhs) < self.ccc_data.ccc(rhs);
+    return self.norm_data.ccc_data.ccc(lhs) < self.norm_data.ccc_data.ccc(rhs);
 }
 
 // Applies the Canonical Sorting Algorithm.
@@ -322,7 +309,7 @@ fn canonicalSort(self: Self, cps: []u21) void {
     var i: usize = 0;
     while (i < cps.len) : (i += 1) {
         const start: usize = i;
-        while (i < cps.len and self.ccc_data.ccc(cps[i]) != 0) : (i += 1) {}
+        while (i < cps.len and self.norm_data.ccc_data.ccc(cps[i]) != 0) : (i += 1) {}
         std.mem.sort(u21, cps[start..i], self, cccLess);
     }
 }
@@ -368,10 +355,10 @@ fn nfxd(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 }
 
 test "nfd ASCII / no-alloc" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var result = try n.nfd(allocator, "Hello World!");
@@ -381,10 +368,10 @@ test "nfd ASCII / no-alloc" {
 }
 
 test "nfd !ASCII / alloc" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var result = try n.nfd(allocator, "Héllo World! \u{3d3}");
@@ -394,10 +381,10 @@ test "nfd !ASCII / alloc" {
 }
 
 test "nfkd ASCII / no-alloc" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var result = try n.nfkd(allocator, "Hello World!");
@@ -407,10 +394,10 @@ test "nfkd ASCII / no-alloc" {
 }
 
 test "nfkd !ASCII / alloc" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
@@ -426,7 +413,7 @@ fn isHangul(cp: u21) bool {
 }
 
 fn isNonHangulStarter(self: Self, cp: u21) bool {
-    return !isHangul(cp) and self.ccc_data.isStarter(cp);
+    return !isHangul(cp) and self.norm_data.ccc_data.isStarter(cp);
 }
 
 /// Normalizes `str` to NFC.
@@ -468,7 +455,7 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 
         block_check: while (i < d_list.items.len) : (i += 1) {
             const C = d_list.items[i];
-            const cc_C = self.ccc_data.ccc(C);
+            const cc_C = self.norm_data.ccc_data.ccc(C);
             var starter_index: ?usize = null;
             var j: usize = i;
 
@@ -476,10 +463,10 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
                 j -= 1;
 
                 // Check for starter.
-                if (self.ccc_data.isStarter(d_list.items[j])) {
+                if (self.norm_data.ccc_data.isStarter(d_list.items[j])) {
                     if (i - j > 1) { // If there's distance between the starting point and the current position.
                         for (d_list.items[(j + 1)..i]) |B| {
-                            const cc_B = self.ccc_data.ccc(B);
+                            const cc_B = self.norm_data.ccc_data.ccc(B);
                             // Check for blocking conditions.
                             if (isHangul(C)) {
                                 if (cc_B != 0 or self.isNonHangulStarter(B)) continue :block_check;
@@ -563,10 +550,10 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 }
 
 test "nfc" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
@@ -576,10 +563,10 @@ test "nfc" {
 }
 
 test "nfkc" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
@@ -637,10 +624,10 @@ pub fn eql(self: Self, allocator: std.mem.Allocator, a: []const u8, b: []const u
 }
 
 test "eql" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     try std.testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
@@ -706,10 +693,10 @@ pub fn eqlCaseless(self: Self, allocator: std.mem.Allocator, a: []const u8, b: [
 }
 
 test "eqlCaseless" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     try std.testing.expect(try n.eqlCaseless(allocator, "Foϓ", "fo\u{03D2}\u{0301}"));
@@ -719,7 +706,7 @@ test "eqlCaseless" {
 // FCD
 fn getLeadCcc(self: Self, cp: u21) u8 {
     const dc = self.mapping(cp, .nfd);
-    return self.ccc_data.ccc(dc.cps[0]);
+    return self.norm_data.ccc_data.ccc(dc.cps[0]);
 }
 
 fn getTrailCcc(self: Self, cp: u21) u8 {
@@ -727,7 +714,7 @@ fn getTrailCcc(self: Self, cp: u21) u8 {
     const len = for (dc.cps, 0..) |dcp, i| {
         if (dcp == 0) break i;
     } else dc.cps.len;
-    return self.ccc_data.ccc(dc.cps[len - 1]);
+    return self.norm_data.ccc_data.ccc(dc.cps[len - 1]);
 }
 
 /// Fast check to detect if a string is already in NFC or NFD form.
@@ -743,10 +730,10 @@ pub fn isFcd(self: Self, str: []const u8) bool {
 }
 
 test "isFcd" {
-    const allocator = std.testing.allocator;
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    const allocator = testing.allocator;
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     const is_nfc = "José \u{3D3}";
@@ -764,9 +751,9 @@ test "Unicode normalization tests" {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var data = try Data.init(allocator);
-    defer data.deinit();
-    var n = try init(allocator, &data);
+    var norm_data = try NormData.init(allocator);
+    defer norm_data.deinit();
+    var n = try init(allocator, &norm_data);
     defer n.deinit();
 
     var file = try std.fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
