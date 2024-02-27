@@ -16,9 +16,9 @@ const std = @import("std");
 // const ascii = @import("ascii");
 // const ascii = std.ascii;
 
-// const norm = @import("ziglyph").Normalizer;
+// const Normalizer = @import("ziglyph").Normalizer;
 const NormData = @import("Normalizer").NormData;
-const norm = @import("Normalizer");
+const Normalizer = @import("Normalizer");
 
 pub fn main() !void {
     var args_iter = std.process.args();
@@ -32,10 +32,9 @@ pub fn main() !void {
     const input = try std.fs.cwd().readFileAlloc(allocator, in_path, std.math.maxInt(u32));
     defer allocator.free(input);
 
-    var norm_data = try NormData.init(allocator);
-    defer norm_data.deinit();
-    var n = try norm.init(allocator, &norm_data);
-    defer n.deinit();
+    var data = try NormData.init(allocator);
+    defer data.deinit();
+    var n = Normalizer{ .norm_data = &data };
     // var n = try norm.init(allocator);
     // defer n.deinit();
 

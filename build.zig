@@ -43,6 +43,15 @@ pub fn build(b: *std.Build) void {
     const run_canon_gen_exe = b.addRunArtifact(canon_gen_exe);
     const canon_gen_out = run_canon_gen_exe.addOutputFileArg("canon.bin.z");
 
+    const compat_gen_exe = b.addExecutable(.{
+        .name = "compat",
+        .root_source_file = .{ .path = "codegen/compat.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_compat_gen_exe = b.addRunArtifact(compat_gen_exe);
+    const compat_gen_out = run_compat_gen_exe.addOutputFileArg("compat.bin.z");
+
     const ccc_gen_exe = b.addExecutable(.{
         .name = "ccc",
         .root_source_file = .{ .path = "codegen/ccc.zig" },
@@ -85,7 +94,7 @@ pub fn build(b: *std.Build) void {
 
     // Fixed pitch font display width
     const dw_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/DisplayWidthData.zig" },
+        .root_source_file = .{ .path = "src/WidthData.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -104,26 +113,34 @@ pub fn build(b: *std.Build) void {
 
     // Normalization
     const ccc_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/CombiningClassData.zig" },
+        .root_source_file = .{ .path = "src/CombiningData.zig" },
         .target = target,
         .optimize = optimize,
     });
     ccc_data.addAnonymousImport("ccc", .{ .root_source_file = ccc_gen_out });
 
     const canon_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/Canonical.zig" },
+        .root_source_file = .{ .path = "src/CanonData.zig" },
         .target = target,
         .optimize = optimize,
     });
     canon_data.addAnonymousImport("canon", .{ .root_source_file = canon_gen_out });
+
+    const compat_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/CompatData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    compat_data.addAnonymousImport("compat", .{ .root_source_file = compat_gen_out });
 
     const norm_data = b.createModule(.{
         .root_source_file = .{ .path = "src/NormData.zig" },
         .target = target,
         .optimize = optimize,
     });
-    norm_data.addImport("CanonicalData", canon_data);
-    norm_data.addImport("CombiningClassData", ccc_data);
+    norm_data.addImport("CanonData", canon_data);
+    norm_data.addImport("CompatData", compat_data);
+    norm_data.addImport("CombiningData", ccc_data);
 
     const norm = b.addModule("Normalizer", .{
         .root_source_file = .{ .path = "src/Normalizer.zig" },
