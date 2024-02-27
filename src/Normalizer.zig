@@ -1,12 +1,11 @@
-//! Normalizer contains functions and methods that implement Unicode Normalization algorithms. You can normalize strings
-//! into NFC, NFKC, NFD, and NFKD normalization forms (see `nfc`, `nfkc`, `nfd`, and `nfkd`). You can also test for
-//! string equality under different parameters related to normalization (see `eql`, `eqlCaseless`, `eqlIdentifiers`).
+//! Normalizer contains functions and methods that implement
+//! Unicode Normalization. You can normalize strings into NFC,
+//! NFKC, NFD, and NFKD normalization forms.
 
 const std = @import("std");
 const testing = std.testing;
 
 const CodePointIterator = @import("code_point").Iterator;
-const case_fold_map = @import("ziglyph").case_folding;
 const norm_props = @import("ziglyph").normalization_props;
 
 pub const NormData = @import("NormData");
@@ -499,44 +498,6 @@ test "nfkc" {
     try std.testing.expectEqualStrings("Complex char: \u{038E}", result.slice);
 }
 
-/// Tests for equality as per Unicode rules for Identifiers.
-pub fn eqlIdentifiers(allocator: std.mem.Allocator, a: []const u8, b: []const u8) !bool {
-    var list_a = try std.ArrayList(u21).initCapacity(allocator, a.len);
-    defer list_a.deinit();
-    var list_b = try std.ArrayList(u21).initCapacity(allocator, b.len);
-    defer list_b.deinit();
-
-    const Item = struct {
-        str: []const u8,
-        list: *std.ArrayList(u21),
-    };
-
-    const items = [_]Item{
-        .{ .str = a, .list = &list_a },
-        .{ .str = b, .list = &list_b },
-    };
-
-    for (items) |item| {
-        var cp_iter = CodePointIterator{ .bytes = item.str };
-        while (cp_iter.next()) |cp| {
-            if (norm_props.toNfkcCaseFold(cp.code)) |nfkcf| {
-                for (nfkcf) |c| {
-                    if (c == 0) break;
-                    item.list.appendAssumeCapacity(c);
-                }
-            } else {
-                item.list.appendAssumeCapacity(cp.code); // maps to itself
-            }
-        }
-    }
-
-    return std.mem.eql(u21, list_a.items, list_b.items);
-}
-
-test "eqlIdentifiers" {
-    try std.testing.expect(try eqlIdentifiers(std.testing.allocator, "Foé", "foé"));
-}
-
 /// Tests for equality of `a` and `b` after normalizing to NFD.
 pub fn eql(self: Self, allocator: std.mem.Allocator, a: []const u8, b: []const u8) !bool {
     var norm_result_a = try self.nfd(allocator, a);
@@ -555,74 +516,6 @@ test "eql" {
 
     try std.testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
     try std.testing.expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
-}
-
-fn requiresNfdBeforeCaseFold(cp: u21) bool {
-    return switch (cp) {
-        0x0345 => true,
-        0x1F80...0x1FAF => true,
-        0x1FB2...0x1FB4 => true,
-        0x1FB7 => true,
-        0x1FBC => true,
-        0x1FC2...0x1FC4 => true,
-        0x1FC7 => true,
-        0x1FCC => true,
-        0x1FF2...0x1FF4 => true,
-        0x1FF7 => true,
-        0x1FFC => true,
-        else => false,
-    };
-}
-
-fn requiresPreNfd(str: []const u8) bool {
-    var cp_iter = CodePointIterator{ .bytes = str };
-
-    return while (cp_iter.next()) |cp| {
-        if (requiresNfdBeforeCaseFold(cp.code)) break true;
-    } else false;
-}
-
-/// `eqlCaseless` tests for equality of `a` and `b` after normalizing to NFD and ignoring letter case.
-pub fn eqlCaseless(self: Self, allocator: std.mem.Allocator, a: []const u8, b: []const u8) !bool {
-    // The long winding road of normalized caseless matching...
-    // NFD(CaseFold(NFD(str))) or NFD(CaseFold(str))
-    var norm_result_a: Result = Result{ .slice = a };
-    if (requiresPreNfd(a)) {
-        if (!self.isFcd(a)) {
-            norm_result_a = try self.nfd(allocator, a);
-        }
-    }
-    defer norm_result_a.deinit();
-
-    const cf_a = try case_fold_map.caseFoldStr(allocator, norm_result_a.slice);
-    defer allocator.free(cf_a);
-    norm_result_a.deinit();
-    norm_result_a = try self.nfd(allocator, cf_a);
-
-    var norm_result_b: Result = Result{ .slice = b };
-    if (requiresPreNfd(b)) {
-        if (!self.isFcd(b)) {
-            norm_result_b = try self.nfd(allocator, b);
-        }
-    }
-    defer norm_result_b.deinit();
-
-    const cf_b = try case_fold_map.caseFoldStr(allocator, norm_result_b.slice);
-    defer allocator.free(cf_b);
-    norm_result_b.deinit();
-    norm_result_b = try self.nfd(allocator, cf_b);
-
-    return std.mem.eql(u8, norm_result_a.slice, norm_result_b.slice);
-}
-
-test "eqlCaseless" {
-    const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
-    defer data.deinit();
-    var n = Self{ .norm_data = &data };
-
-    try std.testing.expect(try n.eqlCaseless(allocator, "Foϓ", "fo\u{03D2}\u{0301}"));
-    try std.testing.expect(try n.eqlCaseless(allocator, "FOÉ", "foe\u{0301}")); // foÉ == foé
 }
 
 // FCD
