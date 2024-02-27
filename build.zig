@@ -79,6 +79,15 @@ pub fn build(b: *std.Build) void {
     const run_ccc_gen_exe = b.addRunArtifact(ccc_gen_exe);
     const ccc_gen_out = run_ccc_gen_exe.addOutputFileArg("ccc.bin.z");
 
+    const gencat_gen_exe = b.addExecutable(.{
+        .name = "gencat",
+        .root_source_file = .{ .path = "codegen/gencat.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_gencat_gen_exe = b.addRunArtifact(gencat_gen_exe);
+    const gencat_gen_out = run_gencat_gen_exe.addOutputFileArg("gencat.bin.z");
+
     // Modules we provide
     // Code points
     const code_point = b.addModule("code_point", .{
@@ -185,6 +194,14 @@ pub fn build(b: *std.Build) void {
     norm.addImport("ziglyph", ziglyph.module("ziglyph"));
     norm.addImport("NormData", norm_data);
 
+    // General Category
+    const gencat_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/GenCatData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    gencat_data.addAnonymousImport("gencat", .{ .root_source_file = gencat_gen_out });
+
     // Benchmark rig
     const exe = b.addExecutable(.{
         .name = "zg",
@@ -194,10 +211,11 @@ pub fn build(b: *std.Build) void {
     });
     // exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
     // exe.root_module.addImport("ascii", ascii);
-    // exe.root_module.addImport("code_point", code_point);
+    exe.root_module.addImport("code_point", code_point);
     // exe.root_module.addImport("grapheme", grapheme);
     // exe.root_module.addImport("DisplayWidth", display_width);
-    exe.root_module.addImport("Normalizer", norm);
+    // exe.root_module.addImport("Normalizer", norm);
+    exe.root_module.addImport("GenCatData", gencat_data);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);

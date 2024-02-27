@@ -15,7 +15,7 @@ pub const Syllable = enum {
 
 allocator: mem.Allocator,
 s1: []u16 = undefined,
-s2: []Syllable = undefined,
+s2: []u3 = undefined,
 
 const Self = @This();
 
@@ -35,8 +35,8 @@ pub fn init(allocator: mem.Allocator) !Self {
     for (0..stage_1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
 
     const stage_2_len: u16 = try reader.readInt(u16, endian);
-    self.s2 = try allocator.alloc(Syllable, stage_2_len);
-    for (0..stage_2_len) |i| self.s2[i] = @enumFromInt(try reader.readInt(u8, endian));
+    self.s2 = try allocator.alloc(u3, stage_2_len);
+    for (0..stage_2_len) |i| self.s2[i] = @intCast(try reader.readInt(u8, endian));
 
     return self;
 }
@@ -48,5 +48,5 @@ pub fn deinit(self: *Self) void {
 
 /// Returns the Hangul syllable type for `cp`.
 pub inline fn syllable(self: Self, cp: u21) Syllable {
-    return self.s2[self.s1[cp >> 8] + (cp & 0xff)];
+    return @enumFromInt(self.s2[self.s1[cp >> 8] + (cp & 0xff)]);
 }
