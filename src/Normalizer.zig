@@ -7,7 +7,6 @@ const testing = std.testing;
 
 const CodePointIterator = @import("code_point").Iterator;
 const case_fold_map = @import("ziglyph").case_folding;
-const hangul_map = @import("ziglyph").hangul;
 const norm_props = @import("ziglyph").normalization_props;
 
 pub const NormData = @import("NormData");
@@ -17,9 +16,9 @@ norm_data: *NormData,
 const Self = @This();
 
 // Hangul processing utilities.
-fn isHangulPrecomposed(cp: u21) bool {
-    if (hangul_map.syllableType(cp)) |kind| return kind == .LV or kind == .LVT;
-    return false;
+fn isHangulPrecomposed(self: Self, cp: u21) bool {
+    const kind = self.norm_data.hangul_data.syllable(cp);
+    return kind == .LV or kind == .LVT;
 }
 
 const SBase: u21 = 0xAC00;
@@ -117,7 +116,7 @@ pub fn decompose(self: Self, cp: u21, form: Form) Decomp {
     }
 
     // Hangul precomposed syllable full decomposition.
-    if (isHangulPrecomposed(cp)) {
+    if (self.isHangulPrecomposed(cp)) {
         const cps = decomposeHangul(cp);
         @memcpy(dc.cps[0..cps.len], &cps);
         return dc;
@@ -335,12 +334,12 @@ test "nfkd !ASCII / alloc" {
 
 // Composition utilities.
 
-fn isHangul(cp: u21) bool {
-    return cp >= 0x1100 and hangul_map.syllableType(cp) != null;
+fn isHangul(self: Self, cp: u21) bool {
+    return cp >= 0x1100 and self.norm_data.hangul_data.syllable(cp) != .none;
 }
 
 fn isNonHangulStarter(self: Self, cp: u21) bool {
-    return !isHangul(cp) and self.norm_data.ccc_data.isStarter(cp);
+    return !self.isHangul(cp) and self.norm_data.ccc_data.isStarter(cp);
 }
 
 /// Normalizes `str` to NFC.
@@ -395,7 +394,7 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
                         for (d_list.items[(j + 1)..i]) |B| {
                             const cc_B = self.norm_data.ccc_data.ccc(B);
                             // Check for blocking conditions.
-                            if (isHangul(C)) {
+                            if (self.isHangul(C)) {
                                 if (cc_B != 0 or self.isNonHangulStarter(B)) continue :block_check;
                             }
                             if (cc_B >= cc_C) continue :block_check;
@@ -414,9 +413,9 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
                 const L = d_list.items[sidx];
                 var processed_hangul = false;
 
-                if (isHangul(L) and isHangul(C)) {
-                    const l_stype = hangul_map.syllableType(L).?;
-                    const c_stype = hangul_map.syllableType(C).?;
+                if (self.isHangul(L) and self.isHangul(C)) {
+                    const l_stype = self.norm_data.hangul_data.syllable(L);
+                    const c_stype = self.norm_data.hangul_data.syllable(C);
 
                     if (l_stype == .LV and c_stype == .T) {
                         // LV, T

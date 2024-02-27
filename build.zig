@@ -52,6 +52,15 @@ pub fn build(b: *std.Build) void {
     const run_compat_gen_exe = b.addRunArtifact(compat_gen_exe);
     const compat_gen_out = run_compat_gen_exe.addOutputFileArg("compat.bin.z");
 
+    const hangul_gen_exe = b.addExecutable(.{
+        .name = "hangul",
+        .root_source_file = .{ .path = "codegen/hangul.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_hangul_gen_exe = b.addRunArtifact(hangul_gen_exe);
+    const hangul_gen_out = run_hangul_gen_exe.addOutputFileArg("hangul.bin.z");
+
     const ccc_gen_exe = b.addExecutable(.{
         .name = "ccc",
         .root_source_file = .{ .path = "codegen/ccc.zig" },
@@ -133,14 +142,22 @@ pub fn build(b: *std.Build) void {
     });
     compat_data.addAnonymousImport("compat", .{ .root_source_file = compat_gen_out });
 
+    const hangul_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/HangulData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    hangul_data.addAnonymousImport("hangul", .{ .root_source_file = hangul_gen_out });
+
     const norm_data = b.createModule(.{
         .root_source_file = .{ .path = "src/NormData.zig" },
         .target = target,
         .optimize = optimize,
     });
     norm_data.addImport("CanonData", canon_data);
-    norm_data.addImport("CompatData", compat_data);
     norm_data.addImport("CombiningData", ccc_data);
+    norm_data.addImport("CompatData", compat_data);
+    norm_data.addImport("HangulData", hangul_data);
 
     const norm = b.addModule("Normalizer", .{
         .root_source_file = .{ .path = "src/Normalizer.zig" },
