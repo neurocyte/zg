@@ -25,9 +25,9 @@ pub fn main() !void {
     _ = args_iter.skip();
     const in_path = args_iter.next() orelse return error.MissingArg;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
     const input = try std.fs.cwd().readFileAlloc(allocator, in_path, std.math.maxInt(u32));
     defer allocator.free(input);
@@ -51,9 +51,9 @@ pub fn main() !void {
     // while (iter.next()) |_| result += 1;
     // while (iter.next()) |line| result += strWidth(line, &data);
     while (iter.next()) |line| {
-        var nfc = try n.nfc(allocator, line);
+        const nfc = try n.nfc(allocator, line);
         result += nfc.slice.len;
-        nfc.deinit();
+        // nfc.deinit();
     }
 
     std.debug.print("result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });

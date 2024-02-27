@@ -61,6 +61,15 @@ pub fn build(b: *std.Build) void {
     const run_hangul_gen_exe = b.addRunArtifact(hangul_gen_exe);
     const hangul_gen_out = run_hangul_gen_exe.addOutputFileArg("hangul.bin.z");
 
+    const normp_gen_exe = b.addExecutable(.{
+        .name = "normp",
+        .root_source_file = .{ .path = "codegen/normp.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_normp_gen_exe = b.addRunArtifact(normp_gen_exe);
+    const normp_gen_out = run_normp_gen_exe.addOutputFileArg("normp.bin.z");
+
     const ccc_gen_exe = b.addExecutable(.{
         .name = "ccc",
         .root_source_file = .{ .path = "codegen/ccc.zig" },
@@ -149,6 +158,13 @@ pub fn build(b: *std.Build) void {
     });
     hangul_data.addAnonymousImport("hangul", .{ .root_source_file = hangul_gen_out });
 
+    const normp_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/NormPropsData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    normp_data.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
+
     const norm_data = b.createModule(.{
         .root_source_file = .{ .path = "src/NormData.zig" },
         .target = target,
@@ -158,6 +174,7 @@ pub fn build(b: *std.Build) void {
     norm_data.addImport("CombiningData", ccc_data);
     norm_data.addImport("CompatData", compat_data);
     norm_data.addImport("HangulData", hangul_data);
+    norm_data.addImport("NormPropsData", normp_data);
 
     const norm = b.addModule("Normalizer", .{
         .root_source_file = .{ .path = "src/Normalizer.zig" },
@@ -200,7 +217,7 @@ pub fn build(b: *std.Build) void {
     exe_unit_tests.root_module.addImport("code_point", code_point);
     // exe_unit_tests.root_module.addImport("GraphemeData", grapheme_data);
     // exe_unit_tests.root_module.addImport("grapheme", grapheme);
-    exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
+    // exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
     // exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
     // exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
     exe_unit_tests.root_module.addImport("NormData", norm_data);

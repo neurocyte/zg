@@ -6,8 +6,6 @@ const std = @import("std");
 const testing = std.testing;
 
 const CodePointIterator = @import("code_point").Iterator;
-const norm_props = @import("ziglyph").normalization_props;
-
 pub const NormData = @import("NormData");
 
 norm_data: *NormData,
@@ -109,7 +107,10 @@ pub fn decompose(self: Self, cp: u21, form: Form) Decomp {
     var dc = Decomp{ .form = form };
 
     // ASCII or NFD / NFKD quick checks.
-    if (cp <= 127 or (form == .nfd and norm_props.isNfd(cp)) or (form == .nfkd and norm_props.isNfkd(cp))) {
+    if (cp <= 127 or
+        (form == .nfd and self.norm_data.normp_data.isNfd(cp)) or
+        (form == .nfkd and self.norm_data.normp_data.isNfkd(cp)))
+    {
         dc.cps[0] = cp;
         return dc;
     }
@@ -436,7 +437,7 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
                 if (!processed_hangul) {
                     // L -> C not Hangul.
                     if (self.norm_data.canon_data.toNfc(.{ L, C })) |P| {
-                        if (!norm_props.isFcx(P)) {
+                        if (!self.norm_data.normp_data.isFcx(P)) {
                             d_list.items[sidx] = P;
                             d_list.items[i] = tombstone; // Mark for deletion.
                             deleted += 1;
