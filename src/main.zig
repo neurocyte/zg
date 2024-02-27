@@ -35,7 +35,7 @@ pub fn main() !void {
     var data = try NormData.init(allocator);
     defer data.deinit();
     var n = Normalizer{ .norm_data = &data };
-    // var n = try norm.init(allocator);
+    // var n = try Normalizer.init(allocator);
     // defer n.deinit();
 
     // var iter = GraphemeIterator.init(input, &data);
