@@ -5,18 +5,13 @@
 const std = @import("std");
 const testing = std.testing;
 
+const ascii = @import("ascii");
 const CodePointIterator = @import("code_point").Iterator;
 pub const NormData = @import("NormData");
 
 norm_data: *NormData,
 
 const Self = @This();
-
-// Hangul processing utilities.
-fn isHangulPrecomposed(self: Self, cp: u21) bool {
-    const kind = self.norm_data.hangul_data.syllable(cp);
-    return kind == .LV or kind == .LVT;
-}
 
 const SBase: u21 = 0xAC00;
 const LBase: u21 = 0x1100;
@@ -28,17 +23,30 @@ const TCount: u21 = 28;
 const NCount: u21 = 588; // VCount * TCount
 const SCount: u21 = 11172; // LCount * NCount
 
-fn decomposeHangul(cp: u21) [3]u21 {
+fn decomposeHangul(self: Self, cp: u21, buf: []u21) ?Decomp {
+    const kind = self.norm_data.hangul_data.syllable(cp);
+    if (kind != .LV and kind != .LVT) return null;
+
     const SIndex: u21 = cp - SBase;
     const LIndex: u21 = SIndex / NCount;
     const VIndex: u21 = (SIndex % NCount) / TCount;
     const TIndex: u21 = SIndex % TCount;
     const LPart: u21 = LBase + LIndex;
     const VPart: u21 = VBase + VIndex;
-    var TPart: u21 = 0;
-    if (TIndex != 0) TPart = TBase + TIndex;
 
-    return [3]u21{ LPart, VPart, TPart };
+    var dc = Decomp{ .form = .nfd };
+    buf[0] = LPart;
+    buf[1] = VPart;
+
+    if (TIndex == 0) {
+        dc.cps = buf[0..2];
+        return dc;
+    }
+
+    // TPart
+    buf[2] = TBase + TIndex;
+    dc.cps = buf[0..3];
+    return dc;
 }
 
 fn composeHangulCanon(lv: u21, t: u21) u21 {
@@ -70,59 +78,59 @@ const Form = enum {
 };
 
 const Decomp = struct {
-    form: Form = .nfd,
-    cps: [18]u21 = [_]u21{0} ** 18,
+    form: Form = .same,
+    cps: []const u21 = &.{},
 };
 
 /// `mapping` retrieves the decomposition mapping for a code point as per the UCD.
 pub fn mapping(self: Self, cp: u21, form: Form) Decomp {
-    std.debug.assert(form == .nfd or form == .nfkd);
+    var dc = Decomp{};
 
-    var dc = Decomp{ .form = .nfd };
-    const canon_dc = self.norm_data.canon_data.toNfd(cp);
-    const len: usize = if (canon_dc[1] == 0) 1 else 2;
+    switch (form) {
+        .nfd => {
+            dc.cps = self.norm_data.canon_data.toNfd(cp);
+            if (dc.cps.len != 0) dc.form = .nfd;
+        },
 
-    if (len == 1 and canon_dc[0] == cp) {
-        dc.form = .same;
-        dc.cps[0] = cp;
-    } else {
-        @memcpy(dc.cps[0..len], canon_dc[0..len]);
-    }
+        .nfkd => {
+            dc.cps = self.norm_data.compat_data.toNfkd(cp);
+            if (dc.cps.len != 0) {
+                dc.form = .nfkd;
+            } else {
+                dc.cps = self.norm_data.canon_data.toNfd(cp);
+                if (dc.cps.len != 0) dc.form = .nfkd;
+            }
+        },
 
-    const compat_dc = self.norm_data.compat_data.toNfkd(cp);
-    if (compat_dc.len != 0) {
-        if (form != .nfd) {
-            dc.form = .nfkd;
-            @memcpy(dc.cps[0..compat_dc.len], compat_dc);
-        }
+        else => @panic("Normalizer.mapping only accepts form .nfd or .nfkd."),
     }
 
     return dc;
 }
 
 /// `decompose` a code point to the specified normalization form, which should be either `.nfd` or `.nfkd`.
-pub fn decompose(self: Self, cp: u21, form: Form) Decomp {
-    std.debug.assert(form == .nfd or form == .nfkd);
+pub fn decompose(
+    self: Self,
+    cp: u21,
+    form: Form,
+    buf: []u21,
+) Decomp {
+    // ASCII
+    if (cp < 128) return .{};
 
-    var dc = Decomp{ .form = form };
-
-    // ASCII or NFD / NFKD quick checks.
-    if (cp <= 127 or
-        (form == .nfd and self.norm_data.normp_data.isNfd(cp)) or
-        (form == .nfkd and self.norm_data.normp_data.isNfkd(cp)))
-    {
-        dc.cps[0] = cp;
-        return dc;
+    // NFD / NFKD quick checks.
+    switch (form) {
+        .nfd => if (self.norm_data.normp_data.isNfd(cp)) return .{},
+        .nfkd => if (self.norm_data.normp_data.isNfkd(cp)) return .{},
+        else => @panic("Normalizer.decompose only accepts form .nfd or .nfkd."),
     }
 
     // Hangul precomposed syllable full decomposition.
-    if (self.isHangulPrecomposed(cp)) {
-        const cps = decomposeHangul(cp);
-        @memcpy(dc.cps[0..cps.len], &cps);
-        return dc;
-    }
+    if (self.decomposeHangul(cp, buf)) |dc| return dc;
 
     // Full decomposition.
+    var dc = Decomp{ .form = form };
+
     var result_index: usize = 0;
     var work_index: usize = 1;
 
@@ -137,26 +145,23 @@ pub fn decompose(self: Self, cp: u21, form: Form) Decomp {
 
         // No more of decompositions for this code point.
         if (m.form == .same) {
-            dc.cps[result_index] = m.cps[0];
+            buf[result_index] = next;
             result_index += 1;
             continue;
         }
 
-        // Find last index of decomposition.
-        const m_last = for (m.cps, 0..) |mcp, i| {
-            if (mcp == 0) break i;
-        } else m.cps.len;
-
         // Work backwards through decomposition.
         // `i` starts at 1 because m_last is 1 past the last code point.
         var i: usize = 1;
-        while (i <= m_last) : ({
+        while (i <= m.cps.len) : ({
             i += 1;
             work_index += 1;
         }) {
-            work[work_index] = m.cps[m_last - i];
+            work[work_index] = m.cps[m.cps.len - i];
         }
     }
+
+    dc.cps = buf[0..result_index];
 
     return dc;
 }
@@ -167,56 +172,43 @@ test "decompose" {
     defer data.deinit();
     var n = Self{ .norm_data = &data };
 
-    var dc = n.decompose('é', .nfd);
+    var buf: [18]u21 = undefined;
+
+    var dc = n.decompose('é', .nfd, &buf);
     try std.testing.expect(dc.form == .nfd);
     try std.testing.expectEqualSlices(u21, &[_]u21{ 'e', '\u{301}' }, dc.cps[0..2]);
 
-    dc = n.decompose('\u{1e0a}', .nfd);
+    dc = n.decompose('\u{1e0a}', .nfd, &buf);
     try std.testing.expect(dc.form == .nfd);
     try std.testing.expectEqualSlices(u21, &[_]u21{ 'D', '\u{307}' }, dc.cps[0..2]);
 
-    dc = n.decompose('\u{1e0a}', .nfkd);
+    dc = n.decompose('\u{1e0a}', .nfkd, &buf);
     try std.testing.expect(dc.form == .nfkd);
     try std.testing.expectEqualSlices(u21, &[_]u21{ 'D', '\u{307}' }, dc.cps[0..2]);
 
-    dc = n.decompose('\u{3189}', .nfd);
-    try std.testing.expect(dc.form == .nfd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{'\u{3189}'}, dc.cps[0..1]);
+    dc = n.decompose('\u{3189}', .nfd, &buf);
+    try std.testing.expect(dc.form == .same);
+    try std.testing.expect(dc.cps.len == 0);
 
-    dc = n.decompose('\u{3189}', .nfkd);
+    dc = n.decompose('\u{3189}', .nfkd, &buf);
     try std.testing.expect(dc.form == .nfkd);
     try std.testing.expectEqualSlices(u21, &[_]u21{'\u{1188}'}, dc.cps[0..1]);
 
-    dc = n.decompose('\u{ace1}', .nfd);
+    dc = n.decompose('\u{ace1}', .nfd, &buf);
     try std.testing.expect(dc.form == .nfd);
     try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{1100}', '\u{1169}', '\u{11a8}' }, dc.cps[0..3]);
 
-    dc = n.decompose('\u{ace1}', .nfkd);
-    try std.testing.expect(dc.form == .nfkd);
+    dc = n.decompose('\u{ace1}', .nfkd, &buf);
+    try std.testing.expect(dc.form == .nfd);
     try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{1100}', '\u{1169}', '\u{11a8}' }, dc.cps[0..3]);
 
-    dc = n.decompose('\u{3d3}', .nfd);
+    dc = n.decompose('\u{3d3}', .nfd, &buf);
     try std.testing.expect(dc.form == .nfd);
     try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{3d2}', '\u{301}' }, dc.cps[0..2]);
 
-    dc = n.decompose('\u{3d3}', .nfkd);
+    dc = n.decompose('\u{3d3}', .nfkd, &buf);
     try std.testing.expect(dc.form == .nfkd);
     try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{3a5}', '\u{301}' }, dc.cps[0..2]);
-}
-
-// Some quick checks.
-
-fn onlyAscii(str: []const u8) bool {
-    return for (str) |b| {
-        if (b > 127) break false;
-    } else true;
-}
-
-fn onlyLatin1(str: []const u8) bool {
-    var cp_iter = CodePointIterator{ .bytes = str };
-    return while (cp_iter.next()) |cp| {
-        if (cp.code > 256) break false;
-    } else true;
 }
 
 /// Returned from various functions in this namespace. Remember to call `deinit` to free any allocated memory.
@@ -256,18 +248,21 @@ pub fn nfkd(self: Self, allocator: std.mem.Allocator, str: []const u8) !Result {
 
 fn nfxd(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !Result {
     // Quick checks.
-    if (onlyAscii(str)) return Result{ .slice = str };
+    if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
 
-    var dcp_list = try std.ArrayList(u21).initCapacity(allocator, str.len + str.len / 2);
+    var dcp_list = try std.ArrayList(u21).initCapacity(allocator, str.len * 3);
     defer dcp_list.deinit();
 
     var cp_iter = CodePointIterator{ .bytes = str };
+    var dc_buf: [18]u21 = undefined;
+
     while (cp_iter.next()) |cp| {
-        const dc = self.decompose(cp.code, form);
-        const slice = for (dc.cps, 0..) |dcp, i| {
-            if (dcp == 0) break dc.cps[0..i];
-        } else dc.cps[0..];
-        try dcp_list.appendSlice(slice);
+        const dc = self.decompose(cp.code, form, &dc_buf);
+        if (dc.form == .same) {
+            try dcp_list.append(cp.code);
+        } else {
+            try dcp_list.appendSlice(dc.cps);
+        }
     }
 
     self.canonicalSort(dcp_list.items);
@@ -354,8 +349,7 @@ pub fn nfkc(self: Self, allocator: std.mem.Allocator, str: []const u8) !Result {
 
 fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !Result {
     // Quick checks.
-    if (onlyAscii(str)) return Result{ .slice = str };
-    if (form == .nfc and onlyLatin1(str)) return Result{ .slice = str };
+    if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
 
     // Decompose first.
     var d_result = if (form == .nfc)
@@ -522,15 +516,14 @@ test "eql" {
 // FCD
 fn getLeadCcc(self: Self, cp: u21) u8 {
     const dc = self.mapping(cp, .nfd);
-    return self.norm_data.ccc_data.ccc(dc.cps[0]);
+    const dcp = if (dc.form == .same) cp else dc.cps[0];
+    return self.norm_data.ccc_data.ccc(dcp);
 }
 
 fn getTrailCcc(self: Self, cp: u21) u8 {
     const dc = self.mapping(cp, .nfd);
-    const len = for (dc.cps, 0..) |dcp, i| {
-        if (dcp == 0) break i;
-    } else dc.cps.len;
-    return self.norm_data.ccc_data.ccc(dc.cps[len - 1]);
+    const dcp = if (dc.form == .same) cp else dc.cps[dc.cps.len - 1];
+    return self.norm_data.ccc_data.ccc(dcp);
 }
 
 /// Fast check to detect if a string is already in NFC or NFD form.

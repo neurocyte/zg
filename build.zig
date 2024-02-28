@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Dependencies
-    const ziglyph = b.dependency("ziglyph", .{});
+    // const ziglyph = b.dependency("ziglyph", .{});
 
     // Code generation
     // Grapheme break
@@ -190,8 +190,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    norm.addImport("ascii", ascii);
     norm.addImport("code_point", code_point);
-    norm.addImport("ziglyph", ziglyph.module("ziglyph"));
     norm.addImport("NormData", norm_data);
 
     // General Category
@@ -211,11 +211,11 @@ pub fn build(b: *std.Build) void {
     });
     // exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
     // exe.root_module.addImport("ascii", ascii);
-    exe.root_module.addImport("code_point", code_point);
+    // exe.root_module.addImport("code_point", code_point);
     // exe.root_module.addImport("grapheme", grapheme);
     // exe.root_module.addImport("DisplayWidth", display_width);
-    // exe.root_module.addImport("Normalizer", norm);
-    exe.root_module.addImport("GenCatData", gencat_data);
+    exe.root_module.addImport("Normalizer", norm);
+    // exe.root_module.addImport("GenCatData", gencat_data);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -231,7 +231,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    // exe_unit_tests.root_module.addImport("ascii", ascii);
+    exe_unit_tests.root_module.addImport("ascii", ascii);
     exe_unit_tests.root_module.addImport("code_point", code_point);
     // exe_unit_tests.root_module.addImport("GraphemeData", grapheme_data);
     // exe_unit_tests.root_module.addImport("grapheme", grapheme);
@@ -239,6 +239,7 @@ pub fn build(b: *std.Build) void {
     // exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
     // exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
     exe_unit_tests.root_module.addImport("NormData", norm_data);
+    // exe_unit_tests.filter = "nfd !ASCII";
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
 

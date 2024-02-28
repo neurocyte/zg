@@ -22,7 +22,7 @@ pub fn init(allocator: mem.Allocator) !Self {
         .nfkd = try allocator.alloc([]u21, 0x110000),
     };
 
-    for (0..0x110000) |i| self.nfkd[i] = &.{};
+    @memset(self.nfkd, &.{});
 
     while (true) {
         const len: u8 = try reader.readInt(u8, endian);

@@ -5,7 +5,7 @@ const mem = std.mem;
 
 allocator: mem.Allocator,
 nfc: std.AutoHashMap([2]u21, u21),
-nfd: [][2]u21 = undefined,
+nfd: [][]u21 = undefined,
 
 const Self = @This();
 
@@ -21,19 +21,21 @@ pub fn init(allocator: mem.Allocator) !Self {
     var self = Self{
         .allocator = allocator,
         .nfc = std.AutoHashMap([2]u21, u21).init(allocator),
-        .nfd = try allocator.alloc([2]u21, 0x110000),
+        .nfd = try allocator.alloc([]u21, 0x110000),
     };
 
-    for (0..0x110000) |i| self.nfd[i] = .{ @intCast(i), 0 };
+    @memset(self.nfd, &.{});
 
     while (true) {
         const len: u8 = try reader.readInt(u8, endian);
         if (len == 0) break;
         const cp = try reader.readInt(u24, endian);
-        self.nfd[cp][0] = @intCast(try reader.readInt(u24, endian));
+        self.nfd[cp] = try allocator.alloc(u21, len - 1);
+        for (0..len - 1) |i| {
+            self.nfd[cp][i] = @intCast(try reader.readInt(u24, endian));
+        }
         if (len == 3) {
-            self.nfd[cp][1] = @intCast(try reader.readInt(u24, endian));
-            try self.nfc.put(self.nfd[cp], @intCast(cp));
+            try self.nfc.put(self.nfd[cp][0..2].*, @intCast(cp));
         }
     }
 
@@ -42,11 +44,12 @@ pub fn init(allocator: mem.Allocator) !Self {
 
 pub fn deinit(self: *Self) void {
     self.nfc.deinit();
+    for (self.nfd) |slice| self.allocator.free(slice);
     self.allocator.free(self.nfd);
 }
 
 /// Returns canonical decomposition for `cp`.
-pub inline fn toNfd(self: Self, cp: u21) [2]u21 {
+pub inline fn toNfd(self: Self, cp: u21) []const u21 {
     return self.nfd[cp];
 }
 
