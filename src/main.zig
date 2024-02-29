@@ -56,7 +56,7 @@ pub fn main() !void {
     // while (iter.next()) |_| result += 1;
     // while (iter.next()) |line| result += strWidth(line, &data);
     while (iter.next()) |line| {
-        const nfc = try n.nfd(allocator, line);
+        const nfc = try n.nfkc(allocator, line);
         result += nfc.slice.len;
         // nfc.deinit();
     }

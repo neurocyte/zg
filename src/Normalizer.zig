@@ -3,7 +3,16 @@
 //! NFKC, NFD, and NFKD normalization forms.
 
 const std = @import("std");
+const assert = std.debug.assert;
+const debug = std.debug;
+const fmt = std.fmt;
+const fs = std.fs;
+const heap = std.heap;
+const io = std.io;
+const mem = std.mem;
+const simd = std.simd;
 const testing = std.testing;
+const unicode = std.unicode;
 
 const ascii = @import("ascii");
 const CodePointIterator = @import("code_point").Iterator;
@@ -50,20 +59,20 @@ fn decomposeHangul(self: Self, cp: u21, buf: []u21) ?Decomp {
 }
 
 fn composeHangulCanon(lv: u21, t: u21) u21 {
-    std.debug.assert(0x11A8 <= t and t <= 0x11C2);
+    assert(0x11A8 <= t and t <= 0x11C2);
     return lv + (t - TBase);
 }
 
 fn composeHangulFull(l: u21, v: u21, t: u21) u21 {
-    std.debug.assert(0x1100 <= l and l <= 0x1112);
-    std.debug.assert(0x1161 <= v and v <= 0x1175);
+    assert(0x1100 <= l and l <= 0x1112);
+    assert(0x1161 <= v and v <= 0x1175);
     const LIndex = l - LBase;
     const VIndex = v - VBase;
     const LVIndex = LIndex * NCount + VIndex * TCount;
 
     if (t == 0) return SBase + LVIndex;
 
-    std.debug.assert(0x11A8 <= t and t <= 0x11C2);
+    assert(0x11A8 <= t and t <= 0x11C2);
     const TIndex = t - TBase;
 
     return SBase + LVIndex + TIndex;
@@ -175,45 +184,45 @@ test "decompose" {
     var buf: [18]u21 = undefined;
 
     var dc = n.decompose('é', .nfd, &buf);
-    try std.testing.expect(dc.form == .nfd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{ 'e', '\u{301}' }, dc.cps[0..2]);
+    try testing.expect(dc.form == .nfd);
+    try testing.expectEqualSlices(u21, &[_]u21{ 'e', '\u{301}' }, dc.cps[0..2]);
 
     dc = n.decompose('\u{1e0a}', .nfd, &buf);
-    try std.testing.expect(dc.form == .nfd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{ 'D', '\u{307}' }, dc.cps[0..2]);
+    try testing.expect(dc.form == .nfd);
+    try testing.expectEqualSlices(u21, &[_]u21{ 'D', '\u{307}' }, dc.cps[0..2]);
 
     dc = n.decompose('\u{1e0a}', .nfkd, &buf);
-    try std.testing.expect(dc.form == .nfkd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{ 'D', '\u{307}' }, dc.cps[0..2]);
+    try testing.expect(dc.form == .nfkd);
+    try testing.expectEqualSlices(u21, &[_]u21{ 'D', '\u{307}' }, dc.cps[0..2]);
 
     dc = n.decompose('\u{3189}', .nfd, &buf);
-    try std.testing.expect(dc.form == .same);
-    try std.testing.expect(dc.cps.len == 0);
+    try testing.expect(dc.form == .same);
+    try testing.expect(dc.cps.len == 0);
 
     dc = n.decompose('\u{3189}', .nfkd, &buf);
-    try std.testing.expect(dc.form == .nfkd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{'\u{1188}'}, dc.cps[0..1]);
+    try testing.expect(dc.form == .nfkd);
+    try testing.expectEqualSlices(u21, &[_]u21{'\u{1188}'}, dc.cps[0..1]);
 
     dc = n.decompose('\u{ace1}', .nfd, &buf);
-    try std.testing.expect(dc.form == .nfd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{1100}', '\u{1169}', '\u{11a8}' }, dc.cps[0..3]);
+    try testing.expect(dc.form == .nfd);
+    try testing.expectEqualSlices(u21, &[_]u21{ '\u{1100}', '\u{1169}', '\u{11a8}' }, dc.cps[0..3]);
 
     dc = n.decompose('\u{ace1}', .nfkd, &buf);
-    try std.testing.expect(dc.form == .nfd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{1100}', '\u{1169}', '\u{11a8}' }, dc.cps[0..3]);
+    try testing.expect(dc.form == .nfd);
+    try testing.expectEqualSlices(u21, &[_]u21{ '\u{1100}', '\u{1169}', '\u{11a8}' }, dc.cps[0..3]);
 
     dc = n.decompose('\u{3d3}', .nfd, &buf);
-    try std.testing.expect(dc.form == .nfd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{3d2}', '\u{301}' }, dc.cps[0..2]);
+    try testing.expect(dc.form == .nfd);
+    try testing.expectEqualSlices(u21, &[_]u21{ '\u{3d2}', '\u{301}' }, dc.cps[0..2]);
 
     dc = n.decompose('\u{3d3}', .nfkd, &buf);
-    try std.testing.expect(dc.form == .nfkd);
-    try std.testing.expectEqualSlices(u21, &[_]u21{ '\u{3a5}', '\u{301}' }, dc.cps[0..2]);
+    try testing.expect(dc.form == .nfkd);
+    try testing.expectEqualSlices(u21, &[_]u21{ '\u{3a5}', '\u{301}' }, dc.cps[0..2]);
 }
 
 /// Returned from various functions in this namespace. Remember to call `deinit` to free any allocated memory.
 pub const Result = struct {
-    allocator: ?std.mem.Allocator = null,
+    allocator: ?mem.Allocator = null,
     slice: []const u8,
 
     pub fn deinit(self: *Result) void {
@@ -232,25 +241,25 @@ fn canonicalSort(self: Self, cps: []u21) void {
     while (i < cps.len) : (i += 1) {
         const start: usize = i;
         while (i < cps.len and self.norm_data.ccc_data.ccc(cps[i]) != 0) : (i += 1) {}
-        std.mem.sort(u21, cps[start..i], self, cccLess);
+        mem.sort(u21, cps[start..i], self, cccLess);
     }
 }
 
 /// Normalize `str` to NFD.
-pub fn nfd(self: Self, allocator: std.mem.Allocator, str: []const u8) !Result {
+pub fn nfd(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
     return self.nfxd(allocator, str, .nfd);
 }
 
 /// Normalize `str` to NFKD.
-pub fn nfkd(self: Self, allocator: std.mem.Allocator, str: []const u8) !Result {
+pub fn nfkd(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
     return self.nfxd(allocator, str, .nfkd);
 }
 
-fn nfxd(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !Result {
+fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Result {
     // Quick checks.
     if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
 
-    var dcp_list = try std.ArrayList(u21).initCapacity(allocator, str.len * 3);
+    var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
     var cp_iter = CodePointIterator{ .bytes = str };
@@ -272,7 +281,7 @@ fn nfxd(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 
     var buf: [4]u8 = undefined;
     for (dcp_list.items) |dcp| {
-        const len = try std.unicode.utf8Encode(dcp, &buf);
+        const len = try unicode.utf8Encode(dcp, &buf);
         dstr_list.appendSliceAssumeCapacity(buf[0..len]);
     }
 
@@ -288,7 +297,7 @@ test "nfd ASCII / no-alloc" {
     var result = try n.nfd(allocator, "Hello World!");
     defer result.deinit();
 
-    try std.testing.expectEqualStrings("Hello World!", result.slice);
+    try testing.expectEqualStrings("Hello World!", result.slice);
 }
 
 test "nfd !ASCII / alloc" {
@@ -300,7 +309,7 @@ test "nfd !ASCII / alloc" {
     var result = try n.nfd(allocator, "Héllo World! \u{3d3}");
     defer result.deinit();
 
-    try std.testing.expectEqualStrings("He\u{301}llo World! \u{3d2}\u{301}", result.slice);
+    try testing.expectEqualStrings("He\u{301}llo World! \u{3d2}\u{301}", result.slice);
 }
 
 test "nfkd ASCII / no-alloc" {
@@ -312,7 +321,7 @@ test "nfkd ASCII / no-alloc" {
     var result = try n.nfkd(allocator, "Hello World!");
     defer result.deinit();
 
-    try std.testing.expectEqualStrings("Hello World!", result.slice);
+    try testing.expectEqualStrings("Hello World!", result.slice);
 }
 
 test "nfkd !ASCII / alloc" {
@@ -324,7 +333,7 @@ test "nfkd !ASCII / alloc" {
     var result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
     defer result.deinit();
 
-    try std.testing.expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", result.slice);
+    try testing.expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", result.slice);
 }
 
 // Composition utilities.
@@ -338,18 +347,19 @@ fn isNonHangulStarter(self: Self, cp: u21) bool {
 }
 
 /// Normalizes `str` to NFC.
-pub fn nfc(self: Self, allocator: std.mem.Allocator, str: []const u8) !Result {
+pub fn nfc(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
     return self.nfxc(allocator, str, .nfc);
 }
 
 /// Normalizes `str` to NFKC.
-pub fn nfkc(self: Self, allocator: std.mem.Allocator, str: []const u8) !Result {
+pub fn nfkc(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
     return self.nfxc(allocator, str, .nfkc);
 }
 
-fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !Result {
+fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Result {
     // Quick checks.
     if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
+    if (form == .nfc and isLatin1Only(str)) return Result{ .slice = str };
 
     // Decompose first.
     var d_result = if (form == .nfc)
@@ -449,7 +459,7 @@ fn nfxc(self: Self, allocator: std.mem.Allocator, str: []const u8, form: Form) !
 
             for (d_list.items) |cp| {
                 if (cp == tombstone) continue; // "Delete"
-                const len = try std.unicode.utf8Encode(cp, &buf);
+                const len = try unicode.utf8Encode(cp, &buf);
                 cstr_list.appendSliceAssumeCapacity(buf[0..len]);
             }
 
@@ -478,7 +488,7 @@ test "nfc" {
     var result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
     defer result.deinit();
 
-    try std.testing.expectEqualStrings("Complex char: \u{3D3}", result.slice);
+    try testing.expectEqualStrings("Complex char: \u{3D3}", result.slice);
 }
 
 test "nfkc" {
@@ -490,17 +500,17 @@ test "nfkc" {
     var result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
     defer result.deinit();
 
-    try std.testing.expectEqualStrings("Complex char: \u{038E}", result.slice);
+    try testing.expectEqualStrings("Complex char: \u{038E}", result.slice);
 }
 
 /// Tests for equality of `a` and `b` after normalizing to NFD.
-pub fn eql(self: Self, allocator: std.mem.Allocator, a: []const u8, b: []const u8) !bool {
+pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !bool {
     var norm_result_a = try self.nfd(allocator, a);
     defer norm_result_a.deinit();
     var norm_result_b = try self.nfd(allocator, b);
     defer norm_result_b.deinit();
 
-    return std.mem.eql(u8, norm_result_a.slice, norm_result_b.slice);
+    return mem.eql(u8, norm_result_a.slice, norm_result_b.slice);
 }
 
 test "eql" {
@@ -509,8 +519,8 @@ test "eql" {
     defer data.deinit();
     var n = Self{ .norm_data = &data };
 
-    try std.testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
-    try std.testing.expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
+    try testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
+    try testing.expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
 }
 
 // FCD
@@ -545,17 +555,17 @@ test "isFcd" {
     var n = Self{ .norm_data = &data };
 
     const is_nfc = "José \u{3D3}";
-    try std.testing.expect(n.isFcd(is_nfc));
+    try testing.expect(n.isFcd(is_nfc));
 
     const is_nfd = "Jose\u{301} \u{3d2}\u{301}";
-    try std.testing.expect(n.isFcd(is_nfd));
+    try testing.expect(n.isFcd(is_nfd));
 
     const not_fcd = "Jose\u{301} \u{3d2}\u{315}\u{301}";
-    try std.testing.expect(!n.isFcd(not_fcd));
+    try testing.expect(!n.isFcd(not_fcd));
 }
 
 test "Unicode normalization tests" {
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    var arena = heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
 
@@ -563,9 +573,9 @@ test "Unicode normalization tests" {
     defer data.deinit();
     var n = Self{ .norm_data = &data };
 
-    var file = try std.fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
+    var file = try fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
     defer file.close();
-    var buf_reader = std.io.bufferedReader(file.reader());
+    var buf_reader = io.bufferedReader(file.reader());
     const input_stream = buf_reader.reader();
 
     var line_no: usize = 0;
@@ -577,7 +587,7 @@ test "Unicode normalization tests" {
         // Skip comments or empty lines.
         if (line.len == 0 or line[0] == '#' or line[0] == '@') continue;
         // Iterate over fields.
-        var fields = std.mem.split(u8, line, ";");
+        var fields = mem.split(u8, line, ";");
         var field_index: usize = 0;
         var input: []u8 = undefined;
         defer allocator.free(input);
@@ -587,24 +597,24 @@ test "Unicode normalization tests" {
                 var i_buf = std.ArrayList(u8).init(allocator);
                 defer i_buf.deinit();
 
-                var i_fields = std.mem.split(u8, field, " ");
+                var i_fields = mem.split(u8, field, " ");
                 while (i_fields.next()) |s| {
-                    const icp = try std.fmt.parseInt(u21, s, 16);
-                    const len = try std.unicode.utf8Encode(icp, &cp_buf);
+                    const icp = try fmt.parseInt(u21, s, 16);
+                    const len = try unicode.utf8Encode(icp, &cp_buf);
                     try i_buf.appendSlice(cp_buf[0..len]);
                 }
 
                 input = try i_buf.toOwnedSlice();
             } else if (field_index == 1) {
-                //std.debug.print("\n*** {s} ***\n", .{line});
+                //debug.print("\n*** {s} ***\n", .{line});
                 // NFC, time to test.
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = std.mem.split(u8, field, " ");
+                var w_fields = mem.split(u8, field, " ");
                 while (w_fields.next()) |s| {
-                    const wcp = try std.fmt.parseInt(u21, s, 16);
-                    const len = try std.unicode.utf8Encode(wcp, &cp_buf);
+                    const wcp = try fmt.parseInt(u21, s, 16);
+                    const len = try unicode.utf8Encode(wcp, &cp_buf);
                     try w_buf.appendSlice(cp_buf[0..len]);
                 }
 
@@ -612,16 +622,16 @@ test "Unicode normalization tests" {
                 var got = try n.nfc(allocator, input);
                 defer got.deinit();
 
-                try std.testing.expectEqualStrings(want, got.slice);
+                try testing.expectEqualStrings(want, got.slice);
             } else if (field_index == 2) {
                 // NFD, time to test.
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = std.mem.split(u8, field, " ");
+                var w_fields = mem.split(u8, field, " ");
                 while (w_fields.next()) |s| {
-                    const wcp = try std.fmt.parseInt(u21, s, 16);
-                    const len = try std.unicode.utf8Encode(wcp, &cp_buf);
+                    const wcp = try fmt.parseInt(u21, s, 16);
+                    const len = try unicode.utf8Encode(wcp, &cp_buf);
                     try w_buf.appendSlice(cp_buf[0..len]);
                 }
 
@@ -629,16 +639,16 @@ test "Unicode normalization tests" {
                 var got = try n.nfd(allocator, input);
                 defer got.deinit();
 
-                try std.testing.expectEqualStrings(want, got.slice);
+                try testing.expectEqualStrings(want, got.slice);
             } else if (field_index == 3) {
                 // NFKC, time to test.
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = std.mem.split(u8, field, " ");
+                var w_fields = mem.split(u8, field, " ");
                 while (w_fields.next()) |s| {
-                    const wcp = try std.fmt.parseInt(u21, s, 16);
-                    const len = try std.unicode.utf8Encode(wcp, &cp_buf);
+                    const wcp = try fmt.parseInt(u21, s, 16);
+                    const len = try unicode.utf8Encode(wcp, &cp_buf);
                     try w_buf.appendSlice(cp_buf[0..len]);
                 }
 
@@ -646,16 +656,16 @@ test "Unicode normalization tests" {
                 var got = try n.nfkc(allocator, input);
                 defer got.deinit();
 
-                try std.testing.expectEqualStrings(want, got.slice);
+                try testing.expectEqualStrings(want, got.slice);
             } else if (field_index == 4) {
                 // NFKD, time to test.
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = std.mem.split(u8, field, " ");
+                var w_fields = mem.split(u8, field, " ");
                 while (w_fields.next()) |s| {
-                    const wcp = try std.fmt.parseInt(u21, s, 16);
-                    const len = try std.unicode.utf8Encode(wcp, &cp_buf);
+                    const wcp = try fmt.parseInt(u21, s, 16);
+                    const len = try unicode.utf8Encode(wcp, &cp_buf);
                     try w_buf.appendSlice(cp_buf[0..len]);
                 }
 
@@ -663,10 +673,51 @@ test "Unicode normalization tests" {
                 var got = try n.nfkd(allocator, input);
                 defer got.deinit();
 
-                try std.testing.expectEqualStrings(want, got.slice);
+                try testing.expectEqualStrings(want, got.slice);
             } else {
                 continue;
             }
         }
     }
+}
+
+/// Returns true if `str` only contains Latin-1 Supplement
+/// code points. Uses SIMD if possible.
+pub fn isLatin1Only(str: []const u8) bool {
+    var cp_iter = CodePointIterator{ .bytes = str };
+
+    const vec_len = simd.suggestVectorLength(u21) orelse return blk: {
+        break :blk while (cp_iter.next()) |cp| {
+            if (cp.code > 256) break false;
+        } else true;
+    };
+
+    const Vec = @Vector(vec_len, u21);
+
+    outer: while (true) {
+        var v1: Vec = undefined;
+        const saved_cp_i = cp_iter.i;
+
+        for (0..vec_len) |i| {
+            if (cp_iter.next()) |cp| {
+                v1[i] = cp.code;
+            } else {
+                cp_iter.i = saved_cp_i;
+                break :outer;
+            }
+        }
+        const v2: Vec = @splat(256);
+        if (@reduce(.Or, v1 > v2)) return false;
+    }
+
+    return while (cp_iter.next()) |cp| {
+        if (cp.code > 256) break false;
+    } else true;
+}
+
+test "isLatin1Only" {
+    const latin1_only = "Hello, World! \u{fe} \u{ff}";
+    try testing.expect(isLatin1Only(latin1_only));
+    const not_latin1_only = "Héllo, World! \u{3d3}";
+    try testing.expect(!isLatin1Only(not_latin1_only));
 }
