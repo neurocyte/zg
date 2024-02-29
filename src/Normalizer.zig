@@ -255,10 +255,7 @@ pub fn nfkd(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
     return self.nfxd(allocator, str, .nfkd);
 }
 
-fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Result {
-    // Quick checks.
-    if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
-
+fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) ![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -276,13 +273,23 @@ fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
 
     self.canonicalSort(dcp_list.items);
 
-    var dstr_list = try std.ArrayList(u8).initCapacity(allocator, dcp_list.items.len * 4);
-    defer dstr_list.deinit();
+    return try dcp_list.toOwnedSlice();
+}
 
+fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Result {
+    // Quick checks.
+    if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
+
+    const dcps = try self.nfxdCodePoints(allocator, str, form);
+    defer allocator.free(dcps);
+
+    var dstr_list = std.ArrayList(u8).init(allocator);
+    defer dstr_list.deinit();
     var buf: [4]u8 = undefined;
-    for (dcp_list.items) |dcp| {
+
+    for (dcps) |dcp| {
         const len = try unicode.utf8Encode(dcp, &buf);
-        dstr_list.appendSliceAssumeCapacity(buf[0..len]);
+        try dstr_list.appendSlice(buf[0..len]);
     }
 
     return Result{ .allocator = allocator, .slice = try dstr_list.toOwnedSlice() };
@@ -342,10 +349,6 @@ fn isHangul(self: Self, cp: u21) bool {
     return cp >= 0x1100 and self.norm_data.hangul_data.syllable(cp) != .none;
 }
 
-fn isNonHangulStarter(self: Self, cp: u21) bool {
-    return !self.isHangul(cp) and self.norm_data.ccc_data.isStarter(cp);
-}
-
 /// Normalizes `str` to NFC.
 pub fn nfc(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
     return self.nfxc(allocator, str, .nfc);
@@ -362,47 +365,42 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
     if (form == .nfc and isLatin1Only(str)) return Result{ .slice = str };
 
     // Decompose first.
-    var d_result = if (form == .nfc)
-        try self.nfd(allocator, str)
+    var dcps = if (form == .nfc)
+        try self.nfxdCodePoints(allocator, str, .nfd)
     else
-        try self.nfkd(allocator, str);
-    defer d_result.deinit();
-
-    // Get code points.
-    var cp_iter = CodePointIterator{ .bytes = d_result.slice };
-
-    var d_list = try std.ArrayList(u21).initCapacity(allocator, d_result.slice.len);
-    defer d_list.deinit();
-
-    while (cp_iter.next()) |cp| d_list.appendAssumeCapacity(cp.code);
+        try self.nfxdCodePoints(allocator, str, .nfkd);
+    defer allocator.free(dcps);
 
     // Compose
     const tombstone = 0xe000; // Start of BMP Private Use Area
 
+    // Loop over all decomposed code points.
     while (true) {
         var i: usize = 1; // start at second code point.
         var deleted: usize = 0;
 
-        block_check: while (i < d_list.items.len) : (i += 1) {
-            const C = d_list.items[i];
+        // For each code point, C, find the preceding
+        // starter code point L, if any.
+        block_check: while (i < dcps.len) : (i += 1) {
+            const C = dcps[i];
+            if (C == tombstone) continue :block_check;
             const cc_C = self.norm_data.ccc_data.ccc(C);
             var starter_index: ?usize = null;
             var j: usize = i;
 
+            // Seek back to find starter L, if any.
             while (true) {
                 j -= 1;
+                if (dcps[j] == tombstone) continue;
 
                 // Check for starter.
-                if (self.norm_data.ccc_data.isStarter(d_list.items[j])) {
-                    if (i - j > 1) { // If there's distance between the starting point and the current position.
-                        for (d_list.items[(j + 1)..i]) |B| {
-                            const cc_B = self.norm_data.ccc_data.ccc(B);
-                            // Check for blocking conditions.
-                            if (self.isHangul(C)) {
-                                if (cc_B != 0 or self.isNonHangulStarter(B)) continue :block_check;
-                            }
-                            if (cc_B >= cc_C) continue :block_check;
-                        }
+                if (self.norm_data.ccc_data.isStarter(dcps[j])) {
+                    // Check for blocking conditions.
+                    for (dcps[(j + 1)..i]) |B| {
+                        if (B == tombstone) continue;
+                        const cc_B = self.norm_data.ccc_data.ccc(B);
+                        if (cc_B != 0 and self.isHangul(C)) continue :block_check;
+                        if (cc_B >= cc_C) continue :block_check;
                     }
 
                     // Found starter at j.
@@ -413,37 +411,50 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
                 if (j == 0) break;
             }
 
+            // If we have a starter L, see if there's a primary
+            // composite, P, for the sequence L, C. If so, we must
+            // repace L with P and delete C.
             if (starter_index) |sidx| {
-                const L = d_list.items[sidx];
+                const L = dcps[sidx];
                 var processed_hangul = false;
 
+                // If L and C are Hangul syllables, we can compose
+                // them algorithmically if possible.
                 if (self.isHangul(L) and self.isHangul(C)) {
+                    // Get Hangul syllable types.
                     const l_stype = self.norm_data.hangul_data.syllable(L);
                     const c_stype = self.norm_data.hangul_data.syllable(C);
 
                     if (l_stype == .LV and c_stype == .T) {
-                        // LV, T
-                        d_list.items[sidx] = composeHangulCanon(L, C);
-                        d_list.items[i] = tombstone; // Mark for deletion.
+                        // LV, T canonical composition.
+                        dcps[sidx] = composeHangulCanon(L, C);
+                        dcps[i] = tombstone; // Mark for deletion.
                         processed_hangul = true;
                     }
 
                     if (l_stype == .L and c_stype == .V) {
-                        // Handle L, V. L, V, T is handled via main loop.
-                        d_list.items[sidx] = composeHangulFull(L, C, 0);
-                        d_list.items[i] = tombstone; // Mark for deletion.
+                        // L, V full composition. L, V, T is handled via main loop.
+                        dcps[sidx] = composeHangulFull(L, C, 0);
+                        dcps[i] = tombstone; // Mark for deletion.
                         processed_hangul = true;
                     }
 
                     if (processed_hangul) deleted += 1;
                 }
 
+                // If no composition has occurred yet.
                 if (!processed_hangul) {
-                    // L -> C not Hangul.
+                    // L, C are not Hangul, so check for primary composite
+                    // in the Unicode Character Database.
                     if (self.norm_data.canon_data.toNfc(.{ L, C })) |P| {
+                        // We have a primary composite P for L, C.
+                        // We must check if P is not in the Full
+                        // Composition Exclusions  (FCX) list,
+                        // preventing it from appearing in any
+                        // composed form (NFC, NFKC).
                         if (!self.norm_data.normp_data.isFcx(P)) {
-                            d_list.items[sidx] = P;
-                            d_list.items[i] = tombstone; // Mark for deletion.
+                            dcps[sidx] = P;
+                            dcps[i] = tombstone; // Mark for deletion.
                             deleted += 1;
                         }
                     }
@@ -451,31 +462,35 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
             }
         }
 
-        // Check if finished.
+        // If we have no deletions. the code point sequence
+        // has been fully composed.
         if (deleted == 0) {
-            var cstr_list = try std.ArrayList(u8).initCapacity(allocator, d_list.items.len * 4);
+            var cstr_list = std.ArrayList(u8).init(allocator);
             defer cstr_list.deinit();
             var buf: [4]u8 = undefined;
 
-            for (d_list.items) |cp| {
+            for (dcps) |cp| {
+                if (cp == tombstone) continue;
                 if (cp == tombstone) continue; // "Delete"
                 const len = try unicode.utf8Encode(cp, &buf);
-                cstr_list.appendSliceAssumeCapacity(buf[0..len]);
+                try cstr_list.appendSlice(buf[0..len]);
             }
 
             return Result{ .allocator = allocator, .slice = try cstr_list.toOwnedSlice() };
         }
 
-        // Otherwise update code points list.
-        var tmp_d_list = try std.ArrayList(u21).initCapacity(allocator, d_list.items.len - deleted);
-        defer tmp_d_list.deinit();
-
-        for (d_list.items) |cp| {
-            if (cp != tombstone) tmp_d_list.appendAssumeCapacity(cp);
-        }
-
-        d_list.clearRetainingCapacity();
-        d_list.appendSliceAssumeCapacity(tmp_d_list.items);
+        // We're still not finished, so create a new
+        // code point sequence with the marked code points
+        // removed.
+        // var tmp_list = try std.ArrayList(u21).initCapacity(allocator, dcps.len - deleted);
+        // defer tmp_list.deinit();
+        //
+        // for (dcps) |cp| {
+        //     if (cp != tombstone) tmp_list.appendAssumeCapacity(cp);
+        // }
+        //
+        // allocator.free(dcps);
+        // dcps = try tmp_list.toOwnedSlice();
     }
 }
 
