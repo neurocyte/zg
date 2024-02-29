@@ -470,7 +470,6 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
             var buf: [4]u8 = undefined;
 
             for (dcps) |cp| {
-                if (cp == tombstone) continue;
                 if (cp == tombstone) continue; // "Delete"
                 const len = try unicode.utf8Encode(cp, &buf);
                 try cstr_list.appendSlice(buf[0..len]);
@@ -478,19 +477,6 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
 
             return Result{ .allocator = allocator, .slice = try cstr_list.toOwnedSlice() };
         }
-
-        // We're still not finished, so create a new
-        // code point sequence with the marked code points
-        // removed.
-        // var tmp_list = try std.ArrayList(u21).initCapacity(allocator, dcps.len - deleted);
-        // defer tmp_list.deinit();
-        //
-        // for (dcps) |cp| {
-        //     if (cp != tombstone) tmp_list.appendAssumeCapacity(cp);
-        // }
-        //
-        // allocator.free(dcps);
-        // dcps = try tmp_list.toOwnedSlice();
     }
 }
 
