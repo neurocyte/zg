@@ -88,6 +88,15 @@ pub fn build(b: *std.Build) void {
     const run_gencat_gen_exe = b.addRunArtifact(gencat_gen_exe);
     const gencat_gen_out = run_gencat_gen_exe.addOutputFileArg("gencat.bin.z");
 
+    const fold_gen_exe = b.addExecutable(.{
+        .name = "fold",
+        .root_source_file = .{ .path = "codegen/fold.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_fold_gen_exe = b.addRunArtifact(fold_gen_exe);
+    const fold_gen_out = run_fold_gen_exe.addOutputFileArg("fold.bin.z");
+
     // Modules we provide
     // Code points
     const code_point = b.addModule("code_point", .{
@@ -174,6 +183,14 @@ pub fn build(b: *std.Build) void {
     });
     normp_data.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
 
+    // Case folding
+    const fold_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/FoldData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    fold_data.addAnonymousImport("fold", .{ .root_source_file = fold_gen_out });
+
     const norm_data = b.createModule(.{
         .root_source_file = .{ .path = "src/NormData.zig" },
         .target = target,
@@ -184,6 +201,7 @@ pub fn build(b: *std.Build) void {
     norm_data.addImport("CompatData", compat_data);
     norm_data.addImport("HangulData", hangul_data);
     norm_data.addImport("NormPropsData", normp_data);
+    norm_data.addImport("FoldData", fold_data);
 
     const norm = b.addModule("Normalizer", .{
         .root_source_file = .{ .path = "src/Normalizer.zig" },
@@ -195,7 +213,7 @@ pub fn build(b: *std.Build) void {
     norm.addImport("NormData", norm_data);
 
     // General Category
-    const gencat_data = b.createModule(.{
+    const gencat_data = b.addModule("GenCatData", .{
         .root_source_file = .{ .path = "src/GenCatData.zig" },
         .target = target,
         .optimize = optimize,

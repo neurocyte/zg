@@ -49,21 +49,28 @@ pub fn main() !void {
     var iter = std.mem.splitScalar(u8, input, '\n');
 
     var result: usize = 0;
+    var prev_line: []const u8 = "";
     // var result: isize = 0;
     var timer = try std.time.Timer.start();
 
     // while (iter.next()) |cp| result += codePointWidth(@intCast(cp.code));
     // while (iter.next()) |_| result += 1;
     // while (iter.next()) |line| result += strWidth(line, &data);
-    while (iter.next()) |line| {
-        const nfc = try n.nfkc(allocator, line);
-        result += nfc.slice.len;
-        // nfc.deinit();
-    }
+    // while (iter.next()) |line| {
+    //     const nfc = try n.nfkc(allocator, line);
+    //     result += nfc.slice.len;
+    //     // nfc.deinit();
+    // }
     // while (iter.next()) |cp| {
     //     if (cp.code == 'É') std.debug.print("`{u}` Gc: {s}\n", .{ cp.code, @tagName(gencat_data.gc(cp.code)) });
     //     result += 1;
     // }
+    while (iter.next()) |line| {
+        if (try n.eqlIgnoreCase(allocator, prev_line, line)) {
+            result += line.len;
+        }
+        prev_line = line;
+    }
 
     std.debug.print("result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
 }

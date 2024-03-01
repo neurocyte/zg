@@ -343,7 +343,102 @@ test "nfkd !ASCII / alloc" {
     try testing.expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", result.slice);
 }
 
-// Composition utilities.
+fn caseFold(
+    self: Self,
+    allocator: mem.Allocator,
+    cps: []const u21,
+) ![]const u21 {
+    var cfcps = std.ArrayList(u21).init(allocator);
+    defer cfcps.deinit();
+
+    for (cps) |cp| {
+        const cf = self.norm_data.fold_data.caseFold(cp);
+
+        if (cf.len == 0) {
+            try cfcps.append(cp);
+        } else {
+            try cfcps.appendSlice(cf);
+        }
+    }
+
+    return try cfcps.toOwnedSlice();
+}
+
+fn nfkdCodePoints(
+    self: Self,
+    allocator: mem.Allocator,
+    cps: []const u21,
+) ![]u21 {
+    var dcp_list = std.ArrayList(u21).init(allocator);
+    defer dcp_list.deinit();
+
+    var dc_buf: [18]u21 = undefined;
+
+    for (cps) |cp| {
+        const dc = self.decompose(cp, .nfkd, &dc_buf);
+
+        if (dc.form == .same) {
+            try dcp_list.append(cp);
+        } else {
+            try dcp_list.appendSlice(dc.cps);
+        }
+    }
+
+    self.canonicalSort(dcp_list.items);
+
+    return try dcp_list.toOwnedSlice();
+}
+
+pub fn eqlIgnoreCase(
+    self: Self,
+    allocator: mem.Allocator,
+    a: []const u8,
+    b: []const u8,
+) !bool {
+    if (ascii.isAsciiOnly(a) and ascii.isAsciiOnly(b)) return std.ascii.eqlIgnoreCase(a, b);
+
+    const nfd_a = try self.nfxdCodePoints(allocator, a, .nfd);
+    defer allocator.free(nfd_a);
+    const cf_nfd_a = try self.caseFold(allocator, nfd_a);
+    defer allocator.free(cf_nfd_a);
+    const nfkd_cf_nfd_a = try self.nfkdCodePoints(allocator, cf_nfd_a);
+    defer allocator.free(nfkd_cf_nfd_a);
+    const cf_nfkd_cf_nfd_a = try self.caseFold(allocator, nfkd_cf_nfd_a);
+    defer allocator.free(cf_nfkd_cf_nfd_a);
+    const nfkd_cf_nfkd_cf_nfd_a = try self.nfkdCodePoints(allocator, cf_nfkd_cf_nfd_a);
+    defer allocator.free(nfkd_cf_nfkd_cf_nfd_a);
+
+    const nfd_b = try self.nfxdCodePoints(allocator, b, .nfd);
+    defer allocator.free(nfd_b);
+    const cf_nfd_b = try self.caseFold(allocator, nfd_b);
+    defer allocator.free(cf_nfd_b);
+    const nfkd_cf_nfd_b = try self.nfkdCodePoints(allocator, cf_nfd_b);
+    defer allocator.free(nfkd_cf_nfd_b);
+    const cf_nfkd_cf_nfd_b = try self.caseFold(allocator, nfkd_cf_nfd_b);
+    defer allocator.free(cf_nfkd_cf_nfd_b);
+    const nfkd_cf_nfkd_cf_nfd_b = try self.nfkdCodePoints(allocator, cf_nfkd_cf_nfd_b);
+    defer allocator.free(nfkd_cf_nfkd_cf_nfd_b);
+
+    return mem.eql(u21, nfkd_cf_nfkd_cf_nfd_a, nfkd_cf_nfkd_cf_nfd_b);
+}
+
+test "eqlIgnoreCase" {
+    const allocator = testing.allocator;
+    var data = try NormData.init(allocator);
+    defer data.deinit();
+    var n = Self{ .norm_data = &data };
+
+    try testing.expect(try n.eqlIgnoreCase(allocator, "ascii only!", "ASCII Only!"));
+
+    const a = "Héllo World! \u{3d3}";
+    const b = "He\u{301}llo World! \u{3a5}\u{301}";
+    try testing.expect(try n.eqlIgnoreCase(allocator, a, b));
+
+    const c = "He\u{301}llo World! \u{3d2}\u{301}";
+    try testing.expect(try n.eqlIgnoreCase(allocator, a, c));
+}
+
+// Composition (NFC, NFKC)
 
 fn isHangul(self: Self, cp: u21) bool {
     return cp >= 0x1100 and self.norm_data.hangul_data.syllable(cp) != .none;
@@ -504,11 +599,11 @@ test "nfkc" {
     try testing.expectEqualStrings("Complex char: \u{038E}", result.slice);
 }
 
-/// Tests for equality of `a` and `b` after normalizing to NFD.
+/// Tests for equality of `a` and `b` after normalizing to NFC.
 pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !bool {
-    var norm_result_a = try self.nfd(allocator, a);
+    var norm_result_a = try self.nfc(allocator, a);
     defer norm_result_a.deinit();
-    var norm_result_b = try self.nfd(allocator, b);
+    var norm_result_b = try self.nfc(allocator, b);
     defer norm_result_b.deinit();
 
     return mem.eql(u8, norm_result_a.slice, norm_result_b.slice);
