@@ -389,6 +389,12 @@ fn nfkdCodePoints(
     return try dcp_list.toOwnedSlice();
 }
 
+fn changesWhenCaseFolded(self: Self, cps: []const u21) bool {
+    return for (cps) |cp| {
+        if (self.norm_data.fold_data.changesWhenCaseFolded(cp)) break true;
+    } else false;
+}
+
 pub fn eqlIgnoreCase(
     self: Self,
     allocator: mem.Allocator,
@@ -397,10 +403,18 @@ pub fn eqlIgnoreCase(
 ) !bool {
     if (ascii.isAsciiOnly(a) and ascii.isAsciiOnly(b)) return std.ascii.eqlIgnoreCase(a, b);
 
+    // Process a
     const nfd_a = try self.nfxdCodePoints(allocator, a, .nfd);
     defer allocator.free(nfd_a);
-    const cf_nfd_a = try self.caseFold(allocator, nfd_a);
-    defer allocator.free(cf_nfd_a);
+
+    var need_frr_cf_nfd_a = false;
+    var cf_nfd_a: []const u21 = nfd_a;
+    if (self.changesWhenCaseFolded(nfd_a)) {
+        cf_nfd_a = try self.caseFold(allocator, nfd_a);
+        need_frr_cf_nfd_a = true;
+    }
+    defer if (need_frr_cf_nfd_a) allocator.free(cf_nfd_a);
+
     const nfkd_cf_nfd_a = try self.nfkdCodePoints(allocator, cf_nfd_a);
     defer allocator.free(nfkd_cf_nfd_a);
     const cf_nfkd_cf_nfd_a = try self.caseFold(allocator, nfkd_cf_nfd_a);
@@ -408,10 +422,18 @@ pub fn eqlIgnoreCase(
     const nfkd_cf_nfkd_cf_nfd_a = try self.nfkdCodePoints(allocator, cf_nfkd_cf_nfd_a);
     defer allocator.free(nfkd_cf_nfkd_cf_nfd_a);
 
+    // Process b
     const nfd_b = try self.nfxdCodePoints(allocator, b, .nfd);
     defer allocator.free(nfd_b);
-    const cf_nfd_b = try self.caseFold(allocator, nfd_b);
-    defer allocator.free(cf_nfd_b);
+
+    var need_frr_cf_nfd_b = false;
+    var cf_nfd_b: []const u21 = nfd_b;
+    if (self.changesWhenCaseFolded(nfd_b)) {
+        cf_nfd_b = try self.caseFold(allocator, nfd_b);
+        need_frr_cf_nfd_b = true;
+    }
+    defer if (need_frr_cf_nfd_b) allocator.free(cf_nfd_b);
+
     const nfkd_cf_nfd_b = try self.nfkdCodePoints(allocator, cf_nfd_b);
     defer allocator.free(nfkd_cf_nfd_b);
     const cf_nfkd_cf_nfd_b = try self.caseFold(allocator, nfkd_cf_nfd_b);
