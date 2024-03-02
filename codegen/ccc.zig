@@ -31,7 +31,7 @@ pub fn main() !void {
 
     var line_buf: [4096]u8 = undefined;
 
-    // Process DerivedEastAsianWidth.txt
+    // Process DerivedCombiningClass.txt
     var cc_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedCombiningClass.txt", .{});
     defer cc_file.close();
     var cc_buf = std.io.bufferedReader(cc_file.reader());

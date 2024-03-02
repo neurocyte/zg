@@ -11,14 +11,15 @@ const std = @import("std");
 // const strWidth = @import("display_width").strWidth;
 
 // const CodePointIterator = @import("ziglyph").CodePointIterator;
-const CodePointIterator = @import("code_point").Iterator;
+// const CodePointIterator = @import("code_point").Iterator;
 
 // const ascii = @import("ascii");
 // const ascii = std.ascii;
 
 // const Normalizer = @import("ziglyph").Normalizer;
-const NormData = @import("Normalizer").NormData;
 const Normalizer = @import("Normalizer");
+
+const Caser = @import("Caser");
 
 // const GenCatData = @import("GenCatData");
 
@@ -34,14 +35,18 @@ pub fn main() !void {
     const input = try std.fs.cwd().readFileAlloc(allocator, in_path, std.math.maxInt(u32));
     defer allocator.free(input);
 
-    var data = try NormData.init(allocator);
-    defer data.deinit();
-    var n = Normalizer{ .norm_data = &data };
-    // var n = try Normalizer.init(allocator);
-    // defer n.deinit();
+    var norm_data = try Normalizer.NormData.init(allocator);
+    defer norm_data.deinit();
+    var norm = Normalizer{ .norm_data = &norm_data };
+    // var norm = try Normalizer.init(allocator);
+    // defer norm.deinit();
 
     // var gencat_data = try GenCatData.init(allocator);
     // defer gencat_data.deinit();
+
+    var fold_data = try Caser.FoldData.init(allocator);
+    defer fold_data.deinit();
+    var caser = Caser{ .fold_data = &fold_data };
 
     // var iter = GraphemeIterator.init(input, &data);
     // defer iter.deinit();
@@ -66,7 +71,7 @@ pub fn main() !void {
     //     result += 1;
     // }
     while (iter.next()) |line| {
-        if (try n.eqlIgnoreCase(allocator, prev_line, line)) {
+        if (try caser.compatCaselessMatch(allocator, &norm, prev_line, line)) {
             result += line.len;
         }
         prev_line = line;

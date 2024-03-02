@@ -64,7 +64,7 @@ pub fn main() !void {
 
     var line_buf: [4096]u8 = undefined;
 
-    // Process DerivedEastAsianWidth.txt
+    // Process DerivedGeneralCategory.txt
     var in_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedGeneralCategory.txt", .{});
     defer in_file.close();
     var in_buf = std.io.bufferedReader(in_file.reader());

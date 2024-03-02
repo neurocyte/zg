@@ -18,7 +18,7 @@ const ascii = @import("ascii");
 const CodePointIterator = @import("code_point").Iterator;
 pub const NormData = @import("NormData");
 
-norm_data: *NormData,
+norm_data: *const NormData,
 
 const Self = @This();
 
@@ -255,7 +255,7 @@ pub fn nfkd(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
     return self.nfxd(allocator, str, .nfkd);
 }
 
-fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) ![]u21 {
+pub fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) ![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -343,28 +343,7 @@ test "nfkd !ASCII / alloc" {
     try testing.expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", result.slice);
 }
 
-fn caseFold(
-    self: Self,
-    allocator: mem.Allocator,
-    cps: []const u21,
-) ![]const u21 {
-    var cfcps = std.ArrayList(u21).init(allocator);
-    defer cfcps.deinit();
-
-    for (cps) |cp| {
-        const cf = self.norm_data.fold_data.caseFold(cp);
-
-        if (cf.len == 0) {
-            try cfcps.append(cp);
-        } else {
-            try cfcps.appendSlice(cf);
-        }
-    }
-
-    return try cfcps.toOwnedSlice();
-}
-
-fn nfkdCodePoints(
+pub fn nfkdCodePoints(
     self: Self,
     allocator: mem.Allocator,
     cps: []const u21,
@@ -387,77 +366,6 @@ fn nfkdCodePoints(
     self.canonicalSort(dcp_list.items);
 
     return try dcp_list.toOwnedSlice();
-}
-
-fn changesWhenCaseFolded(self: Self, cps: []const u21) bool {
-    return for (cps) |cp| {
-        if (self.norm_data.fold_data.changesWhenCaseFolded(cp)) break true;
-    } else false;
-}
-
-pub fn eqlIgnoreCase(
-    self: Self,
-    allocator: mem.Allocator,
-    a: []const u8,
-    b: []const u8,
-) !bool {
-    if (ascii.isAsciiOnly(a) and ascii.isAsciiOnly(b)) return std.ascii.eqlIgnoreCase(a, b);
-
-    // Process a
-    const nfd_a = try self.nfxdCodePoints(allocator, a, .nfd);
-    defer allocator.free(nfd_a);
-
-    var need_frr_cf_nfd_a = false;
-    var cf_nfd_a: []const u21 = nfd_a;
-    if (self.changesWhenCaseFolded(nfd_a)) {
-        cf_nfd_a = try self.caseFold(allocator, nfd_a);
-        need_frr_cf_nfd_a = true;
-    }
-    defer if (need_frr_cf_nfd_a) allocator.free(cf_nfd_a);
-
-    const nfkd_cf_nfd_a = try self.nfkdCodePoints(allocator, cf_nfd_a);
-    defer allocator.free(nfkd_cf_nfd_a);
-    const cf_nfkd_cf_nfd_a = try self.caseFold(allocator, nfkd_cf_nfd_a);
-    defer allocator.free(cf_nfkd_cf_nfd_a);
-    const nfkd_cf_nfkd_cf_nfd_a = try self.nfkdCodePoints(allocator, cf_nfkd_cf_nfd_a);
-    defer allocator.free(nfkd_cf_nfkd_cf_nfd_a);
-
-    // Process b
-    const nfd_b = try self.nfxdCodePoints(allocator, b, .nfd);
-    defer allocator.free(nfd_b);
-
-    var need_frr_cf_nfd_b = false;
-    var cf_nfd_b: []const u21 = nfd_b;
-    if (self.changesWhenCaseFolded(nfd_b)) {
-        cf_nfd_b = try self.caseFold(allocator, nfd_b);
-        need_frr_cf_nfd_b = true;
-    }
-    defer if (need_frr_cf_nfd_b) allocator.free(cf_nfd_b);
-
-    const nfkd_cf_nfd_b = try self.nfkdCodePoints(allocator, cf_nfd_b);
-    defer allocator.free(nfkd_cf_nfd_b);
-    const cf_nfkd_cf_nfd_b = try self.caseFold(allocator, nfkd_cf_nfd_b);
-    defer allocator.free(cf_nfkd_cf_nfd_b);
-    const nfkd_cf_nfkd_cf_nfd_b = try self.nfkdCodePoints(allocator, cf_nfkd_cf_nfd_b);
-    defer allocator.free(nfkd_cf_nfkd_cf_nfd_b);
-
-    return mem.eql(u21, nfkd_cf_nfkd_cf_nfd_a, nfkd_cf_nfkd_cf_nfd_b);
-}
-
-test "eqlIgnoreCase" {
-    const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
-    defer data.deinit();
-    var n = Self{ .norm_data = &data };
-
-    try testing.expect(try n.eqlIgnoreCase(allocator, "ascii only!", "ASCII Only!"));
-
-    const a = "Héllo World! \u{3d3}";
-    const b = "He\u{301}llo World! \u{3a5}\u{301}";
-    try testing.expect(try n.eqlIgnoreCase(allocator, a, b));
-
-    const c = "He\u{301}llo World! \u{3d2}\u{301}";
-    try testing.expect(try n.eqlIgnoreCase(allocator, a, c));
 }
 
 // Composition (NFC, NFKC)
