@@ -241,7 +241,7 @@ pub fn build(b: *std.Build) void {
     // exe.root_module.addImport("grapheme", grapheme);
     // exe.root_module.addImport("DisplayWidth", display_width);
     exe.root_module.addImport("Normalizer", norm);
-    exe.root_module.addImport("Caser", caser);
+    // exe.root_module.addImport("Caser", caser);
     // exe.root_module.addImport("GenCatData", gencat_data);
     b.installArtifact(exe);
 
