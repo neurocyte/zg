@@ -10,9 +10,10 @@
     .paths = .{
         "build.zig",
         "build.zig.zon",
-        "src",
-	"unicode",
+	"codegen",
+	"data",
         "LICENSE",
         "README.md",
+        "src",
     },
 }
