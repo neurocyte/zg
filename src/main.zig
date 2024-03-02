@@ -71,7 +71,7 @@ pub fn main() !void {
     //     result += 1;
     // }
     while (iter.next()) |line| {
-        if (try caser.compatCaselessMatch(allocator, &norm, prev_line, line)) {
+        if (try caser.canonCaselessMatch(allocator, &norm, prev_line, line)) {
             result += line.len;
         }
         prev_line = line;

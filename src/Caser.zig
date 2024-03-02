@@ -50,13 +50,13 @@ pub fn compatCaselessMatch(
     const nfd_a = try normalizer.nfxdCodePoints(allocator, a, .nfd);
     defer allocator.free(nfd_a);
 
-    var need_frr_cf_nfd_a = false;
+    var need_free_cf_nfd_a = false;
     var cf_nfd_a: []const u21 = nfd_a;
     if (self.changesWhenCaseFolded(nfd_a)) {
         cf_nfd_a = try self.caseFold(allocator, nfd_a);
-        need_frr_cf_nfd_a = true;
+        need_free_cf_nfd_a = true;
     }
-    defer if (need_frr_cf_nfd_a) allocator.free(cf_nfd_a);
+    defer if (need_free_cf_nfd_a) allocator.free(cf_nfd_a);
 
     const nfkd_cf_nfd_a = try normalizer.nfkdCodePoints(allocator, cf_nfd_a);
     defer allocator.free(nfkd_cf_nfd_a);
@@ -69,13 +69,13 @@ pub fn compatCaselessMatch(
     const nfd_b = try normalizer.nfxdCodePoints(allocator, b, .nfd);
     defer allocator.free(nfd_b);
 
-    var need_frr_cf_nfd_b = false;
+    var need_free_cf_nfd_b = false;
     var cf_nfd_b: []const u21 = nfd_b;
     if (self.changesWhenCaseFolded(nfd_b)) {
         cf_nfd_b = try self.caseFold(allocator, nfd_b);
-        need_frr_cf_nfd_b = true;
+        need_free_cf_nfd_b = true;
     }
-    defer if (need_frr_cf_nfd_b) allocator.free(cf_nfd_b);
+    defer if (need_free_cf_nfd_b) allocator.free(cf_nfd_b);
 
     const nfkd_cf_nfd_b = try normalizer.nfkdCodePoints(allocator, cf_nfd_b);
     defer allocator.free(nfkd_cf_nfd_b);
@@ -106,4 +106,77 @@ test "compatCaselessMatch" {
 
     const c = "He\u{301}llo World! \u{3d2}\u{301}";
     try testing.expect(try caser.compatCaselessMatch(allocator, &n, a, c));
+}
+
+pub fn canonCaselessMatch(
+    self: Self,
+    allocator: mem.Allocator,
+    normalizer: *const Normalizer,
+    a: []const u8,
+    b: []const u8,
+) !bool {
+    if (ascii.isAsciiOnly(a) and ascii.isAsciiOnly(b)) return std.ascii.eqlIgnoreCase(a, b);
+
+    // Process a
+    const nfd_a = try normalizer.nfxdCodePoints(allocator, a, .nfd);
+    defer allocator.free(nfd_a);
+
+    var need_free_cf_nfd_a = false;
+    var cf_nfd_a: []const u21 = nfd_a;
+    if (self.changesWhenCaseFolded(nfd_a)) {
+        cf_nfd_a = try self.caseFold(allocator, nfd_a);
+        need_free_cf_nfd_a = true;
+    }
+    defer if (need_free_cf_nfd_a) allocator.free(cf_nfd_a);
+
+    var need_free_nfd_cf_nfd_a = false;
+    var nfd_cf_nfd_a = cf_nfd_a;
+    if (!need_free_cf_nfd_a) {
+        nfd_cf_nfd_a = try normalizer.nfdCodePoints(allocator, cf_nfd_a);
+        need_free_nfd_cf_nfd_a = true;
+    }
+    defer if (need_free_nfd_cf_nfd_a) allocator.free(nfd_cf_nfd_a);
+
+    // Process b
+    const nfd_b = try normalizer.nfxdCodePoints(allocator, b, .nfd);
+    defer allocator.free(nfd_b);
+
+    var need_free_cf_nfd_b = false;
+    var cf_nfd_b: []const u21 = nfd_b;
+    if (self.changesWhenCaseFolded(nfd_b)) {
+        cf_nfd_b = try self.caseFold(allocator, nfd_b);
+        need_free_cf_nfd_b = true;
+    }
+    defer if (need_free_cf_nfd_b) allocator.free(cf_nfd_b);
+
+    var need_free_nfd_cf_nfd_b = false;
+    var nfd_cf_nfd_b = cf_nfd_b;
+    if (!need_free_cf_nfd_b) {
+        nfd_cf_nfd_b = try normalizer.nfdCodePoints(allocator, cf_nfd_b);
+        need_free_nfd_cf_nfd_b = true;
+    }
+    defer if (need_free_nfd_cf_nfd_b) allocator.free(nfd_cf_nfd_b);
+
+    return mem.eql(u21, nfd_cf_nfd_a, nfd_cf_nfd_b);
+}
+
+test "canonCaselessMatch" {
+    const allocator = testing.allocator;
+
+    var norm_data = try Normalizer.NormData.init(allocator);
+    defer norm_data.deinit();
+    const n = Normalizer{ .norm_data = &norm_data };
+
+    var fold_data = try FoldData.init(allocator);
+    defer fold_data.deinit();
+    const caser = Self{ .fold_data = &fold_data };
+
+    try testing.expect(try caser.canonCaselessMatch(allocator, &n, "ascii only!", "ASCII Only!"));
+
+    const a = "Héllo World! \u{3d3}";
+    const b = "He\u{301}llo World! \u{3a5}\u{301}";
+    try testing.expect(!try caser.canonCaselessMatch(allocator, &n, a, b));
+
+    const c = "He\u{301}llo World! \u{3d2}\u{301}";
+    try testing.expect(try caser.canonCaselessMatch(allocator, &n, a, c));
 }

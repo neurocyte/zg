@@ -343,6 +343,31 @@ test "nfkd !ASCII / alloc" {
     try testing.expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", result.slice);
 }
 
+pub fn nfdCodePoints(
+    self: Self,
+    allocator: mem.Allocator,
+    cps: []const u21,
+) ![]u21 {
+    var dcp_list = std.ArrayList(u21).init(allocator);
+    defer dcp_list.deinit();
+
+    var dc_buf: [18]u21 = undefined;
+
+    for (cps) |cp| {
+        const dc = self.decompose(cp, .nfd, &dc_buf);
+
+        if (dc.form == .same) {
+            try dcp_list.append(cp);
+        } else {
+            try dcp_list.appendSlice(dc.cps);
+        }
+    }
+
+    self.canonicalSort(dcp_list.items);
+
+    return try dcp_list.toOwnedSlice();
+}
+
 pub fn nfkdCodePoints(
     self: Self,
     allocator: mem.Allocator,
