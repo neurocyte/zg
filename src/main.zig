@@ -32,7 +32,11 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    const input = try std.fs.cwd().readFileAlloc(allocator, in_path, std.math.maxInt(u32));
+    const input = try std.fs.cwd().readFileAlloc(
+        allocator,
+        in_path,
+        std.math.maxInt(u32),
+    );
     defer allocator.free(input);
 
     var norm_data = try Normalizer.NormData.init(allocator);
