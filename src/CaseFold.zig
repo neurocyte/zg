@@ -4,7 +4,7 @@ const testing = std.testing;
 
 const ascii = @import("ascii");
 pub const FoldData = @import("FoldData");
-const Normalizer = @import("Normalizer");
+const Normalize = @import("Normalize");
 
 fold_data: *const FoldData,
 
@@ -40,7 +40,7 @@ fn changesWhenCaseFolded(self: Self, cps: []const u21) bool {
 pub fn compatCaselessMatch(
     self: Self,
     allocator: mem.Allocator,
-    normalizer: *const Normalizer,
+    normalizer: *const Normalize,
     a: []const u8,
     b: []const u8,
 ) !bool {
@@ -90,9 +90,9 @@ pub fn compatCaselessMatch(
 test "compatCaselessMatch" {
     const allocator = testing.allocator;
 
-    var norm_data = try Normalizer.NormData.init(allocator);
+    var norm_data = try Normalize.NormData.init(allocator);
     defer norm_data.deinit();
-    const n = Normalizer{ .norm_data = &norm_data };
+    const n = Normalize{ .norm_data = &norm_data };
 
     var fold_data = try FoldData.init(allocator);
     defer fold_data.deinit();
@@ -111,7 +111,7 @@ test "compatCaselessMatch" {
 pub fn canonCaselessMatch(
     self: Self,
     allocator: mem.Allocator,
-    normalizer: *const Normalizer,
+    normalizer: *const Normalize,
     a: []const u8,
     b: []const u8,
 ) !bool {
@@ -163,9 +163,9 @@ pub fn canonCaselessMatch(
 test "canonCaselessMatch" {
     const allocator = testing.allocator;
 
-    var norm_data = try Normalizer.NormData.init(allocator);
+    var norm_data = try Normalize.NormData.init(allocator);
     defer norm_data.deinit();
-    const n = Normalizer{ .norm_data = &norm_data };
+    const n = Normalize{ .norm_data = &norm_data };
 
     var fold_data = try FoldData.init(allocator);
     defer fold_data.deinit();

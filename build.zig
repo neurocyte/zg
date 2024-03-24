@@ -194,8 +194,8 @@ pub fn build(b: *std.Build) void {
     norm_data.addImport("HangulData", hangul_data);
     norm_data.addImport("NormPropsData", normp_data);
 
-    const norm = b.addModule("Normalizer", .{
-        .root_source_file = .{ .path = "src/Normalizer.zig" },
+    const norm = b.addModule("Normalize", .{
+        .root_source_file = .{ .path = "src/Normalize.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -219,14 +219,14 @@ pub fn build(b: *std.Build) void {
     });
     fold_data.addAnonymousImport("fold", .{ .root_source_file = fold_gen_out });
 
-    const folder = b.addModule("Folder", .{
-        .root_source_file = .{ .path = "src/Folder.zig" },
+    const case_fold = b.addModule("CaseFold", .{
+        .root_source_file = .{ .path = "src/CaseFold.zig" },
         .target = target,
         .optimize = optimize,
     });
-    folder.addImport("ascii", ascii);
-    folder.addImport("FoldData", fold_data);
-    folder.addImport("Normalizer", norm);
+    case_fold.addImport("ascii", ascii);
+    case_fold.addImport("FoldData", fold_data);
+    case_fold.addImport("Normalize", norm);
 
     // Benchmark rig
     const exe = b.addExecutable(.{
@@ -241,8 +241,8 @@ pub fn build(b: *std.Build) void {
     // exe.root_module.addImport("code_point", code_point);
     // exe.root_module.addImport("grapheme", grapheme);
     // exe.root_module.addImport("DisplayWidth", display_width);
-    exe.root_module.addImport("Normalizer", norm);
-    // exe.root_module.addImport("Folder", folder);
+    exe.root_module.addImport("Normalize", norm);
+    // exe.root_module.addImport("CaseFold", case_fold);
     // exe.root_module.addImport("GenCatData", gencat_data);
     b.installArtifact(exe);
 
@@ -255,7 +255,7 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/Folder.zig" },
+        .root_source_file = .{ .path = "src/CaseFold.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -267,7 +267,7 @@ pub fn build(b: *std.Build) void {
     // exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
     // exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
     exe_unit_tests.root_module.addImport("NormData", norm_data);
-    exe_unit_tests.root_module.addImport("Normalizer", norm);
+    exe_unit_tests.root_module.addImport("Normalize", norm);
     exe_unit_tests.root_module.addImport("FoldData", fold_data);
     // exe_unit_tests.filter = "nfd !ASCII";
 

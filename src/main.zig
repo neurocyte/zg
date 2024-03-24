@@ -16,10 +16,10 @@ const std = @import("std");
 // const ascii = @import("ascii");
 // const ascii = std.ascii;
 
-// const Normalizer = @import("ziglyph").Normalizer;
-const Normalizer = @import("Normalizer");
+// const Normalize = @import("ziglyph").Normalizer;
+const Normalize = @import("Normalize");
 
-// const Caser = @import("Caser");
+// const CaseFold = @import("CaseFold");
 
 // const GenCatData = @import("GenCatData");
 
@@ -39,18 +39,18 @@ pub fn main() !void {
     );
     defer allocator.free(input);
 
-    var norm_data = try Normalizer.NormData.init(allocator);
+    var norm_data = try Normalize.NormData.init(allocator);
     defer norm_data.deinit();
-    var norm = Normalizer{ .norm_data = &norm_data };
-    // var norm = try Normalizer.init(allocator);
+    var norm = Normalize{ .norm_data = &norm_data };
+    // var norm = try Normalize.init(allocator);
     // defer norm.deinit();
 
     // var gencat_data = try GenCatData.init(allocator);
     // defer gencat_data.deinit();
 
-    // var fold_data = try Caser.FoldData.init(allocator);
+    // var fold_data = try CaseFold.FoldData.init(allocator);
     // defer fold_data.deinit();
-    // var caser = Caser{ .fold_data = &fold_data };
+    // var caser = CaseFold{ .fold_data = &fold_data };
 
     // var iter = GraphemeIterator.init(input, &data);
     // defer iter.deinit();
