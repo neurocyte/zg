@@ -219,14 +219,14 @@ pub fn build(b: *std.Build) void {
     });
     fold_data.addAnonymousImport("fold", .{ .root_source_file = fold_gen_out });
 
-    const caser = b.addModule("Caser", .{
-        .root_source_file = .{ .path = "src/Caser.zig" },
+    const folder = b.addModule("Folder", .{
+        .root_source_file = .{ .path = "src/Folder.zig" },
         .target = target,
         .optimize = optimize,
     });
-    caser.addImport("ascii", ascii);
-    caser.addImport("FoldData", fold_data);
-    caser.addImport("Normalizer", norm);
+    folder.addImport("ascii", ascii);
+    folder.addImport("FoldData", fold_data);
+    folder.addImport("Normalizer", norm);
 
     // Benchmark rig
     const exe = b.addExecutable(.{
@@ -234,6 +234,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
+        // .strip = true,
     });
     // exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
     // exe.root_module.addImport("ascii", ascii);
@@ -241,7 +242,7 @@ pub fn build(b: *std.Build) void {
     // exe.root_module.addImport("grapheme", grapheme);
     // exe.root_module.addImport("DisplayWidth", display_width);
     exe.root_module.addImport("Normalizer", norm);
-    // exe.root_module.addImport("Caser", caser);
+    // exe.root_module.addImport("Folder", folder);
     // exe.root_module.addImport("GenCatData", gencat_data);
     b.installArtifact(exe);
 
@@ -254,7 +255,7 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/Caser.zig" },
+        .root_source_file = .{ .path = "src/Folder.zig" },
         .target = target,
         .optimize = optimize,
     });
