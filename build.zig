@@ -97,6 +97,16 @@ pub fn build(b: *std.Build) void {
     const run_fold_gen_exe = b.addRunArtifact(fold_gen_exe);
     const fold_gen_out = run_fold_gen_exe.addOutputFileArg("fold.bin.z");
 
+    // Numeric types
+    const num_gen_exe = b.addExecutable(.{
+        .name = "numeric",
+        .root_source_file = .{ .path = "codegen/numeric.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_num_gen_exe = b.addRunArtifact(num_gen_exe);
+    const num_gen_out = run_num_gen_exe.addOutputFileArg("numeric.bin.z");
+
     // Modules we provide
     // Code points
     const code_point = b.addModule("code_point", .{
@@ -228,6 +238,14 @@ pub fn build(b: *std.Build) void {
     case_fold.addImport("FoldData", fold_data);
     case_fold.addImport("Normalize", norm);
 
+    // Numeric type
+    const num_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/NumericData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    num_data.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
+
     // Benchmark rig
     const exe = b.addExecutable(.{
         .name = "zg",
@@ -238,12 +256,13 @@ pub fn build(b: *std.Build) void {
     });
     // exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
     // exe.root_module.addImport("ascii", ascii);
-    // exe.root_module.addImport("code_point", code_point);
+    exe.root_module.addImport("code_point", code_point);
     // exe.root_module.addImport("grapheme", grapheme);
     // exe.root_module.addImport("DisplayWidth", display_width);
-    exe.root_module.addImport("Normalize", norm);
+    // exe.root_module.addImport("Normalize", norm);
     // exe.root_module.addImport("CaseFold", case_fold);
     // exe.root_module.addImport("GenCatData", gencat_data);
+    exe.root_module.addImport("NumericData", num_data);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -255,20 +274,21 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/CaseFold.zig" },
+        .root_source_file = .{ .path = "src/NumericData.zig" },
         .target = target,
         .optimize = optimize,
     });
-    exe_unit_tests.root_module.addImport("ascii", ascii);
+    // exe_unit_tests.root_module.addImport("ascii", ascii);
     // exe_unit_tests.root_module.addImport("code_point", code_point);
     // exe_unit_tests.root_module.addImport("GraphemeData", grapheme_data);
     // exe_unit_tests.root_module.addImport("grapheme", grapheme);
     // exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
     // exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
     // exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
-    exe_unit_tests.root_module.addImport("NormData", norm_data);
-    exe_unit_tests.root_module.addImport("Normalize", norm);
-    exe_unit_tests.root_module.addImport("FoldData", fold_data);
+    // exe_unit_tests.root_module.addImport("NormData", norm_data);
+    // exe_unit_tests.root_module.addImport("Normalize", norm);
+    // exe_unit_tests.root_module.addImport("FoldData", fold_data);
+    exe_unit_tests.root_module.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
     // exe_unit_tests.filter = "nfd !ASCII";
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);

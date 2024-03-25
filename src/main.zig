@@ -11,17 +11,19 @@ const std = @import("std");
 // const strWidth = @import("display_width").strWidth;
 
 // const CodePointIterator = @import("ziglyph").CodePointIterator;
-// const CodePointIterator = @import("code_point").Iterator;
+const CodePointIterator = @import("code_point").Iterator;
 
 // const ascii = @import("ascii");
 // const ascii = std.ascii;
 
 // const Normalize = @import("ziglyph").Normalizer;
-const Normalize = @import("Normalize");
+// const Normalize = @import("Normalize");
 
 // const CaseFold = @import("CaseFold");
 
 // const GenCatData = @import("GenCatData");
+
+const NumericData = @import("NumericData");
 
 pub fn main() !void {
     var args_iter = std.process.args();
@@ -39,9 +41,9 @@ pub fn main() !void {
     );
     defer allocator.free(input);
 
-    var norm_data = try Normalize.NormData.init(allocator);
-    defer norm_data.deinit();
-    var norm = Normalize{ .norm_data = &norm_data };
+    // var norm_data = try Normalize.NormData.init(allocator);
+    // defer norm_data.deinit();
+    // var norm = Normalize{ .norm_data = &norm_data };
     // var norm = try Normalize.init(allocator);
     // defer norm.deinit();
 
@@ -52,10 +54,13 @@ pub fn main() !void {
     // defer fold_data.deinit();
     // var caser = CaseFold{ .fold_data = &fold_data };
 
+    var num_data = try NumericData.init(allocator);
+    defer num_data.deinit();
+
     // var iter = GraphemeIterator.init(input, &data);
     // defer iter.deinit();
-    // var iter = CodePointIterator{ .bytes = input };
-    var iter = std.mem.splitScalar(u8, input, '\n');
+    var iter = CodePointIterator{ .bytes = input };
+    // var iter = std.mem.splitScalar(u8, input, '\n');
 
     var result: usize = 0;
     // var prev_line: []const u8 = "";
@@ -65,11 +70,11 @@ pub fn main() !void {
     // while (iter.next()) |cp| result += codePointWidth(@intCast(cp.code));
     // while (iter.next()) |_| result += 1;
     // while (iter.next()) |line| result += strWidth(line, &data);
-    while (iter.next()) |line| {
-        const nfc = try norm.nfc(allocator, line);
-        result += nfc.slice.len;
-        // nfc.deinit();
-    }
+    // while (iter.next()) |line| {
+    //     const nfc = try norm.nfc(allocator, line);
+    //     result += nfc.slice.len;
+    //     // nfc.deinit();
+    // }
     // while (iter.next()) |cp| {
     //     if (cp.code == 'É') std.debug.print("`{u}` Gc: {s}\n", .{ cp.code, @tagName(gencat_data.gc(cp.code)) });
     //     result += 1;
@@ -80,6 +85,9 @@ pub fn main() !void {
     //     }
     //     prev_line = line;
     // }
+    while (iter.next()) |cp| {
+        if (num_data.isNumberic(cp)) result += 1;
+    }
 
     std.debug.print("result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
 }
