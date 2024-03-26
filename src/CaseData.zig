@@ -37,9 +37,10 @@ pub fn init(allocator: mem.Allocator) !Self {
     var upper_reader = upper_decomp.reader();
 
     while (true) {
-        const cp = try upper_reader.readInt(u24, endian);
+        const cp = try upper_reader.readInt(i24, endian);
         if (cp == 0) break;
-        self.case_map[cp][0] = @intCast(try upper_reader.readInt(u24, endian));
+        const diff = try upper_reader.readInt(i24, endian);
+        self.case_map[@intCast(cp)][0] = @intCast(cp + diff);
     }
 
     // Lowercase

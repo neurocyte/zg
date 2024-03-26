@@ -31,26 +31,26 @@ pub fn main() !void {
         if (line.len == 0) continue;
 
         var field_iter = std.mem.splitScalar(u8, line, ';');
-        var cps: [2]u24 = undefined;
+        var cp: i24 = undefined;
 
         var i: usize = 0;
         while (field_iter.next()) |field| : (i += 1) {
             switch (i) {
-                0 => cps[0] = try std.fmt.parseInt(u24, field, 16),
+                0 => cp = try std.fmt.parseInt(i24, field, 16),
+
+                2 => if (line[0] == '<') continue :lines,
 
                 12 => {
                     // Simple uppercase mapping
                     if (field.len == 0) continue :lines;
-                    cps[1] = try std.fmt.parseInt(u24, field, 16);
+                    try writer.writeInt(i24, cp, endian);
+                    const mapping = try std.fmt.parseInt(i24, field, 16);
+                    try writer.writeInt(i24, mapping - cp, endian);
                 },
-
-                2 => if (line[0] == '<') continue :lines,
 
                 else => {},
             }
         }
-
-        for (&cps) |cp| try writer.writeInt(u24, cp, endian);
     }
 
     try writer.writeInt(u24, 0, endian);
