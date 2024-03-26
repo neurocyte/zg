@@ -51,9 +51,10 @@ pub fn init(allocator: mem.Allocator) !Self {
     var lower_reader = lower_decomp.reader();
 
     while (true) {
-        const cp = try lower_reader.readInt(u24, endian);
+        const cp = try lower_reader.readInt(i24, endian);
         if (cp == 0) break;
-        self.case_map[cp][1] = @intCast(try lower_reader.readInt(u24, endian));
+        const diff = try lower_reader.readInt(i24, endian);
+        self.case_map[@intCast(cp)][1] = @intCast(cp + diff);
     }
 
     // Case properties
