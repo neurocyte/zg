@@ -107,6 +107,46 @@ pub fn build(b: *std.Build) void {
     const run_num_gen_exe = b.addRunArtifact(num_gen_exe);
     const num_gen_out = run_num_gen_exe.addOutputFileArg("numeric.bin.z");
 
+    // Letter case properties
+    const case_prop_gen_exe = b.addExecutable(.{
+        .name = "case_prop",
+        .root_source_file = .{ .path = "codegen/case_prop.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_case_prop_gen_exe = b.addRunArtifact(case_prop_gen_exe);
+    const case_prop_gen_out = run_case_prop_gen_exe.addOutputFileArg("case_prop.bin.z");
+
+    // Uppercase mappings
+    const upper_gen_exe = b.addExecutable(.{
+        .name = "upper",
+        .root_source_file = .{ .path = "codegen/upper.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_upper_gen_exe = b.addRunArtifact(upper_gen_exe);
+    const upper_gen_out = run_upper_gen_exe.addOutputFileArg("upper.bin.z");
+
+    // Lowercase mappings
+    const lower_gen_exe = b.addExecutable(.{
+        .name = "lower",
+        .root_source_file = .{ .path = "codegen/lower.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_lower_gen_exe = b.addRunArtifact(lower_gen_exe);
+    const lower_gen_out = run_lower_gen_exe.addOutputFileArg("lower.bin.z");
+
+    // Titlecase mappings
+    const title_gen_exe = b.addExecutable(.{
+        .name = "title",
+        .root_source_file = .{ .path = "codegen/title.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_title_gen_exe = b.addRunArtifact(title_gen_exe);
+    const title_gen_out = run_title_gen_exe.addOutputFileArg("title.bin.z");
+
     // Modules we provide
     // Code points
     const code_point = b.addModule("code_point", .{
@@ -221,7 +261,7 @@ pub fn build(b: *std.Build) void {
     });
     gencat_data.addAnonymousImport("gencat", .{ .root_source_file = gencat_gen_out });
 
-    // Case
+    // Case folding
     const fold_data = b.createModule(.{
         .root_source_file = .{ .path = "src/FoldData.zig" },
         .target = target,
@@ -245,6 +285,18 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     num_data.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
+
+    // Letter case
+    const case_data = b.createModule(.{
+        .root_source_file = .{ .path = "src/CaseData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    case_data.addImport("code_point", code_point);
+    case_data.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
+    case_data.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
+    case_data.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
+    case_data.addAnonymousImport("title", .{ .root_source_file = title_gen_out });
 
     // Benchmark rig
     const exe = b.addExecutable(.{
@@ -274,12 +326,12 @@ pub fn build(b: *std.Build) void {
 
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/NumericData.zig" },
+        .root_source_file = .{ .path = "src/CaseData.zig" },
         .target = target,
         .optimize = optimize,
     });
     // exe_unit_tests.root_module.addImport("ascii", ascii);
-    // exe_unit_tests.root_module.addImport("code_point", code_point);
+    exe_unit_tests.root_module.addImport("code_point", code_point);
     // exe_unit_tests.root_module.addImport("GraphemeData", grapheme_data);
     // exe_unit_tests.root_module.addImport("grapheme", grapheme);
     // exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
@@ -288,7 +340,11 @@ pub fn build(b: *std.Build) void {
     // exe_unit_tests.root_module.addImport("NormData", norm_data);
     // exe_unit_tests.root_module.addImport("Normalize", norm);
     // exe_unit_tests.root_module.addImport("FoldData", fold_data);
-    exe_unit_tests.root_module.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
+    // exe_unit_tests.root_module.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("title", .{ .root_source_file = title_gen_out });
     // exe_unit_tests.filter = "nfd !ASCII";
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);

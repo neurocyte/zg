@@ -32,8 +32,8 @@ pub fn main() !void {
 
     var line_buf: [4096]u8 = undefined;
 
-    // Process DerivedNumericType.txt
-    var in_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedNumericType.txt", .{});
+    // Process DerivedCoreProperties.txt
+    var in_file = try std.fs.cwd().openFile("data/unicode/DerivedCoreProperties.txt", .{});
     defer in_file.close();
     var in_buf = std.io.bufferedReader(in_file.reader());
     const in_reader = in_buf.reader();
@@ -61,12 +61,12 @@ pub fn main() !void {
                     }
                 },
                 1 => {
-                    // Numeric type
+                    // Props
                     var bit: u8 = 0;
 
-                    if (mem.eql(u8, field, "Numeric")) bit = 1;
-                    if (mem.eql(u8, field, "Digit")) bit = 2;
-                    if (mem.eql(u8, field, "Decimal")) bit = 4;
+                    if (mem.eql(u8, field, "Lowercase")) bit = 1;
+                    if (mem.eql(u8, field, "Uppercase")) bit = 2;
+                    if (mem.eql(u8, field, "Cased")) bit = 4;
 
                     if (bit != 0) {
                         for (current_code[0]..current_code[1] + 1) |cp| {
@@ -95,10 +95,10 @@ pub fn main() !void {
 
     for (0..0x110000) |i| {
         const cp: u21 = @intCast(i);
-        const nt = flat_map.get(cp) orelse 0;
+        const prop = flat_map.get(cp) orelse 0;
 
         // Process block
-        block[block_len] = nt;
+        block[block_len] = prop;
         block_len += 1;
 
         if (block_len < block_size and cp != 0x10ffff) continue;
