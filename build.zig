@@ -137,16 +137,6 @@ pub fn build(b: *std.Build) void {
     const run_lower_gen_exe = b.addRunArtifact(lower_gen_exe);
     const lower_gen_out = run_lower_gen_exe.addOutputFileArg("lower.bin.z");
 
-    // Titlecase mappings
-    const title_gen_exe = b.addExecutable(.{
-        .name = "title",
-        .root_source_file = .{ .path = "codegen/title.zig" },
-        .target = b.host,
-        .optimize = .Debug,
-    });
-    const run_title_gen_exe = b.addRunArtifact(title_gen_exe);
-    const title_gen_out = run_title_gen_exe.addOutputFileArg("title.bin.z");
-
     // Modules we provide
     // Code points
     const code_point = b.addModule("code_point", .{
@@ -296,7 +286,6 @@ pub fn build(b: *std.Build) void {
     case_data.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
     case_data.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
     case_data.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
-    case_data.addAnonymousImport("title", .{ .root_source_file = title_gen_out });
 
     // Benchmark rig
     const exe = b.addExecutable(.{
@@ -344,7 +333,6 @@ pub fn build(b: *std.Build) void {
     exe_unit_tests.root_module.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
     exe_unit_tests.root_module.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
     exe_unit_tests.root_module.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
-    exe_unit_tests.root_module.addAnonymousImport("title", .{ .root_source_file = title_gen_out });
     // exe_unit_tests.filter = "nfd !ASCII";
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);

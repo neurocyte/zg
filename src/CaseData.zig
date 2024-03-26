@@ -8,7 +8,7 @@ const unicode = std.unicode;
 const CodePointIterator = @import("code_point").Iterator;
 
 allocator: mem.Allocator,
-case_map: [][3]u21,
+case_map: [][2]u21,
 prop_s1: []u16 = undefined,
 prop_s2: []u8 = undefined,
 
@@ -20,13 +20,13 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     var self = Self{
         .allocator = allocator,
-        .case_map = try allocator.alloc([3]u21, 0x110000),
+        .case_map = try allocator.alloc([2]u21, 0x110000),
     };
     errdefer allocator.free(self.case_map);
 
     for (0..0x110000) |i| {
         const cp: u21 = @intCast(i);
-        self.case_map[cp] = .{ cp, cp, cp };
+        self.case_map[cp] = .{ cp, cp };
     }
 
     // Uppercase
@@ -53,19 +53,6 @@ pub fn init(allocator: mem.Allocator) !Self {
         const cp = try lower_reader.readInt(u24, endian);
         if (cp == 0) break;
         self.case_map[cp][1] = @intCast(try lower_reader.readInt(u24, endian));
-    }
-
-    // Titlercase
-    const title_bytes = @embedFile("title");
-    var title_fbs = std.io.fixedBufferStream(title_bytes);
-    var title_decomp = try decompressor(allocator, title_fbs.reader(), null);
-    defer title_decomp.deinit();
-    var title_reader = title_decomp.reader();
-
-    while (true) {
-        const cp = try title_reader.readInt(u24, endian);
-        if (cp == 0) break;
-        self.case_map[cp][2] = @intCast(try title_reader.readInt(u24, endian));
     }
 
     // Case properties
@@ -101,7 +88,6 @@ pub inline fn isCased(self: Self, cp: u21) bool {
 
 // Returns true if `cp` is uppercase.
 pub fn isUpper(self: Self, cp: u21) bool {
-    if (!self.isCased(cp)) return true;
     return self.prop_s2[self.prop_s1[cp >> 8] + (cp & 0xff)] & 2 == 2;
 }
 
@@ -110,7 +96,7 @@ pub fn isUpperStr(self: Self, str: []const u8) bool {
     var iter = CodePointIterator{ .bytes = str };
 
     return while (iter.next()) |cp| {
-        if (!self.isUpper(cp.code)) break false;
+        if (self.isCased(cp.code) and !self.isUpper(cp.code)) break false;
     } else true;
 }
 
@@ -121,6 +107,11 @@ test "isUpperStr" {
     try testing.expect(cd.isUpperStr("HELLO, WORLD 2112!"));
     try testing.expect(!cd.isUpperStr("hello, world 2112!"));
     try testing.expect(!cd.isUpperStr("Hello, World 2112!"));
+}
+
+/// Returns uppercase mapping for `cp`.
+pub inline fn toUpper(self: Self, cp: u21) u21 {
+    return self.case_map[cp][0];
 }
 
 /// Returns a new string with all letters in uppercase.
@@ -153,20 +144,9 @@ test "toUpperStr" {
     try testing.expectEqualStrings("HELLO, WORLD 2112!", uppered);
 }
 
-/// Returns uppercase mapping for `cp`.
-pub inline fn toUpper(self: Self, cp: u21) u21 {
-    return self.case_map[cp][0];
-}
-
 // Returns true if `cp` is lowercase.
 pub fn isLower(self: Self, cp: u21) bool {
-    if (!self.isCased(cp)) return true;
     return self.prop_s2[self.prop_s1[cp >> 8] + (cp & 0xff)] & 1 == 1;
-}
-
-/// Returns lowercase mapping for `cp`.
-pub inline fn toLower(self: Self, cp: u21) u21 {
-    return self.case_map[cp][1];
 }
 
 /// Returns true if `str` is all lowercase.
@@ -174,7 +154,7 @@ pub fn isLowerStr(self: Self, str: []const u8) bool {
     var iter = CodePointIterator{ .bytes = str };
 
     return while (iter.next()) |cp| {
-        if (!self.isLower(cp.code)) break false;
+        if (self.isCased(cp.code) and !self.isLower(cp.code)) break false;
     } else true;
 }
 
@@ -185,6 +165,11 @@ test "isLowerStr" {
     try testing.expect(cd.isLowerStr("hello, world 2112!"));
     try testing.expect(!cd.isLowerStr("HELLO, WORLD 2112!"));
     try testing.expect(!cd.isLowerStr("Hello, World 2112!"));
+}
+
+/// Returns lowercase mapping for `cp`.
+pub inline fn toLower(self: Self, cp: u21) u21 {
+    return self.case_map[cp][1];
 }
 
 /// Returns a new string with all letters in lowercase.
@@ -215,9 +200,4 @@ test "toLowerStr" {
     const lowered = try cd.toLowerStr(testing.allocator, "Hello, World 2112!");
     defer testing.allocator.free(lowered);
     try testing.expectEqualStrings("hello, world 2112!", lowered);
-}
-
-/// Returns titlecase mapping for `cp`.
-pub inline fn toTitle(self: Self, cp: u21) u21 {
-    return self.case_map[cp][2];
 }
