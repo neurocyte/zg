@@ -91,8 +91,8 @@ const Decomp = struct {
     cps: []const u21 = &.{},
 };
 
-/// `mapping` retrieves the decomposition mapping for a code point as per the UCD.
-pub fn mapping(self: Self, cp: u21, form: Form) Decomp {
+// `mapping` retrieves the decomposition mapping for a code point as per the UCD.
+fn mapping(self: Self, cp: u21, form: Form) Decomp {
     var dc = Decomp{};
 
     switch (form) {
@@ -117,8 +117,8 @@ pub fn mapping(self: Self, cp: u21, form: Form) Decomp {
     return dc;
 }
 
-/// `decompose` a code point to the specified normalization form, which should be either `.nfd` or `.nfkd`.
-pub fn decompose(
+// `decompose` a code point to the specified normalization form, which should be either `.nfd` or `.nfkd`.
+fn decompose(
     self: Self,
     cp: u21,
     form: Form,
@@ -587,8 +587,8 @@ fn getTrailCcc(self: Self, cp: u21) u8 {
     return self.norm_data.ccc_data.ccc(dcp);
 }
 
-/// Fast check to detect if a string is already in NFC or NFD form.
-pub fn isFcd(self: Self, str: []const u8) bool {
+// Fast check to detect if a string is already in NFC or NFD form.
+fn isFcd(self: Self, str: []const u8) bool {
     var prev_ccc: u8 = 0;
     var cp_iter = CodePointIterator{ .bytes = str };
 

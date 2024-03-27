@@ -4,7 +4,7 @@ const unicode = std.unicode;
 
 const CodePoint = @import("code_point").CodePoint;
 const CodePointIterator = @import("code_point").Iterator;
-pub const Data = @import("GraphemeData");
+pub const GraphemeData = @import("GraphemeData");
 
 /// `Grapheme` represents a Unicode grapheme cluster by its length and offset in the source bytes.
 pub const Grapheme = struct {
@@ -22,12 +22,12 @@ pub const Grapheme = struct {
 pub const Iterator = struct {
     buf: [2]?CodePoint = .{ null, null },
     cp_iter: CodePointIterator,
-    data: *Data,
+    data: *const GraphemeData,
 
     const Self = @This();
 
     /// Assumes `src` is valid UTF-8.
-    pub fn init(str: []const u8, data: *Data) Self {
+    pub fn init(str: []const u8, data: *const GraphemeData) Self {
         var self = Self{ .cp_iter = .{ .bytes = str }, .data = data };
         self.advance();
         return self;
@@ -80,7 +80,7 @@ pub const Iterator = struct {
 };
 
 // Predicates
-fn isBreaker(cp: u21, data: *Data) bool {
+fn isBreaker(cp: u21, data: *const GraphemeData) bool {
     // Extract relevant properties.
     const cp_gbp_prop = data.gbp(cp);
     return cp == '\x0d' or cp == '\x0a' or cp_gbp_prop == .Control;
@@ -133,7 +133,7 @@ const State = struct {
 pub fn graphemeBreak(
     cp1: u21,
     cp2: u21,
-    data: *Data,
+    data: *const GraphemeData,
     state: *State,
 ) bool {
     // Extract relevant properties.
@@ -237,7 +237,7 @@ test "Segmentation GraphemeIterator" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var input_stream = buf_reader.reader();
 
-    var data = try Data.init(allocator);
+    var data = try GraphemeData.init(allocator);
     defer data.deinit();
 
     var buf: [4096]u8 = undefined;
@@ -302,7 +302,7 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
     const with_zwsp = seq_1 ++ "\u{200B}" ++ seq_2;
     const no_joiner = seq_1 ++ seq_2;
 
-    var data = try Data.init(std.testing.allocator);
+    var data = try GraphemeData.init(std.testing.allocator);
     defer data.deinit();
 
     var iter = Iterator.init(with_zwj, &data);
