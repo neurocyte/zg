@@ -277,7 +277,7 @@ pub fn build(b: *std.Build) void {
     num_data.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
 
     // Letter case
-    const case_data = b.createModule(.{
+    const case_data = b.addModule("CaseData", .{
         .root_source_file = .{ .path = "src/CaseData.zig" },
         .target = target,
         .optimize = optimize,
