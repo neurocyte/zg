@@ -287,32 +287,6 @@ pub fn build(b: *std.Build) void {
     case_data.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
     case_data.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
 
-    // Benchmark rig
-    const exe = b.addExecutable(.{
-        .name = "zg",
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-        // .strip = true,
-    });
-    // exe.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    // exe.root_module.addImport("ascii", ascii);
-    exe.root_module.addImport("code_point", code_point);
-    // exe.root_module.addImport("grapheme", grapheme);
-    // exe.root_module.addImport("DisplayWidth", display_width);
-    // exe.root_module.addImport("Normalize", norm);
-    // exe.root_module.addImport("CaseFold", case_fold);
-    // exe.root_module.addImport("GenCatData", gencat_data);
-    exe.root_module.addImport("NumericData", num_data);
-    b.installArtifact(exe);
-
-    const run_cmd = b.addRunArtifact(exe);
-    run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
-
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
-
     // Tests
     const exe_unit_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/CaseData.zig" },
