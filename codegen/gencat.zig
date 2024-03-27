@@ -2,36 +2,36 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const Gc = enum {
-    Cc,
-    Cf,
-    Cn,
-    Co,
-    Cs,
-    Ll,
-    Lm,
-    Lo,
-    Lt,
-    Lu,
-    Mc,
-    Me,
-    Mn,
-    Nd,
-    Nl,
-    No,
-    Pc,
-    Pd,
-    Pe,
-    Pf,
-    Pi,
-    Po,
-    Ps,
-    Sc,
-    Sk,
-    Sm,
-    So,
-    Zl,
-    Zp,
-    Zs,
+    Cc, // Other, Control
+    Cf, // Other, Format
+    Cn, // Other, Unassigned
+    Co, // Other, Private Use
+    Cs, // Other, Surrogate
+    Ll, // Letter, Lowercase
+    Lm, // Letter, Modifier
+    Lo, // Letter, Other
+    Lu, // Letter, Uppercase
+    Lt, // Letter, Titlecase
+    Mc, // Mark, Spacing Combining
+    Me, // Mark, Enclosing
+    Mn, // Mark, Non-Spacing
+    Nd, // Number, Decimal Digit
+    Nl, // Number, Letter
+    No, // Number, Other
+    Pc, // Punctuation, Connector
+    Pd, // Punctuation, Dash
+    Pe, // Punctuation, Close
+    Pf, // Punctuation, Final quote (may behave like Ps or Pe depending on usage)
+    Pi, // Punctuation, Initial quote (may behave like Ps or Pe depending on usage)
+    Po, // Punctuation, Other
+    Ps, // Punctuation, Open
+    Sc, // Symbol, Currency
+    Sk, // Symbol, Modifier
+    Sm, // Symbol, Math
+    So, // Symbol, Other
+    Zl, // Separator, Line
+    Zp, // Separator, Paragraph
+    Zs, // Separator, Space
 };
 
 const block_size = 256;

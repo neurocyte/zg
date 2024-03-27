@@ -5,36 +5,36 @@ const mem = std.mem;
 
 /// General Category
 pub const Gc = enum {
-    Cc,
-    Cf,
-    Cn,
-    Co,
-    Cs,
-    Ll,
-    Lm,
-    Lo,
-    Lt,
-    Lu,
-    Mc,
-    Me,
-    Mn,
-    Nd,
-    Nl,
-    No,
-    Pc,
-    Pd,
-    Pe,
-    Pf,
-    Pi,
-    Po,
-    Ps,
-    Sc,
-    Sk,
-    Sm,
-    So,
-    Zl,
-    Zp,
-    Zs,
+    Cc, // Other, Control
+    Cf, // Other, Format
+    Cn, // Other, Unassigned
+    Co, // Other, Private Use
+    Cs, // Other, Surrogate
+    Ll, // Letter, Lowercase
+    Lm, // Letter, Modifier
+    Lo, // Letter, Other
+    Lu, // Letter, Uppercase
+    Lt, // Letter, Titlecase
+    Mc, // Mark, Spacing Combining
+    Me, // Mark, Enclosing
+    Mn, // Mark, Non-Spacing
+    Nd, // Number, Decimal Digit
+    Nl, // Number, Letter
+    No, // Number, Other
+    Pc, // Punctuation, Connector
+    Pd, // Punctuation, Dash
+    Pe, // Punctuation, Close
+    Pf, // Punctuation, Final quote (may behave like Ps or Pe depending on usage)
+    Pi, // Punctuation, Initial quote (may behave like Ps or Pe depending on usage)
+    Po, // Punctuation, Other
+    Ps, // Punctuation, Open
+    Sc, // Symbol, Currency
+    Sk, // Symbol, Modifier
+    Sm, // Symbol, Math
+    So, // Symbol, Other
+    Zl, // Separator, Line
+    Zp, // Separator, Paragraph
+    Zs, // Separator, Space
 };
 
 allocator: mem.Allocator,
@@ -80,4 +80,90 @@ pub fn deinit(self: *Self) void {
 /// Lookup the General Category for `cp`.
 pub inline fn gc(self: Self, cp: u21) Gc {
     return @enumFromInt(self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]]);
+}
+
+/// True if `cp` has an C general category.
+pub fn isControl(self: Self, cp: u21) bool {
+    return switch (self.gc(cp)) {
+        .Cc,
+        .Cf,
+        .Cn,
+        .Co,
+        .Cs,
+        => true,
+        else => false,
+    };
+}
+
+/// True if `cp` has an L general category.
+pub fn isLetter(self: Self, cp: u21) bool {
+    return switch (self.gc(cp)) {
+        .Ll,
+        .Lm,
+        .Lo,
+        .Lu,
+        .Lt,
+        => true,
+        else => false,
+    };
+}
+
+/// True if `cp` has an M general category.
+pub fn isMark(self: Self, cp: u21) bool {
+    return switch (self.gc(cp)) {
+        .Mc,
+        .Me,
+        .Mn,
+        => true,
+        else => false,
+    };
+}
+
+/// True if `cp` has an N general category.
+pub fn isNumber(self: Self, cp: u21) bool {
+    return switch (self.gc(cp)) {
+        .Nd,
+        .Nl,
+        .No,
+        => true,
+        else => false,
+    };
+}
+
+/// True if `cp` has an P general category.
+pub fn isPunctuation(self: Self, cp: u21) bool {
+    return switch (self.gc(cp)) {
+        .Pc,
+        .Pd,
+        .Pe,
+        .Pf,
+        .Pi,
+        .Po,
+        .Ps,
+        => true,
+        else => false,
+    };
+}
+
+/// True if `cp` has an S general category.
+pub fn isSymbol(self: Self, cp: u21) bool {
+    return switch (self.gc(cp)) {
+        .Sc,
+        .Sk,
+        .Sm,
+        .So,
+        => true,
+        else => false,
+    };
+}
+
+/// True if `cp` has an Z general category.
+pub fn isSeparator(self: Self, cp: u21) bool {
+    return switch (self.gc(cp)) {
+        .Zl,
+        .Zp,
+        .Zs,
+        => true,
+        else => false,
+    };
 }
