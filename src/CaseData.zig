@@ -77,7 +77,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *const Self) void {
     self.allocator.free(self.case_map);
     self.allocator.free(self.prop_s1);
     self.allocator.free(self.prop_s2);
@@ -103,7 +103,7 @@ pub fn isUpperStr(self: Self, str: []const u8) bool {
 }
 
 test "isUpperStr" {
-    var cd = try init(testing.allocator);
+    const cd = try init(testing.allocator);
     defer cd.deinit();
 
     try testing.expect(cd.isUpperStr("HELLO, WORLD 2112!"));
@@ -138,7 +138,7 @@ pub fn toUpperStr(
 }
 
 test "toUpperStr" {
-    var cd = try init(testing.allocator);
+    const cd = try init(testing.allocator);
     defer cd.deinit();
 
     const uppered = try cd.toUpperStr(testing.allocator, "Hello, World 2112!");
@@ -161,7 +161,7 @@ pub fn isLowerStr(self: Self, str: []const u8) bool {
 }
 
 test "isLowerStr" {
-    var cd = try init(testing.allocator);
+    const cd = try init(testing.allocator);
     defer cd.deinit();
 
     try testing.expect(cd.isLowerStr("hello, world 2112!"));
@@ -196,7 +196,7 @@ pub fn toLowerStr(
 }
 
 test "toLowerStr" {
-    var cd = try init(testing.allocator);
+    const cd = try init(testing.allocator);
     defer cd.deinit();
 
     const lowered = try cd.toLowerStr(testing.allocator, "Hello, World 2112!");

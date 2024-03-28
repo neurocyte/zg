@@ -56,7 +56,7 @@ pub fn strWidth(self: Self, str: []const u8) usize {
 }
 
 test "strWidth" {
-    var data = try DisplayWidthData.init(testing.allocator);
+    const data = try DisplayWidthData.init(testing.allocator);
     defer data.deinit();
     const self = Self{ .data = &data };
 
@@ -157,7 +157,7 @@ pub fn center(
 
 test "center" {
     const allocator = testing.allocator;
-    var data = try DisplayWidthData.init(allocator);
+    const data = try DisplayWidthData.init(allocator);
     defer data.deinit();
     const self = Self{ .data = &data };
 
@@ -236,7 +236,7 @@ pub fn padLeft(
 
 test "padLeft" {
     const allocator = testing.allocator;
-    var data = try DisplayWidthData.init(allocator);
+    const data = try DisplayWidthData.init(allocator);
     defer data.deinit();
     const self = Self{ .data = &data };
 
@@ -286,7 +286,7 @@ pub fn padRight(
 
 test "padRight" {
     const allocator = testing.allocator;
-    var data = try DisplayWidthData.init(allocator);
+    const data = try DisplayWidthData.init(allocator);
     defer data.deinit();
     const self = Self{ .data = &data };
 
@@ -339,7 +339,7 @@ pub fn wrap(
 
 test "wrap" {
     const allocator = testing.allocator;
-    var data = try DisplayWidthData.init(allocator);
+    const data = try DisplayWidthData.init(allocator);
     defer data.deinit();
     const self = Self{ .data = &data };
 

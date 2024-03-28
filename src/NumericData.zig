@@ -33,7 +33,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *const Self) void {
     self.allocator.free(self.s1);
     self.allocator.free(self.s2);
 }
@@ -59,7 +59,7 @@ pub inline fn isDecimal(self: Self, cp: u21) bool {
 }
 
 test "isDecimal" {
-    var self = try init(testing.allocator);
+    const self = try init(testing.allocator);
     defer self.deinit();
 
     try testing.expect(self.isNumber('\u{277f}'));

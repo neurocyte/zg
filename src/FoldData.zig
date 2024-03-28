@@ -41,7 +41,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *const Self) void {
     for (self.fold) |slice| self.allocator.free(slice);
     self.allocator.free(self.fold);
     self.allocator.free(self.cwcf);

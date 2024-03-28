@@ -42,7 +42,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *const Self) void {
     self.nfc.deinit();
     for (self.nfd) |slice| self.allocator.free(slice);
     self.allocator.free(self.nfd);

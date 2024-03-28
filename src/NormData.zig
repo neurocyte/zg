@@ -26,7 +26,7 @@ pub fn init(allocator: std.mem.Allocator) !Self {
     };
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *const Self) void {
     self.canon_data.deinit();
     self.ccc_data.deinit();
     self.compat_data.deinit();

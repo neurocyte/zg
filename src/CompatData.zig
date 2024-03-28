@@ -37,7 +37,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *const Self) void {
     for (self.nfkd) |slice| {
         if (slice.len != 0) self.allocator.free(slice);
     }

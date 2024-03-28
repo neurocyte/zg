@@ -177,7 +177,7 @@ fn decompose(
 
 test "decompose" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
     var n = Self{ .norm_data = &data };
 
@@ -225,7 +225,7 @@ pub const Result = struct {
     allocator: ?mem.Allocator = null,
     slice: []const u8,
 
-    pub fn deinit(self: *Result) void {
+    pub fn deinit(self: *const Result) void {
         if (self.allocator) |allocator| allocator.free(self.slice);
     }
 };
@@ -297,11 +297,11 @@ fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
 
 test "nfd ASCII / no-alloc" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
-    var result = try n.nfd(allocator, "Hello World!");
+    const result = try n.nfd(allocator, "Hello World!");
     defer result.deinit();
 
     try testing.expectEqualStrings("Hello World!", result.slice);
@@ -309,11 +309,11 @@ test "nfd ASCII / no-alloc" {
 
 test "nfd !ASCII / alloc" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
-    var result = try n.nfd(allocator, "Héllo World! \u{3d3}");
+    const result = try n.nfd(allocator, "Héllo World! \u{3d3}");
     defer result.deinit();
 
     try testing.expectEqualStrings("He\u{301}llo World! \u{3d2}\u{301}", result.slice);
@@ -321,11 +321,11 @@ test "nfd !ASCII / alloc" {
 
 test "nfkd ASCII / no-alloc" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
-    var result = try n.nfkd(allocator, "Hello World!");
+    const result = try n.nfkd(allocator, "Hello World!");
     defer result.deinit();
 
     try testing.expectEqualStrings("Hello World!", result.slice);
@@ -333,11 +333,11 @@ test "nfkd ASCII / no-alloc" {
 
 test "nfkd !ASCII / alloc" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
-    var result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
+    const result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
     defer result.deinit();
 
     try testing.expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", result.slice);
@@ -532,11 +532,11 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
 
 test "nfc" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
-    var result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
+    const result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
     defer result.deinit();
 
     try testing.expectEqualStrings("Complex char: \u{3D3}", result.slice);
@@ -544,11 +544,11 @@ test "nfc" {
 
 test "nfkc" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
-    var result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
+    const result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
     defer result.deinit();
 
     try testing.expectEqualStrings("Complex char: \u{038E}", result.slice);
@@ -556,9 +556,9 @@ test "nfkc" {
 
 /// Tests for equality of `a` and `b` after normalizing to NFC.
 pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !bool {
-    var norm_result_a = try self.nfc(allocator, a);
+    const norm_result_a = try self.nfc(allocator, a);
     defer norm_result_a.deinit();
-    var norm_result_b = try self.nfc(allocator, b);
+    const norm_result_b = try self.nfc(allocator, b);
     defer norm_result_b.deinit();
 
     return mem.eql(u8, norm_result_a.slice, norm_result_b.slice);
@@ -566,9 +566,9 @@ pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !
 
 test "eql" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
     try testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
     try testing.expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
@@ -601,9 +601,9 @@ fn isFcd(self: Self, str: []const u8) bool {
 
 test "isFcd" {
     const allocator = testing.allocator;
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
     const is_nfc = "José \u{3D3}";
     try testing.expect(n.isFcd(is_nfc));
@@ -620,9 +620,9 @@ test "Unicode normalization tests" {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var data = try NormData.init(allocator);
+    const data = try NormData.init(allocator);
     defer data.deinit();
-    var n = Self{ .norm_data = &data };
+    const n = Self{ .norm_data = &data };
 
     var file = try fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
     defer file.close();
@@ -721,7 +721,7 @@ test "Unicode normalization tests" {
                 }
 
                 const want = w_buf.items;
-                var got = try n.nfkd(allocator, input);
+                const got = try n.nfkd(allocator, input);
                 defer got.deinit();
 
                 try testing.expectEqualStrings(want, got.slice);

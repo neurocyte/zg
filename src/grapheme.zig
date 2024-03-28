@@ -237,7 +237,7 @@ test "Segmentation GraphemeIterator" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var input_stream = buf_reader.reader();
 
-    var data = try GraphemeData.init(allocator);
+    const data = try GraphemeData.init(allocator);
     defer data.deinit();
 
     var buf: [4096]u8 = undefined;
@@ -302,7 +302,7 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
     const with_zwsp = seq_1 ++ "\u{200B}" ++ seq_2;
     const no_joiner = seq_1 ++ seq_2;
 
-    var data = try GraphemeData.init(std.testing.allocator);
+    const data = try GraphemeData.init(std.testing.allocator);
     defer data.deinit();
 
     var iter = Iterator.init(with_zwj, &data);
