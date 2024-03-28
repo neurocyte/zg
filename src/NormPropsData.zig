@@ -23,10 +23,12 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     const stage_1_len: u16 = try reader.readInt(u16, endian);
     self.s1 = try allocator.alloc(u16, stage_1_len);
+    errdefer allocator.free(self.s1);
     for (0..stage_1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
 
     const stage_2_len: u16 = try reader.readInt(u16, endian);
     self.s2 = try allocator.alloc(u4, stage_2_len);
+    errdefer allocator.free(self.s2);
     for (0..stage_2_len) |i| self.s2[i] = @intCast(try reader.readInt(u8, endian));
 
     return self;

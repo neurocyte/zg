@@ -21,6 +21,7 @@ pub fn init(allocator: mem.Allocator) !Self {
         .allocator = allocator,
         .nfkd = try allocator.alloc([]u21, 0x110000),
     };
+    errdefer self.deinit();
 
     @memset(self.nfkd, &.{});
 

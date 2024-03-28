@@ -58,14 +58,17 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     const s1_len: u16 = try reader.readInt(u16, endian);
     self.s1 = try allocator.alloc(u16, s1_len);
+    errdefer allocator.free(self.s1);
     for (0..s1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
 
     const s2_len: u16 = try reader.readInt(u16, endian);
     self.s2 = try allocator.alloc(u5, s2_len);
+    errdefer allocator.free(self.s2);
     for (0..s2_len) |i| self.s2[i] = @intCast(try reader.readInt(u8, endian));
 
     const s3_len: u16 = try reader.readInt(u8, endian);
     self.s3 = try allocator.alloc(u5, s3_len);
+    errdefer allocator.free(self.s3);
     for (0..s3_len) |i| self.s3[i] = @intCast(try reader.readInt(u8, endian));
 
     return self;

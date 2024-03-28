@@ -24,10 +24,12 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     const stage_1_len: u16 = try reader.readInt(u16, endian);
     self.s1 = try allocator.alloc(u16, stage_1_len);
+    errdefer allocator.free(self.s1);
     for (0..stage_1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
 
     const stage_2_len: u16 = try reader.readInt(u16, endian);
     self.s2 = try allocator.alloc(u8, stage_2_len);
+    errdefer allocator.free(self.s2);
     _ = try reader.readAll(self.s2);
 
     return self;
@@ -36,11 +38,6 @@ pub fn init(allocator: mem.Allocator) !Self {
 pub fn deinit(self: *const Self) void {
     self.allocator.free(self.s1);
     self.allocator.free(self.s2);
-}
-
-/// True if `cp` is any numeric type.
-pub fn isNumber(self: Self, cp: u21) bool {
-    return self.isNumeric(cp) or self.isDigit(cp) or self.isDecimal(cp);
 }
 
 /// True if `cp` is numeric.
@@ -62,13 +59,10 @@ test "isDecimal" {
     const self = try init(testing.allocator);
     defer self.deinit();
 
-    try testing.expect(self.isNumber('\u{277f}'));
-    try testing.expect(self.isNumber('3'));
     try testing.expect(self.isNumeric('\u{277f}'));
     try testing.expect(self.isDigit('\u{2070}'));
     try testing.expect(self.isDecimal('3'));
 
-    try testing.expect(!self.isNumber('z'));
     try testing.expect(!self.isNumeric('1'));
     try testing.expect(!self.isDigit('2'));
     try testing.expect(!self.isDecimal('g'));

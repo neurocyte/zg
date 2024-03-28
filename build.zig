@@ -146,6 +146,24 @@ pub fn build(b: *std.Build) void {
     const run_scripts_gen_exe = b.addRunArtifact(scripts_gen_exe);
     const scripts_gen_out = run_scripts_gen_exe.addOutputFileArg("scripts.bin.z");
 
+    const core_gen_exe = b.addExecutable(.{
+        .name = "core",
+        .root_source_file = .{ .path = "codegen/core_props.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_core_gen_exe = b.addRunArtifact(core_gen_exe);
+    const core_gen_out = run_core_gen_exe.addOutputFileArg("core_props.bin.z");
+
+    const props_gen_exe = b.addExecutable(.{
+        .name = "props",
+        .root_source_file = .{ .path = "codegen/props.zig" },
+        .target = b.host,
+        .optimize = .Debug,
+    });
+    const run_props_gen_exe = b.addRunArtifact(props_gen_exe);
+    const props_gen_out = run_props_gen_exe.addOutputFileArg("props.bin.z");
+
     // Modules we provide
     // Code points
     const code_point = b.addModule("code_point", .{
@@ -304,9 +322,18 @@ pub fn build(b: *std.Build) void {
     });
     scripts_data.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
 
+    // Properties
+    const props_data = b.addModule("ScriptsData", .{
+        .root_source_file = .{ .path = "src/PropsData.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    props_data.addAnonymousImport("core_props", .{ .root_source_file = core_gen_out });
+    props_data.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
+
     // Tests
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/ScriptsData.zig" },
+        .root_source_file = .{ .path = "src/PropsData.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -324,7 +351,9 @@ pub fn build(b: *std.Build) void {
     // exe_unit_tests.root_module.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
     // exe_unit_tests.root_module.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
     // exe_unit_tests.root_module.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
-    exe_unit_tests.root_module.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
+    // exe_unit_tests.root_module.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("core_props", .{ .root_source_file = core_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
     // exe_unit_tests.filter = "nfd !ASCII";
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);

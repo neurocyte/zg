@@ -24,6 +24,13 @@ pub fn init(allocator: mem.Allocator) !Self {
         .nfd = try allocator.alloc([]u21, 0x110000),
     };
 
+    var slices: usize = 0;
+    errdefer {
+        self.nfc.deinit();
+        for (self.nfd[0..slices]) |slice| self.allocator.free(slice);
+        self.allocator.free(self.nfd);
+    }
+
     @memset(self.nfd, &.{});
 
     while (true) {
@@ -31,6 +38,7 @@ pub fn init(allocator: mem.Allocator) !Self {
         if (len == 0) break;
         const cp = try reader.readInt(u24, endian);
         self.nfd[cp] = try allocator.alloc(u21, len - 1);
+        slices += 1;
         for (0..len - 1) |i| {
             self.nfd[cp][i] = @intCast(try reader.readInt(u24, endian));
         }
@@ -42,7 +50,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *const Self) void {
+pub fn deinit(self: *Self) void {
     self.nfc.deinit();
     for (self.nfd) |slice| self.allocator.free(slice);
     self.allocator.free(self.nfd);
