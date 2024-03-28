@@ -9,6 +9,8 @@ core_s1: []u16 = undefined,
 core_s2: []u8 = undefined,
 props_s1: []u16 = undefined,
 props_s2: []u8 = undefined,
+num_s1: []u16 = undefined,
+num_s2: []u8 = undefined,
 
 const Self = @This();
 
@@ -52,6 +54,23 @@ pub fn init(allocator: mem.Allocator) !Self {
     errdefer allocator.free(self.props_s2);
     _ = try props_reader.readAll(self.props_s2);
 
+    // Process DerivedNumericType.txt
+    const num_bytes = @embedFile("numeric");
+    var num_fbs = std.io.fixedBufferStream(num_bytes);
+    var num_decomp = try decompressor(allocator, num_fbs.reader(), null);
+    defer num_decomp.deinit();
+    var num_reader = num_decomp.reader();
+
+    const num_stage_1_len: u16 = try num_reader.readInt(u16, endian);
+    self.num_s1 = try allocator.alloc(u16, num_stage_1_len);
+    errdefer allocator.free(self.num_s1);
+    for (0..num_stage_1_len) |i| self.num_s1[i] = try num_reader.readInt(u16, endian);
+
+    const num_stage_2_len: u16 = try num_reader.readInt(u16, endian);
+    self.num_s2 = try allocator.alloc(u8, num_stage_2_len);
+    errdefer allocator.free(self.num_s2);
+    _ = try num_reader.readAll(self.num_s2);
+
     return self;
 }
 
@@ -60,6 +79,8 @@ pub fn deinit(self: *const Self) void {
     self.allocator.free(self.core_s2);
     self.allocator.free(self.props_s1);
     self.allocator.free(self.props_s2);
+    self.allocator.free(self.num_s1);
+    self.allocator.free(self.num_s2);
 }
 
 /// True if `cp` is a mathematical symbol.
@@ -107,6 +128,21 @@ pub inline fn isDiacritic(self: Self, cp: u21) bool {
     return self.props_s2[self.props_s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
 }
 
+/// True if `cp` is numeric.
+pub inline fn isNumeric(self: Self, cp: u21) bool {
+    return self.num_s2[self.num_s1[cp >> 8] + (cp & 0xff)] & 1 == 1;
+}
+
+/// True if `cp` is a digit.
+pub inline fn isDigit(self: Self, cp: u21) bool {
+    return self.num_s2[self.num_s1[cp >> 8] + (cp & 0xff)] & 2 == 2;
+}
+
+/// True if `cp` is decimal.
+pub inline fn isDecimal(self: Self, cp: u21) bool {
+    return self.num_s2[self.num_s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
+}
+
 test "Props" {
     const self = try init(testing.allocator);
     defer self.deinit();
@@ -120,4 +156,12 @@ test "Props" {
     try testing.expect(self.isAlphabetic('A'));
     try testing.expect(!self.isAlphabetic('3'));
     try testing.expect(self.isMath('+'));
+
+    try testing.expect(self.isNumeric('\u{277f}'));
+    try testing.expect(self.isDigit('\u{2070}'));
+    try testing.expect(self.isDecimal('3'));
+
+    try testing.expect(!self.isNumeric('1'));
+    try testing.expect(!self.isDigit('2'));
+    try testing.expect(!self.isDecimal('g'));
 }

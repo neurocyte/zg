@@ -295,14 +295,6 @@ pub fn build(b: *std.Build) void {
     case_fold.addImport("FoldData", fold_data);
     case_fold.addImport("Normalize", norm);
 
-    // Numeric type
-    const num_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/NumericData.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    num_data.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
-
     // Letter case
     const case_data = b.addModule("CaseData", .{
         .root_source_file = .{ .path = "src/CaseData.zig" },
@@ -330,6 +322,7 @@ pub fn build(b: *std.Build) void {
     });
     props_data.addAnonymousImport("core_props", .{ .root_source_file = core_gen_out });
     props_data.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
+    props_data.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
 
     // Tests
     const exe_unit_tests = b.addTest(.{
@@ -354,6 +347,7 @@ pub fn build(b: *std.Build) void {
     // exe_unit_tests.root_module.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
     exe_unit_tests.root_module.addAnonymousImport("core_props", .{ .root_source_file = core_gen_out });
     exe_unit_tests.root_module.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
+    exe_unit_tests.root_module.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
     // exe_unit_tests.filter = "nfd !ASCII";
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
