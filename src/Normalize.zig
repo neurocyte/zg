@@ -3,12 +3,10 @@
 //! NFKC, NFD, and NFKD normalization forms.
 
 const std = @import("std");
-const assert = std.debug.assert;
 const debug = std.debug;
+const assert = debug.assert;
 const fmt = std.fmt;
-const fs = std.fs;
 const heap = std.heap;
-const io = std.io;
 const mem = std.mem;
 const simd = std.simd;
 const testing = std.testing;
@@ -613,123 +611,6 @@ test "isFcd" {
 
     const not_fcd = "Jose\u{301} \u{3d2}\u{315}\u{301}";
     try testing.expect(!n.isFcd(not_fcd));
-}
-
-test "Unicode normalization tests" {
-    var arena = heap.ArenaAllocator.init(testing.allocator);
-    defer arena.deinit();
-    var allocator = arena.allocator();
-
-    const data = try NormData.init(allocator);
-    defer data.deinit();
-    const n = Self{ .norm_data = &data };
-
-    var file = try fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
-    defer file.close();
-    var buf_reader = io.bufferedReader(file.reader());
-    const input_stream = buf_reader.reader();
-
-    var line_no: usize = 0;
-    var buf: [4096]u8 = undefined;
-    var cp_buf: [4]u8 = undefined;
-
-    while (try input_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        line_no += 1;
-        // Skip comments or empty lines.
-        if (line.len == 0 or line[0] == '#' or line[0] == '@') continue;
-        // Iterate over fields.
-        var fields = mem.split(u8, line, ";");
-        var field_index: usize = 0;
-        var input: []u8 = undefined;
-        defer allocator.free(input);
-
-        while (fields.next()) |field| : (field_index += 1) {
-            if (field_index == 0) {
-                var i_buf = std.ArrayList(u8).init(allocator);
-                defer i_buf.deinit();
-
-                var i_fields = mem.split(u8, field, " ");
-                while (i_fields.next()) |s| {
-                    const icp = try fmt.parseInt(u21, s, 16);
-                    const len = try unicode.utf8Encode(icp, &cp_buf);
-                    try i_buf.appendSlice(cp_buf[0..len]);
-                }
-
-                input = try i_buf.toOwnedSlice();
-            } else if (field_index == 1) {
-                //debug.print("\n*** {s} ***\n", .{line});
-                // NFC, time to test.
-                var w_buf = std.ArrayList(u8).init(allocator);
-                defer w_buf.deinit();
-
-                var w_fields = mem.split(u8, field, " ");
-                while (w_fields.next()) |s| {
-                    const wcp = try fmt.parseInt(u21, s, 16);
-                    const len = try unicode.utf8Encode(wcp, &cp_buf);
-                    try w_buf.appendSlice(cp_buf[0..len]);
-                }
-
-                const want = w_buf.items;
-                var got = try n.nfc(allocator, input);
-                defer got.deinit();
-
-                try testing.expectEqualStrings(want, got.slice);
-            } else if (field_index == 2) {
-                // NFD, time to test.
-                var w_buf = std.ArrayList(u8).init(allocator);
-                defer w_buf.deinit();
-
-                var w_fields = mem.split(u8, field, " ");
-                while (w_fields.next()) |s| {
-                    const wcp = try fmt.parseInt(u21, s, 16);
-                    const len = try unicode.utf8Encode(wcp, &cp_buf);
-                    try w_buf.appendSlice(cp_buf[0..len]);
-                }
-
-                const want = w_buf.items;
-                var got = try n.nfd(allocator, input);
-                defer got.deinit();
-
-                try testing.expectEqualStrings(want, got.slice);
-            } else if (field_index == 3) {
-                // NFKC, time to test.
-                var w_buf = std.ArrayList(u8).init(allocator);
-                defer w_buf.deinit();
-
-                var w_fields = mem.split(u8, field, " ");
-                while (w_fields.next()) |s| {
-                    const wcp = try fmt.parseInt(u21, s, 16);
-                    const len = try unicode.utf8Encode(wcp, &cp_buf);
-                    try w_buf.appendSlice(cp_buf[0..len]);
-                }
-
-                const want = w_buf.items;
-                var got = try n.nfkc(allocator, input);
-                defer got.deinit();
-
-                try testing.expectEqualStrings(want, got.slice);
-            } else if (field_index == 4) {
-                // NFKD, time to test.
-                var w_buf = std.ArrayList(u8).init(allocator);
-                defer w_buf.deinit();
-
-                var w_fields = mem.split(u8, field, " ");
-                while (w_fields.next()) |s| {
-                    const wcp = try fmt.parseInt(u21, s, 16);
-                    const len = try unicode.utf8Encode(wcp, &cp_buf);
-                    try w_buf.appendSlice(cp_buf[0..len]);
-                }
-
-                const want = w_buf.items;
-                const got = try n.nfkd(allocator, input);
-                defer got.deinit();
-
-                try testing.expectEqualStrings(want, got.slice);
-            } else {
-                continue;
-            }
-        }
-    }
 }
 
 /// Returns true if `str` only contains Latin-1 Supplement

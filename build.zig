@@ -196,13 +196,13 @@ pub fn build(b: *std.Build) void {
     });
 
     // Fixed pitch font display width
-    const dw_data = b.createModule(.{
+    const width_data = b.createModule(.{
         .root_source_file = .{ .path = "src/WidthData.zig" },
         .target = target,
         .optimize = optimize,
     });
-    dw_data.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
-    dw_data.addImport("GraphemeData", grapheme_data);
+    width_data.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
+    width_data.addImport("GraphemeData", grapheme_data);
 
     const display_width = b.addModule("DisplayWidth", .{
         .root_source_file = .{ .path = "src/DisplayWidth.zig" },
@@ -212,7 +212,7 @@ pub fn build(b: *std.Build) void {
     display_width.addImport("ascii", ascii);
     display_width.addImport("code_point", code_point);
     display_width.addImport("grapheme", grapheme);
-    display_width.addImport("DisplayWidthData", dw_data);
+    display_width.addImport("DisplayWidthData", width_data);
 
     // Normalization
     const ccc_data = b.createModule(.{
@@ -324,34 +324,17 @@ pub fn build(b: *std.Build) void {
     props_data.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
     props_data.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
 
-    // Tests
-    const exe_unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/PropsData.zig" },
+    // Unicode Tests
+    const unicode_tests = b.addTest(.{
+        .root_source_file = .{ .path = "src/unicode_tests.zig" },
         .target = target,
         .optimize = optimize,
     });
-    // exe_unit_tests.root_module.addImport("ascii", ascii);
-    // exe_unit_tests.root_module.addImport("code_point", code_point);
-    // exe_unit_tests.root_module.addImport("GraphemeData", grapheme_data);
-    // exe_unit_tests.root_module.addImport("grapheme", grapheme);
-    // exe_unit_tests.root_module.addImport("ziglyph", ziglyph.module("ziglyph"));
-    // exe_unit_tests.root_module.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
-    // exe_unit_tests.root_module.addImport("DisplayWidthData", dw_data);
-    // exe_unit_tests.root_module.addImport("NormData", norm_data);
-    // exe_unit_tests.root_module.addImport("Normalize", norm);
-    // exe_unit_tests.root_module.addImport("FoldData", fold_data);
-    // exe_unit_tests.root_module.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
-    // exe_unit_tests.root_module.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
-    // exe_unit_tests.root_module.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
-    // exe_unit_tests.root_module.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
-    // exe_unit_tests.root_module.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
-    exe_unit_tests.root_module.addAnonymousImport("core_props", .{ .root_source_file = core_gen_out });
-    exe_unit_tests.root_module.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
-    exe_unit_tests.root_module.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
-    // exe_unit_tests.filter = "nfd !ASCII";
+    unicode_tests.root_module.addImport("grapheme", grapheme);
+    unicode_tests.root_module.addImport("Normalize", norm);
 
-    const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);
+    const run_unicode_tests = b.addRunArtifact(unicode_tests);
 
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_exe_unit_tests.step);
+    const unicode_test_step = b.step("unicode-test", "Run Unicode tests");
+    unicode_test_step.dependOn(&run_unicode_tests.step);
 }
