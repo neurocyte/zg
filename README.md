@@ -459,10 +459,11 @@ test "Scripts" {
 ## Relation to Ziglyph
 zg is a total re-write of some of the components of Ziglyph. The idea was to
 reduce binary size and improve performance. These goals were achieved by using
-trie-like data structures instead of generated functions. Where Ziglyph uses a 
-function call, zg uses an array lookup, which is quite faster. In addition, all
-these data structures in zg are loaded at runtime from compressed versions in the
-binary. This allows for smaller binary sizes at the expense of increased memory 
+trie-like data structures (inspired by [Ghostty's implementation](https://mitchellh.com/writing/ghostty-devlog-006))
+instead of generated functions. Where Ziglyph uses a function call, zg uses an 
+array lookup, which is quite faster. In addition, all these data structures in
+zg are loaded at runtime from compressed versions in the binary. This allows
+for smaller binary sizes at the expense of increased memory 
 footprint at runtime.
 
 Benchmarks demonstrate the above stated goals have been met:
