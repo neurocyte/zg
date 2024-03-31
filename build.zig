@@ -315,7 +315,7 @@ pub fn build(b: *std.Build) void {
     scripts_data.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
 
     // Properties
-    const props_data = b.addModule("ScriptsData", .{
+    const props_data = b.addModule("PropsData", .{
         .root_source_file = .{ .path = "src/PropsData.zig" },
         .target = target,
         .optimize = optimize,

@@ -107,11 +107,10 @@ pub fn main() !void {
     _ = args_iter.skip();
     const output_path = args_iter.next() orelse @panic("No output file arg!");
 
-    const compressor = std.compress.deflate.compressor;
+    const compressor = std.compress.flate.deflate.compressor;
     var out_file = try std.fs.cwd().createFile(output_path, .{});
     defer out_file.close();
-    var out_comp = try compressor(allocator, out_file.writer(), .{ .level = .best_compression });
-    defer out_comp.deinit();
+    var out_comp = try compressor(.raw, out_file.writer(), .{ .level = .best });
     const writer = out_comp.writer();
 
     const endian = builtin.cpu.arch.endian();

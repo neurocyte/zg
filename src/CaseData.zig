@@ -15,7 +15,7 @@ prop_s2: []u8 = undefined,
 const Self = @This();
 
 pub fn init(allocator: mem.Allocator) !Self {
-    const decompressor = compress.deflate.decompressor;
+    const decompressor = compress.flate.inflate.decompressor;
     const endian = builtin.cpu.arch.endian();
 
     var self = Self{
@@ -32,8 +32,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     // Uppercase
     const upper_bytes = @embedFile("upper");
     var upper_fbs = std.io.fixedBufferStream(upper_bytes);
-    var upper_decomp = try decompressor(allocator, upper_fbs.reader(), null);
-    defer upper_decomp.deinit();
+    var upper_decomp = decompressor(.raw, upper_fbs.reader());
     var upper_reader = upper_decomp.reader();
 
     while (true) {
@@ -46,8 +45,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     // Lowercase
     const lower_bytes = @embedFile("lower");
     var lower_fbs = std.io.fixedBufferStream(lower_bytes);
-    var lower_decomp = try decompressor(allocator, lower_fbs.reader(), null);
-    defer lower_decomp.deinit();
+    var lower_decomp = decompressor(.raw, lower_fbs.reader());
     var lower_reader = lower_decomp.reader();
 
     while (true) {
@@ -60,8 +58,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     // Case properties
     const cp_bytes = @embedFile("case_prop");
     var cp_fbs = std.io.fixedBufferStream(cp_bytes);
-    var cp_decomp = try decompressor(allocator, cp_fbs.reader(), null);
-    defer cp_decomp.deinit();
+    var cp_decomp = decompressor(.raw, cp_fbs.reader());
     var cp_reader = cp_decomp.reader();
 
     const stage_1_len: u16 = try cp_reader.readInt(u16, endian);

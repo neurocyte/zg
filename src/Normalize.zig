@@ -572,47 +572,6 @@ test "eql" {
     try testing.expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
 }
 
-// FCD
-fn getLeadCcc(self: Self, cp: u21) u8 {
-    const dc = self.mapping(cp, .nfd);
-    const dcp = if (dc.form == .same) cp else dc.cps[0];
-    return self.norm_data.ccc_data.ccc(dcp);
-}
-
-fn getTrailCcc(self: Self, cp: u21) u8 {
-    const dc = self.mapping(cp, .nfd);
-    const dcp = if (dc.form == .same) cp else dc.cps[dc.cps.len - 1];
-    return self.norm_data.ccc_data.ccc(dcp);
-}
-
-// Fast check to detect if a string is already in NFC or NFD form.
-fn isFcd(self: Self, str: []const u8) bool {
-    var prev_ccc: u8 = 0;
-    var cp_iter = CodePointIterator{ .bytes = str };
-
-    return while (cp_iter.next()) |cp| {
-        const ccc = self.getLeadCcc(cp.code);
-        if (ccc != 0 and ccc < prev_ccc) break false;
-        prev_ccc = self.getTrailCcc(cp.code);
-    } else true;
-}
-
-test "isFcd" {
-    const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
-    defer data.deinit();
-    const n = Self{ .norm_data = &data };
-
-    const is_nfc = "José \u{3D3}";
-    try testing.expect(n.isFcd(is_nfc));
-
-    const is_nfd = "Jose\u{301} \u{3d2}\u{301}";
-    try testing.expect(n.isFcd(is_nfd));
-
-    const not_fcd = "Jose\u{301} \u{3d2}\u{315}\u{301}";
-    try testing.expect(!n.isFcd(not_fcd));
-}
-
 /// Returns true if `str` only contains Latin-1 Supplement
 /// code points. Uses SIMD if possible.
 pub fn isLatin1Only(str: []const u8) bool {

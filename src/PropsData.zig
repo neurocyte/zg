@@ -15,14 +15,13 @@ num_s2: []u8 = undefined,
 const Self = @This();
 
 pub fn init(allocator: mem.Allocator) !Self {
-    const decompressor = compress.deflate.decompressor;
+    const decompressor = compress.flate.inflate.decompressor;
     const endian = builtin.cpu.arch.endian();
 
     // Process DerivedCoreProperties.txt
     const core_bytes = @embedFile("core_props");
     var core_fbs = std.io.fixedBufferStream(core_bytes);
-    var core_decomp = try decompressor(allocator, core_fbs.reader(), null);
-    defer core_decomp.deinit();
+    var core_decomp = decompressor(.raw, core_fbs.reader());
     var core_reader = core_decomp.reader();
 
     var self = Self{ .allocator = allocator };
@@ -40,8 +39,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     // Process PropList.txt
     const props_bytes = @embedFile("props");
     var props_fbs = std.io.fixedBufferStream(props_bytes);
-    var props_decomp = try decompressor(allocator, props_fbs.reader(), null);
-    defer props_decomp.deinit();
+    var props_decomp = decompressor(.raw, props_fbs.reader());
     var props_reader = props_decomp.reader();
 
     const stage_1_len: u16 = try props_reader.readInt(u16, endian);
@@ -57,8 +55,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     // Process DerivedNumericType.txt
     const num_bytes = @embedFile("numeric");
     var num_fbs = std.io.fixedBufferStream(num_bytes);
-    var num_decomp = try decompressor(allocator, num_fbs.reader(), null);
-    defer num_decomp.deinit();
+    var num_decomp = decompressor(.raw, num_fbs.reader());
     var num_reader = num_decomp.reader();
 
     const num_stage_1_len: u16 = try num_reader.readInt(u16, endian);

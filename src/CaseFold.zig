@@ -10,7 +10,9 @@ fold_data: *const FoldData,
 
 const Self = @This();
 
-fn caseFold(
+/// Produces the case folded code points for `cps`. Caller must free returned
+/// slice with `allocator`.
+pub fn caseFold(
     self: Self,
     allocator: mem.Allocator,
     cps: []const u21,
@@ -37,6 +39,8 @@ fn changesWhenCaseFolded(self: Self, cps: []const u21) bool {
     } else false;
 }
 
+/// Caseless compare `a` and `b` by decomposing to NFKD. This is the most
+/// comprehensive comparison possible, but slower than `canonCaselessMatch`.
 pub fn compatCaselessMatch(
     self: Self,
     allocator: mem.Allocator,
@@ -108,6 +112,8 @@ test "compatCaselessMatch" {
     try testing.expect(try caser.compatCaselessMatch(allocator, &n, a, c));
 }
 
+/// Performs canonical caseless string matching by decomposing to NFD. This is
+/// faster than `compatCaselessMatch`, but less comprehensive.
 pub fn canonCaselessMatch(
     self: Self,
     allocator: mem.Allocator,

@@ -4,7 +4,7 @@ const compress = std.compress;
 const mem = std.mem;
 const testing = std.testing;
 
-/// Script
+/// Scripts
 pub const Script = enum {
     none,
     Adlam,
@@ -180,11 +180,10 @@ s3: []u8 = undefined,
 const Self = @This();
 
 pub fn init(allocator: mem.Allocator) !Self {
-    const decompressor = compress.deflate.decompressor;
+    const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("scripts");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
-    var in_decomp = try decompressor(allocator, in_fbs.reader(), null);
-    defer in_decomp.deinit();
+    var in_decomp = decompressor(.raw, in_fbs.reader());
     var reader = in_decomp.reader();
 
     const endian = builtin.cpu.arch.endian();
