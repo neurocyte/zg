@@ -4,9 +4,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    // Dependencies
-    // const ziglyph = b.dependency("ziglyph", .{});
-
     // Code generation
     // Grapheme break
     const gbp_gen_exe = b.addExecutable(.{
