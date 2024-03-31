@@ -8,16 +8,14 @@ The Unicode version supported by zg is 15.1.0.
 The minimum Zig version required is 0.12.0-dev.3496+a2df84d0.
 
 ## Integrating zg into your Zig Project
-You first need to add zg as a dependency in your `build.zig.zon` file:
+You first need to add zg as a dependency in your `build.zig.zon` file. In your
+Zig project's root directory, run:
 
-```zig
-.zg = .{
-    .url = "https://codeberg.org/dude_the_builder/zg/archive/v0.1.0.tar.gz",
-}
+```plain
+zig fetch --save https://codeberg.org/dude_the_builder/zg/archive/v0.1.0.tar.gz
 ```
 
 Then instantiate the dependency in your `build.zig`:
-
 
 ```zig
 const zg = b.dependency("zg", .{});
