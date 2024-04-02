@@ -21,7 +21,8 @@ pub fn main() !void {
 
     const fold_data = try CaseFold.FoldData.init(allocator);
     var case_fold = CaseFold{ .fold_data = &fold_data };
-    const norm_data = try Normalize.NormData.init(allocator);
+    var norm_data: Normalize.NormData = undefined;
+    try Normalize.NormData.init(&norm_data, allocator);
     var normalize = Normalize{ .norm_data = &norm_data };
 
     var iter = std.mem.splitScalar(u8, input, '\n');
