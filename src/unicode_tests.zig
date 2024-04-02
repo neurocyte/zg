@@ -17,8 +17,9 @@ test "Unicode normalization tests" {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    const data = try Normalize.NormData.init(allocator);
-    const n = Normalize{ .norm_data = &data };
+    var norm_data: Normalize.NormData = undefined;
+    try Normalize.NormData.init(&norm_data, allocator);
+    const n = Normalize{ .norm_data = &norm_data };
 
     var file = try fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
     defer file.close();

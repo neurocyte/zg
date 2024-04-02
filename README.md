@@ -282,7 +282,8 @@ const Normalize = @import("Normalize");
 
 test "Normalization" {
     // We need lots of Unicode dta for normalization.
-    var norm_data = try Normalize.NormData.init(allocator);
+    var norm_data: Normalize.NormData = undefined;
+    try Normalize.NormData.init(&norm_data, allocator);
     defer norm_data.deinit();
 
     // The `Normalize` structure takes a pointer to the data.
@@ -335,7 +336,8 @@ const CaseFold = @import("CaseFold");
 
 test "Caseless matching" {
     // We need to normalize during the matching process.
-    var norm_data = try Normalize.NormData.init(allocator);
+    var norm_data: Normalize.NormData = undefined;
+    try Normalize.NormData.init(&norm_data, allocator);
     defer norm_data.deinit();
     const n = Normalize{ .norm_data = &norm_data };
 

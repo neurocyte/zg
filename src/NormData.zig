@@ -16,8 +16,7 @@ normp_data: NormPropsData = undefined,
 
 const Self = @This();
 
-pub fn init(allocator: std.mem.Allocator) !Self {
-    var self = Self{};
+pub fn init(self: *Self, allocator: std.mem.Allocator) !void {
     self.canon_data = try CanonData.init(allocator);
     errdefer self.canon_data.deinit();
     self.ccc_data = try CccData.init(allocator);
@@ -27,8 +26,6 @@ pub fn init(allocator: std.mem.Allocator) !Self {
     self.hangul_data = try HangulData.init(allocator);
     errdefer self.hangul_data.deinit();
     self.normp_data = try NormPropsData.init(allocator);
-
-    return self;
 }
 
 pub fn deinit(self: *Self) void {

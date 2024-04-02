@@ -175,7 +175,8 @@ fn decompose(
 
 test "decompose" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     var n = Self{ .norm_data = &data };
 
@@ -295,7 +296,8 @@ fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
 
 test "nfd ASCII / no-alloc" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     const n = Self{ .norm_data = &data };
 
@@ -307,7 +309,8 @@ test "nfd ASCII / no-alloc" {
 
 test "nfd !ASCII / alloc" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     const n = Self{ .norm_data = &data };
 
@@ -319,7 +322,8 @@ test "nfd !ASCII / alloc" {
 
 test "nfkd ASCII / no-alloc" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     const n = Self{ .norm_data = &data };
 
@@ -331,7 +335,8 @@ test "nfkd ASCII / no-alloc" {
 
 test "nfkd !ASCII / alloc" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     const n = Self{ .norm_data = &data };
 
@@ -530,7 +535,8 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
 
 test "nfc" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     const n = Self{ .norm_data = &data };
 
@@ -542,7 +548,8 @@ test "nfc" {
 
 test "nfkc" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     const n = Self{ .norm_data = &data };
 
@@ -564,7 +571,8 @@ pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !
 
 test "eql" {
     const allocator = testing.allocator;
-    const data = try NormData.init(allocator);
+    var data: NormData = undefined;
+    try NormData.init(&data, allocator);
     defer data.deinit();
     const n = Self{ .norm_data = &data };
 
