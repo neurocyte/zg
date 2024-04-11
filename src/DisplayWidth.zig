@@ -39,6 +39,7 @@ pub fn strWidth(self: Self, str: []const u8) usize {
                 if (cp_iter.next()) |ncp| {
                     // emoji text sequence.
                     if (ncp.code == 0xFE0E) w = 1;
+                    if (ncp.code == 0xFE0F) w = 2;
                 }
 
                 // Only adding width of first non-zero-width code point.
@@ -70,6 +71,9 @@ test "strWidth" {
     try testing.expectEqual(@as(usize, 2), self.strWidth("\u{26A1}")); // Lone emoji
     try testing.expectEqual(@as(usize, 1), self.strWidth("\u{26A1}\u{FE0E}")); // Text sequence
     try testing.expectEqual(@as(usize, 2), self.strWidth("\u{26A1}\u{FE0F}")); // Presentation sequence
+    try testing.expectEqual(@as(usize, 1), self.strWidth("\u{2764}")); // Default text presentation
+    try testing.expectEqual(@as(usize, 1), self.strWidth("\u{2764}\u{FE0E}")); // Default text presentation with VS15 selector
+    try testing.expectEqual(@as(usize, 2), self.strWidth("\u{2764}\u{FE0F}")); // Default text presentation with VS16 selector
     try testing.expectEqual(@as(usize, 0), self.strWidth("A\x08")); // Backspace
     try testing.expectEqual(@as(usize, 0), self.strWidth("\x7FA")); // DEL
     try testing.expectEqual(@as(usize, 0), self.strWidth("\x7FA\x08\x08")); // never less than o
