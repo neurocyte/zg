@@ -87,7 +87,7 @@ fn isBreaker(cp: u21, data: *const GraphemeData) bool {
 }
 
 // Grapheme break state.
-const State = struct {
+pub const State = struct {
     bits: u3 = 0,
 
     // Extended Pictographic (emoji)
