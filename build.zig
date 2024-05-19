@@ -8,7 +8,7 @@ pub fn build(b: *std.Build) void {
     // Grapheme break
     const gbp_gen_exe = b.addExecutable(.{
         .name = "gbp",
-        .root_source_file = .{ .path = "codegen/gbp.zig" },
+        .root_source_file = b.path("codegen/gbp.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
 
     const dwp_gen_exe = b.addExecutable(.{
         .name = "dwp",
-        .root_source_file = .{ .path = "codegen/dwp.zig" },
+        .root_source_file = b.path("codegen/dwp.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) void {
     // Normalization properties
     const canon_gen_exe = b.addExecutable(.{
         .name = "canon",
-        .root_source_file = .{ .path = "codegen/canon.zig" },
+        .root_source_file = b.path("codegen/canon.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -42,7 +42,7 @@ pub fn build(b: *std.Build) void {
 
     const compat_gen_exe = b.addExecutable(.{
         .name = "compat",
-        .root_source_file = .{ .path = "codegen/compat.zig" },
+        .root_source_file = b.path("codegen/compat.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -51,7 +51,7 @@ pub fn build(b: *std.Build) void {
 
     const hangul_gen_exe = b.addExecutable(.{
         .name = "hangul",
-        .root_source_file = .{ .path = "codegen/hangul.zig" },
+        .root_source_file = b.path("codegen/hangul.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) void {
 
     const normp_gen_exe = b.addExecutable(.{
         .name = "normp",
-        .root_source_file = .{ .path = "codegen/normp.zig" },
+        .root_source_file = b.path("codegen/normp.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -69,7 +69,7 @@ pub fn build(b: *std.Build) void {
 
     const ccc_gen_exe = b.addExecutable(.{
         .name = "ccc",
-        .root_source_file = .{ .path = "codegen/ccc.zig" },
+        .root_source_file = b.path("codegen/ccc.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -78,7 +78,7 @@ pub fn build(b: *std.Build) void {
 
     const gencat_gen_exe = b.addExecutable(.{
         .name = "gencat",
-        .root_source_file = .{ .path = "codegen/gencat.zig" },
+        .root_source_file = b.path("codegen/gencat.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -87,7 +87,7 @@ pub fn build(b: *std.Build) void {
 
     const fold_gen_exe = b.addExecutable(.{
         .name = "fold",
-        .root_source_file = .{ .path = "codegen/fold.zig" },
+        .root_source_file = b.path("codegen/fold.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -97,7 +97,7 @@ pub fn build(b: *std.Build) void {
     // Numeric types
     const num_gen_exe = b.addExecutable(.{
         .name = "numeric",
-        .root_source_file = .{ .path = "codegen/numeric.zig" },
+        .root_source_file = b.path("codegen/numeric.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -107,7 +107,7 @@ pub fn build(b: *std.Build) void {
     // Letter case properties
     const case_prop_gen_exe = b.addExecutable(.{
         .name = "case_prop",
-        .root_source_file = .{ .path = "codegen/case_prop.zig" },
+        .root_source_file = b.path("codegen/case_prop.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -117,7 +117,7 @@ pub fn build(b: *std.Build) void {
     // Uppercase mappings
     const upper_gen_exe = b.addExecutable(.{
         .name = "upper",
-        .root_source_file = .{ .path = "codegen/upper.zig" },
+        .root_source_file = b.path("codegen/upper.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -127,7 +127,7 @@ pub fn build(b: *std.Build) void {
     // Lowercase mappings
     const lower_gen_exe = b.addExecutable(.{
         .name = "lower",
-        .root_source_file = .{ .path = "codegen/lower.zig" },
+        .root_source_file = b.path("codegen/lower.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -136,7 +136,7 @@ pub fn build(b: *std.Build) void {
 
     const scripts_gen_exe = b.addExecutable(.{
         .name = "scripts",
-        .root_source_file = .{ .path = "codegen/scripts.zig" },
+        .root_source_file = b.path("codegen/scripts.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -145,7 +145,7 @@ pub fn build(b: *std.Build) void {
 
     const core_gen_exe = b.addExecutable(.{
         .name = "core",
-        .root_source_file = .{ .path = "codegen/core_props.zig" },
+        .root_source_file = b.path("codegen/core_props.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -154,7 +154,7 @@ pub fn build(b: *std.Build) void {
 
     const props_gen_exe = b.addExecutable(.{
         .name = "props",
-        .root_source_file = .{ .path = "codegen/props.zig" },
+        .root_source_file = b.path("codegen/props.zig"),
         .target = b.host,
         .optimize = .Debug,
     });
@@ -164,21 +164,21 @@ pub fn build(b: *std.Build) void {
     // Modules we provide
     // Code points
     const code_point = b.addModule("code_point", .{
-        .root_source_file = .{ .path = "src/code_point.zig" },
+        .root_source_file = b.path("src/code_point.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     // Grapheme clusters
     const grapheme_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/GraphemeData.zig" },
+        .root_source_file = b.path("src/GraphemeData.zig"),
         .target = target,
         .optimize = optimize,
     });
     grapheme_data.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
 
     const grapheme = b.addModule("grapheme", .{
-        .root_source_file = .{ .path = "src/grapheme.zig" },
+        .root_source_file = b.path("src/grapheme.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -187,14 +187,14 @@ pub fn build(b: *std.Build) void {
 
     // ASCII utilities
     const ascii = b.addModule("ascii", .{
-        .root_source_file = .{ .path = "src/ascii.zig" },
+        .root_source_file = b.path("src/ascii.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     // Fixed pitch font display width
     const width_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/WidthData.zig" },
+        .root_source_file = b.path("src/WidthData.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -202,7 +202,7 @@ pub fn build(b: *std.Build) void {
     width_data.addImport("GraphemeData", grapheme_data);
 
     const display_width = b.addModule("DisplayWidth", .{
-        .root_source_file = .{ .path = "src/DisplayWidth.zig" },
+        .root_source_file = b.path("src/DisplayWidth.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -213,42 +213,42 @@ pub fn build(b: *std.Build) void {
 
     // Normalization
     const ccc_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/CombiningData.zig" },
+        .root_source_file = b.path("src/CombiningData.zig"),
         .target = target,
         .optimize = optimize,
     });
     ccc_data.addAnonymousImport("ccc", .{ .root_source_file = ccc_gen_out });
 
     const canon_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/CanonData.zig" },
+        .root_source_file = b.path("src/CanonData.zig"),
         .target = target,
         .optimize = optimize,
     });
     canon_data.addAnonymousImport("canon", .{ .root_source_file = canon_gen_out });
 
     const compat_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/CompatData.zig" },
+        .root_source_file = b.path("src/CompatData.zig"),
         .target = target,
         .optimize = optimize,
     });
     compat_data.addAnonymousImport("compat", .{ .root_source_file = compat_gen_out });
 
     const hangul_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/HangulData.zig" },
+        .root_source_file = b.path("src/HangulData.zig"),
         .target = target,
         .optimize = optimize,
     });
     hangul_data.addAnonymousImport("hangul", .{ .root_source_file = hangul_gen_out });
 
     const normp_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/NormPropsData.zig" },
+        .root_source_file = b.path("src/NormPropsData.zig"),
         .target = target,
         .optimize = optimize,
     });
     normp_data.addAnonymousImport("normp", .{ .root_source_file = normp_gen_out });
 
     const norm_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/NormData.zig" },
+        .root_source_file = b.path("src/NormData.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -259,7 +259,7 @@ pub fn build(b: *std.Build) void {
     norm_data.addImport("NormPropsData", normp_data);
 
     const norm = b.addModule("Normalize", .{
-        .root_source_file = .{ .path = "src/Normalize.zig" },
+        .root_source_file = b.path("src/Normalize.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -269,7 +269,7 @@ pub fn build(b: *std.Build) void {
 
     // General Category
     const gencat_data = b.addModule("GenCatData", .{
-        .root_source_file = .{ .path = "src/GenCatData.zig" },
+        .root_source_file = b.path("src/GenCatData.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -277,14 +277,14 @@ pub fn build(b: *std.Build) void {
 
     // Case folding
     const fold_data = b.createModule(.{
-        .root_source_file = .{ .path = "src/FoldData.zig" },
+        .root_source_file = b.path("src/FoldData.zig"),
         .target = target,
         .optimize = optimize,
     });
     fold_data.addAnonymousImport("fold", .{ .root_source_file = fold_gen_out });
 
     const case_fold = b.addModule("CaseFold", .{
-        .root_source_file = .{ .path = "src/CaseFold.zig" },
+        .root_source_file = b.path("src/CaseFold.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -294,7 +294,7 @@ pub fn build(b: *std.Build) void {
 
     // Letter case
     const case_data = b.addModule("CaseData", .{
-        .root_source_file = .{ .path = "src/CaseData.zig" },
+        .root_source_file = b.path("src/CaseData.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -305,7 +305,7 @@ pub fn build(b: *std.Build) void {
 
     // Scripts
     const scripts_data = b.addModule("ScriptsData", .{
-        .root_source_file = .{ .path = "src/ScriptsData.zig" },
+        .root_source_file = b.path("src/ScriptsData.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -313,7 +313,7 @@ pub fn build(b: *std.Build) void {
 
     // Properties
     const props_data = b.addModule("PropsData", .{
-        .root_source_file = .{ .path = "src/PropsData.zig" },
+        .root_source_file = b.path("src/PropsData.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -323,7 +323,7 @@ pub fn build(b: *std.Build) void {
 
     // Unicode Tests
     const unicode_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/unicode_tests.zig" },
+        .root_source_file = b.path("src/unicode_tests.zig"),
         .target = target,
         .optimize = optimize,
     });
