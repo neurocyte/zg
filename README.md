@@ -5,14 +5,14 @@ zg provides Unicode text processing for Zig projects.
 The Unicode version supported by zg is 15.1.0.
 
 ## Zig Version
-The minimum Zig version required is 0.12.0-dev.3496+a2df84d0.
+The minimum Zig version required is 0.13.0 stable.
 
 ## Integrating zg into your Zig Project
 You first need to add zg as a dependency in your `build.zig.zon` file. In your
 Zig project's root directory, run:
 
 ```plain
-zig fetch --save https://codeberg.org/dude_the_builder/zg/archive/v0.1.0.tar.gz
+zig fetch --save https://codeberg.org/dude_the_builder/zg/archive/v0.13.0.tar.gz
 ```
 
 Then instantiate the dependency in your `build.zig`:
