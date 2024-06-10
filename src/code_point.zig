@@ -46,6 +46,17 @@ pub const Iterator = struct {
             .offset = self.i,
         };
 
+        // Return replacement if we don' have a complete codepoint remaining. Consumes only one byte
+        if (self.i + cp.len > self.bytes.len) {
+            defer self.i += 1;
+            // Unicode replacement code point.
+            return .{
+                .code = 0xfffd,
+                .len = 1,
+                .offset = self.i,
+            };
+        }
+
         const cp_bytes = self.bytes[self.i..][0..cp.len];
         self.i += cp.len;
 
