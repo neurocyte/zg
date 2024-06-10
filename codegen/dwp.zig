@@ -178,9 +178,6 @@ pub fn main() !void {
             0x2060...0x206f,
             0xfff0...0xfff8,
             0xe0000...0xE0fff,
-
-            // Sk with EMOJI MODIFIER comment
-            // 0x1f3fb...0x1f3ff,
             => width = 0,
 
             // Two-em dash

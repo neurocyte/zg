@@ -110,7 +110,7 @@ pub fn build(b: *std.Build) !void {
     for (&benches) |bench| {
         const exe = b.addExecutable(.{
             .name = bench.name,
-            .root_source_file = .{ .path = bench.src },
+            .root_source_file = b.path(bench.src),
             .target = target,
             .optimize = optimize,
             .strip = true,
@@ -125,7 +125,7 @@ pub fn build(b: *std.Build) !void {
 
     // Tests
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/tests.zig" },
+        .root_source_file = b.path("src/tests.zig"),
         .target = target,
         .optimize = optimize,
     });
