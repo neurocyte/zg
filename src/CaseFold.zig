@@ -19,9 +19,10 @@ pub fn caseFold(
 ) ![]const u21 {
     var cfcps = std.ArrayList(u21).init(allocator);
     defer cfcps.deinit();
+    var buf: [3]u21 = undefined;
 
     for (cps) |cp| {
-        const cf = self.fold_data.caseFold(cp);
+        const cf = self.fold_data.caseFold(cp, &buf);
 
         if (cf.len == 0) {
             try cfcps.append(cp);
