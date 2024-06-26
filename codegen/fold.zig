@@ -202,6 +202,7 @@ pub fn main() !void {
             @memcpy(stage2[i * 256 ..][0..256], &key);
         }
 
+        // Write out compressed binary data file.
         var args_iter = try std.process.argsWithAllocator(allocator);
         defer args_iter.deinit();
         _ = args_iter.skip();
@@ -214,19 +215,19 @@ pub fn main() !void {
         const writer = out_comp.writer();
 
         const endian = builtin.cpu.arch.endian();
-
+        // Table metadata.
         try writer.writeInt(u24, @intCast(codepoint_cutoff), endian);
         try writer.writeInt(u24, @intCast(multiple_codepoint_start), endian);
-
+        // Stage 1
         try writer.writeInt(u16, @intCast(meaningful_stage1.len), endian);
         try writer.writeAll(meaningful_stage1);
-
+        // Stage 2
         try writer.writeInt(u16, @intCast(stage2.len), endian);
         try writer.writeAll(stage2);
-
+        // Stage 3
         try writer.writeInt(u16, @intCast(stage3.len), endian);
         for (stage3) |offset| try writer.writeInt(i24, offset, endian);
-
+        // Changes when case folded
         try writer.writeInt(u16, @intCast(props_map.count()), endian);
         var iter = props_map.keyIterator();
         while (iter.next()) |key_ptr| try writer.writeInt(u24, key_ptr.*, endian);
