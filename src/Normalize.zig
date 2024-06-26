@@ -245,16 +245,16 @@ fn canonicalSort(self: Self, cps: []u21) void {
 }
 
 /// Normalize `str` to NFD.
-pub fn nfd(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
+pub fn nfd(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
     return self.nfxd(allocator, str, .nfd);
 }
 
 /// Normalize `str` to NFKD.
-pub fn nfkd(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
+pub fn nfkd(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
     return self.nfxd(allocator, str, .nfkd);
 }
 
-pub fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) ![]u21 {
+pub fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.Allocator.Error![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -275,7 +275,7 @@ pub fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, for
     return try dcp_list.toOwnedSlice();
 }
 
-fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Result {
+fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.Allocator.Error!Result {
     // Quick checks.
     if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
 
@@ -287,7 +287,7 @@ fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
     var buf: [4]u8 = undefined;
 
     for (dcps) |dcp| {
-        const len = try unicode.utf8Encode(dcp, &buf);
+        const len = unicode.utf8Encode(dcp, &buf) catch unreachable;
         try dstr_list.appendSlice(buf[0..len]);
     }
 
@@ -350,7 +350,7 @@ pub fn nfdCodePoints(
     self: Self,
     allocator: mem.Allocator,
     cps: []const u21,
-) ![]u21 {
+) mem.Allocator.Error![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -375,7 +375,7 @@ pub fn nfkdCodePoints(
     self: Self,
     allocator: mem.Allocator,
     cps: []const u21,
-) ![]u21 {
+) mem.Allocator.Error![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -403,16 +403,16 @@ fn isHangul(self: Self, cp: u21) bool {
 }
 
 /// Normalizes `str` to NFC.
-pub fn nfc(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
+pub fn nfc(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
     return self.nfxc(allocator, str, .nfc);
 }
 
 /// Normalizes `str` to NFKC.
-pub fn nfkc(self: Self, allocator: mem.Allocator, str: []const u8) !Result {
+pub fn nfkc(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
     return self.nfxc(allocator, str, .nfkc);
 }
 
-fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Result {
+fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.Allocator.Error!Result {
     // Quick checks.
     if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
     if (form == .nfc and isLatin1Only(str)) return Result{ .slice = str };
@@ -524,7 +524,7 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) !Resu
 
             for (dcps) |cp| {
                 if (cp == tombstone) continue; // "Delete"
-                const len = try unicode.utf8Encode(cp, &buf);
+                const len = unicode.utf8Encode(cp, &buf) catch unreachable;
                 try cstr_list.appendSlice(buf[0..len]);
             }
 
