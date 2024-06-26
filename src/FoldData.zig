@@ -5,6 +5,7 @@ const mem = std.mem;
 
 allocator: mem.Allocator,
 cutoff: u21 = undefined,
+cwcf: [0x10ffff]bool = [_]bool{false} ** 0x10ffff,
 multiple_start: u21 = undefined,
 stage1: []u8 = undefined,
 stage2: []u8 = undefined,
@@ -39,6 +40,9 @@ pub fn init(allocator: mem.Allocator) !Self {
     self.stage3 = try allocator.alloc(i24, len);
     errdefer allocator.free(self.stage3);
     for (0..len) |i| self.stage3[i] = try reader.readInt(i24, endian);
+
+    len = try reader.readInt(u16, endian);
+    for (0..len) |_| self.cwcf[try reader.readInt(u24, endian)] = true;
 
     return self;
 }
@@ -76,6 +80,6 @@ pub inline fn caseFold(self: Self, cp: u21, buf: []u21) []const u21 {
 }
 
 /// Returns true when caseFold(NFD(`cp`)) != NFD(`cp`).
-pub inline fn changesWhenCaseFolded(_: Self, _: u21) bool {
-    return true;
+pub inline fn changesWhenCaseFolded(self: Self, cp: u21) bool {
+    return self.cwcf[cp];
 }

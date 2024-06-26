@@ -1,32 +1,66 @@
 const std = @import("std");
 const builtin = @import("builtin");
-
-// From https://www.unicode.org/Public/UCD/latest/ucd/CaseFolding.txt
-// const case_folding_txt = @embedFile("CaseFolding.txt");
+const mem = std.mem;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
-    // const unbuf_stdout = std.io.getStdOut().writer();
-    // var buf_stdout = std.io.bufferedWriter(unbuf_stdout);
-    // const writer = buf_stdout.writer();
+    // Process DerivedCoreProperties.txt
+    var props_file = try std.fs.cwd().openFile("data/unicode/DerivedCoreProperties.txt", .{});
+    defer props_file.close();
+    var props_buf = std.io.bufferedReader(props_file.reader());
+    const props_reader = props_buf.reader();
+
+    var props_map = std.AutoHashMap(u21, void).init(allocator);
+    defer props_map.deinit();
+
+    var line_buf: [4096]u8 = undefined;
+
+    props_lines: while (try props_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+        if (line.len == 0 or line[0] == '#') continue;
+
+        const no_comment = if (std.mem.indexOfScalar(u8, line, '#')) |octo| line[0..octo] else line;
+
+        var field_iter = std.mem.tokenizeAny(u8, no_comment, "; ");
+        var current_code: [2]u21 = undefined;
+
+        var i: usize = 0;
+        while (field_iter.next()) |field| : (i += 1) {
+            switch (i) {
+                0 => {
+                    // Code point(s)
+                    if (std.mem.indexOf(u8, field, "..")) |dots| {
+                        current_code = .{
+                            try std.fmt.parseInt(u21, field[0..dots], 16),
+                            try std.fmt.parseInt(u21, field[dots + 2 ..], 16),
+                        };
+                    } else {
+                        const code = try std.fmt.parseInt(u21, field, 16);
+                        current_code = .{ code, code };
+                    }
+                },
+                1 => {
+                    // Core property
+                    if (!mem.eql(u8, field, "Changes_When_Casefolded")) continue :props_lines;
+                    for (current_code[0]..current_code[1] + 1) |cp| try props_map.put(@intCast(cp), {});
+                },
+                else => {},
+            }
+        }
+    }
 
     var codepoint_mapping = std.AutoArrayHashMap(u21, [3]u21).init(allocator);
     defer codepoint_mapping.deinit();
 
-    // Process
+    // Process CaseFolding.txt
     var cp_file = try std.fs.cwd().openFile("data/unicode/CaseFolding.txt", .{});
     defer cp_file.close();
     var cp_buf = std.io.bufferedReader(cp_file.reader());
     const cp_reader = cp_buf.reader();
 
-    // var line_it = std.mem.tokenizeAny(u8, case_folding_txt, "\r\n");
-    var line_buf: [4096]u8 = undefined;
-
     while (try cp_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
-        // while (line_it.next()) |line| {
         if (line.len == 0 or line[0] == '#') continue;
 
         var field_it = std.mem.splitScalar(u8, line, ';');
@@ -168,12 +202,6 @@ pub fn main() !void {
             @memcpy(stage2[i * 256 ..][0..256], &key);
         }
 
-        // try writer.print("const cutoff = 0x{X};\n", .{codepoint_cutoff});
-        // try writeArray(writer, u8, "stage1", meaningful_stage1);
-        // try writeArray(writer, u8, "stage2", stage2);
-        // try writer.print("const multiple_start = {};\n", .{multiple_codepoint_start});
-        // try writeArray(writer, i24, "stage3", stage3);
-
         var args_iter = try std.process.argsWithAllocator(allocator);
         defer args_iter.deinit();
         _ = args_iter.skip();
@@ -199,20 +227,10 @@ pub fn main() !void {
         try writer.writeInt(u16, @intCast(stage3.len), endian);
         for (stage3) |offset| try writer.writeInt(i24, offset, endian);
 
+        try writer.writeInt(u16, @intCast(props_map.count()), endian);
+        var iter = props_map.keyIterator();
+        while (iter.next()) |key_ptr| try writer.writeInt(u24, key_ptr.*, endian);
+
         try out_comp.flush();
     }
-
-    // try buf_stdout.flush();
 }
-
-// fn writeArray(writer: anytype, comptime T: type, name: []const u8, data: []const T) !void {
-//     try writer.print("const {s} = [{}]{s}{{", .{ name, data.len, @typeName(T) });
-//
-//     for (data, 0..) |v, i| {
-//         if (i % 32 == 0) try writer.writeAll("\n    ");
-//         try writer.print("{},", .{v});
-//         if (i != data.len - 1) try writer.writeByte(' ');
-//     }
-//
-//     try writer.writeAll("\n};\n");
-// }
