@@ -48,6 +48,6 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// Returns the Hangul syllable type for `cp`.
-pub inline fn syllable(self: Self, cp: u21) Syllable {
+pub fn syllable(self: Self, cp: u21) Syllable {
     return @enumFromInt(self.s2[self.s1[cp >> 8] + (cp & 0xff)]);
 }

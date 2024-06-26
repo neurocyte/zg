@@ -56,11 +56,11 @@ pub fn deinit(self: *Self) void {
 }
 
 /// Returns canonical decomposition for `cp`.
-pub inline fn toNfd(self: Self, cp: u21) []const u21 {
+pub fn toNfd(self: Self, cp: u21) []const u21 {
     return self.nfd[cp];
 }
 
 // Returns the primary composite for the codepoints in `cp`.
-pub inline fn toNfc(self: Self, cps: [2]u21) ?u21 {
+pub fn toNfc(self: Self, cps: [2]u21) ?u21 {
     return self.nfc.get(cps);
 }

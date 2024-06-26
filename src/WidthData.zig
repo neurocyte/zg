@@ -52,7 +52,7 @@ pub fn deinit(self: *const Self) void {
 /// 3, where BACKSPACE and DELETE return -1 and 3-em-dash returns 3. C0/C1
 /// control codes return 0. If `cjk` is true, ambiguous code points return 2,
 /// otherwise they return 1.
-pub inline fn codePointWidth(self: Self, cp: u21) i3 {
+pub fn codePointWidth(self: Self, cp: u21) i3 {
     return self.s2[self.s1[cp >> 8] + (cp & 0xff)];
 }
 

@@ -39,16 +39,16 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// Returns true if `cp` is already in NFD form.
-pub inline fn isNfd(self: Self, cp: u21) bool {
+pub fn isNfd(self: Self, cp: u21) bool {
     return self.s2[self.s1[cp >> 8] + (cp & 0xff)] & 1 == 0;
 }
 
 /// Returns true if `cp` is already in NFKD form.
-pub inline fn isNfkd(self: Self, cp: u21) bool {
+pub fn isNfkd(self: Self, cp: u21) bool {
     return self.s2[self.s1[cp >> 8] + (cp & 0xff)] & 2 == 0;
 }
 
 /// Returns true if `cp` is not allowed in any normalized form.
-pub inline fn isFcx(self: Self, cp: u21) bool {
+pub fn isFcx(self: Self, cp: u21) bool {
     return self.s2[self.s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
 }

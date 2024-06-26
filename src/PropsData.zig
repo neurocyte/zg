@@ -81,62 +81,62 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// True if `cp` is a mathematical symbol.
-pub inline fn isMath(self: Self, cp: u21) bool {
+pub fn isMath(self: Self, cp: u21) bool {
     return self.core_s2[self.core_s1[cp >> 8] + (cp & 0xff)] & 1 == 1;
 }
 
 /// True if `cp` is an alphabetic character.
-pub inline fn isAlphabetic(self: Self, cp: u21) bool {
+pub fn isAlphabetic(self: Self, cp: u21) bool {
     return self.core_s2[self.core_s1[cp >> 8] + (cp & 0xff)] & 2 == 2;
 }
 
 /// True if `cp` is a valid identifier start character.
-pub inline fn isIdStart(self: Self, cp: u21) bool {
+pub fn isIdStart(self: Self, cp: u21) bool {
     return self.core_s2[self.core_s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
 }
 
 /// True if `cp` is a valid identifier continuation character.
-pub inline fn isIdContinue(self: Self, cp: u21) bool {
+pub fn isIdContinue(self: Self, cp: u21) bool {
     return self.core_s2[self.core_s1[cp >> 8] + (cp & 0xff)] & 8 == 8;
 }
 
 /// True if `cp` is a valid extended identifier start character.
-pub inline fn isXidStart(self: Self, cp: u21) bool {
+pub fn isXidStart(self: Self, cp: u21) bool {
     return self.core_s2[self.core_s1[cp >> 8] + (cp & 0xff)] & 16 == 16;
 }
 
 /// True if `cp` is a valid extended identifier continuation character.
-pub inline fn isXidContinue(self: Self, cp: u21) bool {
+pub fn isXidContinue(self: Self, cp: u21) bool {
     return self.core_s2[self.core_s1[cp >> 8] + (cp & 0xff)] & 32 == 32;
 }
 
 /// True if `cp` is a whitespace character.
-pub inline fn isWhitespace(self: Self, cp: u21) bool {
+pub fn isWhitespace(self: Self, cp: u21) bool {
     return self.props_s2[self.props_s1[cp >> 8] + (cp & 0xff)] & 1 == 1;
 }
 
 /// True if `cp` is a hexadecimal digit.
-pub inline fn isHexDigit(self: Self, cp: u21) bool {
+pub fn isHexDigit(self: Self, cp: u21) bool {
     return self.props_s2[self.props_s1[cp >> 8] + (cp & 0xff)] & 2 == 2;
 }
 
 /// True if `cp` is a diacritic mark.
-pub inline fn isDiacritic(self: Self, cp: u21) bool {
+pub fn isDiacritic(self: Self, cp: u21) bool {
     return self.props_s2[self.props_s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
 }
 
 /// True if `cp` is numeric.
-pub inline fn isNumeric(self: Self, cp: u21) bool {
+pub fn isNumeric(self: Self, cp: u21) bool {
     return self.num_s2[self.num_s1[cp >> 8] + (cp & 0xff)] & 1 == 1;
 }
 
 /// True if `cp` is a digit.
-pub inline fn isDigit(self: Self, cp: u21) bool {
+pub fn isDigit(self: Self, cp: u21) bool {
     return self.num_s2[self.num_s1[cp >> 8] + (cp & 0xff)] & 2 == 2;
 }
 
 /// True if `cp` is decimal.
-pub inline fn isDecimal(self: Self, cp: u21) bool {
+pub fn isDecimal(self: Self, cp: u21) bool {
     return self.num_s2[self.num_s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
 }
 

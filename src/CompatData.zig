@@ -45,6 +45,6 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// Returns compatibility decomposition for `cp`.
-pub inline fn toNfkd(self: Self, cp: u21) []u21 {
+pub fn toNfkd(self: Self, cp: u21) []u21 {
     return self.nfkd[cp];
 }

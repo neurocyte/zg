@@ -39,11 +39,11 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// Returns the canonical combining class for a code point.
-pub inline fn ccc(self: Self, cp: u21) u8 {
+pub fn ccc(self: Self, cp: u21) u8 {
     return self.s2[self.s1[cp >> 8] + (cp & 0xff)];
 }
 
 /// True if `cp` is a starter code point, not a combining character.
-pub inline fn isStarter(self: Self, cp: u21) bool {
+pub fn isStarter(self: Self, cp: u21) bool {
     return self.s2[self.s1[cp >> 8] + (cp & 0xff)] == 0;
 }

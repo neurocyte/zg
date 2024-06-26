@@ -81,7 +81,7 @@ pub fn deinit(self: *const Self) void {
 }
 
 // Returns true if `cp` is either upper, lower, or title case.
-pub inline fn isCased(self: Self, cp: u21) bool {
+pub fn isCased(self: Self, cp: u21) bool {
     return self.prop_s2[self.prop_s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
 }
 
@@ -109,7 +109,7 @@ test "isUpperStr" {
 }
 
 /// Returns uppercase mapping for `cp`.
-pub inline fn toUpper(self: Self, cp: u21) u21 {
+pub fn toUpper(self: Self, cp: u21) u21 {
     return self.case_map[cp][0];
 }
 
@@ -167,7 +167,7 @@ test "isLowerStr" {
 }
 
 /// Returns lowercase mapping for `cp`.
-pub inline fn toLower(self: Self, cp: u21) u21 {
+pub fn toLower(self: Self, cp: u21) u21 {
     return self.case_map[cp][1];
 }
 

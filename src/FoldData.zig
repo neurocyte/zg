@@ -3,9 +3,11 @@ const builtin = @import("builtin");
 const compress = std.compress;
 const mem = std.mem;
 
+const cwcf_max = 0x1e950;
+
 allocator: mem.Allocator,
 cutoff: u21 = undefined,
-cwcf: [0x10ffff]bool = [_]bool{false} ** 0x10ffff,
+cwcf: [cwcf_max]bool = [_]bool{false} ** cwcf_max,
 multiple_start: u21 = undefined,
 stage1: []u8 = undefined,
 stage2: []u8 = undefined,
@@ -54,7 +56,7 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// Returns the case fold for `cp`.
-pub inline fn caseFold(self: Self, cp: u21, buf: []u21) []const u21 {
+pub fn caseFold(self: Self, cp: u21, buf: []u21) []const u21 {
     if (cp >= self.cutoff) return &.{};
 
     const stage1_val = self.stage1[cp >> 8];
@@ -80,6 +82,6 @@ pub inline fn caseFold(self: Self, cp: u21, buf: []u21) []const u21 {
 }
 
 /// Returns true when caseFold(NFD(`cp`)) != NFD(`cp`).
-pub inline fn changesWhenCaseFolded(self: Self, cp: u21) bool {
-    return self.cwcf[cp];
+pub fn changesWhenCaseFolded(self: Self, cp: u21) bool {
+    return cp < cwcf_max and self.cwcf[cp];
 }

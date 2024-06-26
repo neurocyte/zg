@@ -80,7 +80,7 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// Lookup the General Category for `cp`.
-pub inline fn gc(self: Self, cp: u21) Gc {
+pub fn gc(self: Self, cp: u21) Gc {
     return @enumFromInt(self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]]);
 }
 

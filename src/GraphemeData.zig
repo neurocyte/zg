@@ -73,16 +73,16 @@ pub fn deinit(self: *const Self) void {
 }
 
 /// Lookup the grapheme break property for a code point.
-pub inline fn gbp(self: Self, cp: u21) Gbp {
+pub fn gbp(self: Self, cp: u21) Gbp {
     return @enumFromInt(self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]] >> 4);
 }
 
 /// Lookup the indic syllable type for a code point.
-pub inline fn indic(self: Self, cp: u21) Indic {
+pub fn indic(self: Self, cp: u21) Indic {
     return @enumFromInt((self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]] >> 1) & 0x7);
 }
 
 /// Lookup the indic syllable type for a code point.
-pub inline fn isEmoji(self: Self, cp: u21) bool {
+pub fn isEmoji(self: Self, cp: u21) bool {
     return self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]] & 1 == 1;
 }
