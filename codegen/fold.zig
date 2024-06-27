@@ -83,6 +83,19 @@ pub fn main() !void {
         try codepoint_mapping.putNoClobber(codepoint, mapping_buf);
     }
 
+    var changes_when_casefolded_exceptions = std.ArrayList(u21).init(allocator);
+    defer changes_when_casefolded_exceptions.deinit();
+
+    {
+        // Codepoints with a case fold mapping can be missing the Changes_When_Casefolded property,
+        // but not vice versa.
+        for (codepoint_mapping.keys()) |codepoint| {
+            if (props_map.get(codepoint) == null) {
+                try changes_when_casefolded_exceptions.append(codepoint);
+            }
+        }
+    }
+
     var offset_to_index = std.AutoHashMap(i32, u8).init(allocator);
     defer offset_to_index.deinit();
     var unique_offsets = std.AutoArrayHashMap(i32, u32).init(allocator);
@@ -228,9 +241,11 @@ pub fn main() !void {
         try writer.writeInt(u16, @intCast(stage3.len), endian);
         for (stage3) |offset| try writer.writeInt(i24, offset, endian);
         // Changes when case folded
-        try writer.writeInt(u16, @intCast(props_map.count()), endian);
-        var iter = props_map.keyIterator();
-        while (iter.next()) |key_ptr| try writer.writeInt(u24, key_ptr.*, endian);
+        // Min and max
+        try writer.writeInt(u24, std.mem.min(u21, changes_when_casefolded_exceptions.items), endian);
+        try writer.writeInt(u24, std.mem.max(u21, changes_when_casefolded_exceptions.items), endian);
+        try writer.writeInt(u16, @intCast(changes_when_casefolded_exceptions.items.len), endian);
+        for (changes_when_casefolded_exceptions.items) |cp| try writer.writeInt(u24, cp, endian);
 
         try out_comp.flush();
     }
