@@ -3,13 +3,13 @@ const std = @import("std");
 const Normalizer = @import("ziglyph").Normalizer;
 
 pub fn main() !void {
-    var args_iter = std.process.args();
-    _ = args_iter.skip();
-    const in_path = args_iter.next() orelse return error.MissingArg;
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+
+    var args_iter = try std.process.argsWithAllocator(allocator);
+    _ = args_iter.skip();
+    const in_path = args_iter.next() orelse return error.MissingArg;
 
     const input = try std.fs.cwd().readFileAlloc(
         allocator,
@@ -31,5 +31,5 @@ pub fn main() !void {
         @memcpy(buf[0..line.len], line);
         prev_line = buf[0..line.len];
     }
-    std.debug.print("Ziglyph Normalizer.eqlCaseless: result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
+    std.debug.print("Ziglyph Normalizer.eqlCaseless: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
 }
