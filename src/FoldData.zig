@@ -3,11 +3,11 @@ const builtin = @import("builtin");
 const compress = std.compress;
 const mem = std.mem;
 
-const cwcf_max = 0x1e950;
-
 allocator: mem.Allocator,
 cutoff: u21 = undefined,
-cwcf: [cwcf_max]bool = [_]bool{false} ** cwcf_max,
+cwcf_exceptions_min: u21 = undefined,
+cwcf_exceptions_max: u21 = undefined,
+cwcf_exceptions: []u21 = undefined,
 multiple_start: u21 = undefined,
 stage1: []u8 = undefined,
 stage2: []u8 = undefined,
@@ -43,8 +43,11 @@ pub fn init(allocator: mem.Allocator) !Self {
     errdefer allocator.free(self.stage3);
     for (0..len) |i| self.stage3[i] = try reader.readInt(i24, endian);
 
+    self.cwcf_exceptions_min = @intCast(try reader.readInt(u24, endian));
+    self.cwcf_exceptions_max = @intCast(try reader.readInt(u24, endian));
     len = try reader.readInt(u16, endian);
-    for (0..len) |_| self.cwcf[try reader.readInt(u24, endian)] = true;
+    self.cwcf_exceptions = try allocator.alloc(u21, len);
+    for (0..len) |i| self.cwcf_exceptions[i] = @intCast(try reader.readInt(u24, endian));
 
     return self;
 }
@@ -83,5 +86,13 @@ pub fn caseFold(self: Self, cp: u21, buf: []u21) []const u21 {
 
 /// Returns true when caseFold(NFD(`cp`)) != NFD(`cp`).
 pub fn changesWhenCaseFolded(self: Self, cp: u21) bool {
-    return cp < cwcf_max and self.cwcf[cp];
+    var buf: [3]u21 = undefined;
+    const has_mapping = self.caseFold(cp, &buf).len != 0;
+    return has_mapping and !self.isCwcfException(cp);
+}
+
+fn isCwcfException(self: Self, cp: u21) bool {
+    return cp >= self.cwcf_exceptions_min and
+        cp <= self.cwcf_exceptions_max and
+        std.mem.indexOfScalar(u21, self.cwcf_exceptions, cp) != null;
 }
