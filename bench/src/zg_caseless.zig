@@ -4,13 +4,13 @@ const CaseFold = @import("CaseFold");
 const Normalize = @import("Normalize");
 
 pub fn main() !void {
-    var args_iter = std.process.args();
-    _ = args_iter.skip();
-    const in_path = args_iter.next() orelse return error.MissingArg;
-
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
+
+    var args_iter = try std.process.argsWithAllocator(allocator);
+    _ = args_iter.skip();
+    const in_path = args_iter.next() orelse return error.MissingArg;
 
     const input = try std.fs.cwd().readFileAlloc(
         allocator,
@@ -41,7 +41,7 @@ pub fn main() !void {
         @memcpy(buf[0..line.len], line);
         prev_line = buf[0..line.len];
     }
-    std.debug.print("zg CaseFold.compatCaselessMatch: result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
+    std.debug.print("zg CaseFold.compatCaselessMatch: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
 
     result = 0;
     iter.reset();
@@ -57,5 +57,5 @@ pub fn main() !void {
         @memcpy(buf[0..line.len], line);
         prev_line = buf[0..line.len];
     }
-    std.debug.print("zg CaseFold.canonCaselessMatch: result: {}, took: {}\n", .{ result, timer.lap() / std.time.ns_per_ms });
+    std.debug.print("zg CaseFold.canonCaselessMatch: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
 }
