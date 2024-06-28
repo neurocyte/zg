@@ -12,7 +12,7 @@ You first need to add zg as a dependency in your `build.zig.zon` file. In your
 Zig project's root directory, run:
 
 ```plain
-zig fetch --save https://codeberg.org/dude_the_builder/zg/archive/v0.13.1.tar.gz
+zig fetch --save https://codeberg.org/dude_the_builder/zg/archive/v0.13.2.tar.gz
 ```
 
 Then instantiate the dependency in your `build.zig`:
