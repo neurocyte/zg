@@ -8,6 +8,69 @@ pub const CodePoint = struct {
     offset: u32,
 };
 
+/// given a small slice of a string, decode the corresponding codepoint
+pub fn decode(bytes: []const u8, offset: u32) ?CodePoint {
+    // EOS fast path
+    if (bytes.len == 0) {
+        return null;
+    }
+
+    // ASCII fast path
+    if (bytes[0] < 128) {
+        return .{
+            .code = bytes[0],
+            .len = 1,
+            .offset = offset,
+        };
+    }
+
+    var cp = CodePoint{
+        .code = undefined,
+        .len = switch (bytes[0]) {
+            0b1100_0000...0b1101_1111 => 2,
+            0b1110_0000...0b1110_1111 => 3,
+            0b1111_0000...0b1111_0111 => 4,
+            else => {
+                // unicode replacement code point.
+                return .{
+                    .code = 0xfffd,
+                    .len = 1,
+                    .offset = offset,
+                };
+            },
+        },
+        .offset = offset,
+    };
+
+    // Return replacement if we don' have a complete codepoint remaining. Consumes only one byte
+    if (cp.len > bytes.len) {
+        // Unicode replacement code point.
+        return .{
+            .code = 0xfffd,
+            .len = 1,
+            .offset = offset,
+        };
+    }
+
+    const cp_bytes = bytes[0..cp.len];
+    cp.code = switch (cp.len) {
+        2 => (@as(u21, (cp_bytes[0] & 0b00011111)) << 6) | (cp_bytes[1] & 0b00111111),
+
+        3 => (((@as(u21, (cp_bytes[0] & 0b00001111)) << 6) |
+            (cp_bytes[1] & 0b00111111)) << 6) |
+            (cp_bytes[2] & 0b00111111),
+
+        4 => (((((@as(u21, (cp_bytes[0] & 0b00000111)) << 6) |
+            (cp_bytes[1] & 0b00111111)) << 6) |
+            (cp_bytes[2] & 0b00111111)) << 6) |
+            (cp_bytes[3] & 0b00111111),
+
+        else => @panic("CodePointIterator.next invalid code point length."),
+    };
+
+    return cp;
+}
+
 /// `Iterator` iterates a string one `CodePoint` at-a-time.
 pub const Iterator = struct {
     bytes: []const u8,
@@ -16,66 +79,12 @@ pub const Iterator = struct {
     pub fn next(self: *Iterator) ?CodePoint {
         if (self.i >= self.bytes.len) return null;
 
-        if (self.bytes[self.i] < 128) {
-            // ASCII fast path
-            defer self.i += 1;
-
-            return .{
-                .code = self.bytes[self.i],
-                .len = 1,
-                .offset = self.i,
-            };
+        const res = decode(self.bytes[self.i..], self.i);
+        if (res) |cp| {
+            self.i += cp.len;
         }
 
-        var cp = CodePoint{
-            .code = undefined,
-            .len = switch (self.bytes[self.i]) {
-                0b1100_0000...0b1101_1111 => 2,
-                0b1110_0000...0b1110_1111 => 3,
-                0b1111_0000...0b1111_0111 => 4,
-                else => {
-                    defer self.i += 1;
-                    // Unicode replacement code point.
-                    return .{
-                        .code = 0xfffd,
-                        .len = 1,
-                        .offset = self.i,
-                    };
-                },
-            },
-            .offset = self.i,
-        };
-
-        // Return replacement if we don' have a complete codepoint remaining. Consumes only one byte
-        if (self.i + cp.len > self.bytes.len) {
-            defer self.i += 1;
-            // Unicode replacement code point.
-            return .{
-                .code = 0xfffd,
-                .len = 1,
-                .offset = self.i,
-            };
-        }
-
-        const cp_bytes = self.bytes[self.i..][0..cp.len];
-        self.i += cp.len;
-
-        cp.code = switch (cp.len) {
-            2 => (@as(u21, (cp_bytes[0] & 0b00011111)) << 6) | (cp_bytes[1] & 0b00111111),
-
-            3 => (((@as(u21, (cp_bytes[0] & 0b00001111)) << 6) |
-                (cp_bytes[1] & 0b00111111)) << 6) |
-                (cp_bytes[2] & 0b00111111),
-
-            4 => (((((@as(u21, (cp_bytes[0] & 0b00000111)) << 6) |
-                (cp_bytes[1] & 0b00111111)) << 6) |
-                (cp_bytes[2] & 0b00111111)) << 6) |
-                (cp_bytes[3] & 0b00111111),
-
-            else => @panic("CodePointIterator.next invalid code point length."),
-        };
-
-        return cp;
+        return res;
     }
 
     pub fn peek(self: *Iterator) ?CodePoint {
@@ -84,6 +93,19 @@ pub const Iterator = struct {
         return self.next();
     }
 };
+
+test "decode" {
+    const bytes = "🌩️";
+    const res = decode(bytes, 0);
+
+    if (res) |cp| {
+        try std.testing.expectEqual(@as(u21, 0x1F329), cp.code);
+        try std.testing.expectEqual(4, cp.len);
+    } else {
+        // shouldn't have failed to return
+        try std.testing.expect(false);
+    }
+}
 
 test "peek" {
     var iter = Iterator{ .bytes = "Hi" };
