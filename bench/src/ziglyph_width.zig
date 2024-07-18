@@ -26,5 +26,5 @@ pub fn main() !void {
         const width = try display_width.strWidth(line, .half);
         result += width;
     }
-    std.debug.print("Ziglyph display_width.strWidth: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph display_width.strWidth: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }

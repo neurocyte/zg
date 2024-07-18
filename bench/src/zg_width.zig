@@ -29,5 +29,5 @@ pub fn main() !void {
         const width = display_width.strWidth(line);
         result += width;
     }
-    std.debug.print("zg DisplayWidth.strWidth: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("zg DisplayWidth.strWidth: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }

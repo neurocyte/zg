@@ -41,7 +41,7 @@ pub fn main() !void {
         @memcpy(buf[0..line.len], line);
         prev_line = buf[0..line.len];
     }
-    std.debug.print("zg CaseFold.compatCaselessMatch: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("zg CaseFold.compatCaselessMatch: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 
     result = 0;
     iter.reset();
@@ -57,5 +57,5 @@ pub fn main() !void {
         @memcpy(buf[0..line.len], line);
         prev_line = buf[0..line.len];
     }
-    std.debug.print("zg CaseFold.canonCaselessMatch: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("zg CaseFold.canonCaselessMatch: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }

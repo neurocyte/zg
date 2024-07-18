@@ -23,5 +23,5 @@ pub fn main() !void {
     var timer = try std.time.Timer.start();
 
     while (iter.next()) |_| result += 1;
-    std.debug.print("zg CodePointIterator: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("zg CodePointIterator: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }

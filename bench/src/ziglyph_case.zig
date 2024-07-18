@@ -27,7 +27,7 @@ pub fn main() !void {
         const lower = try ziglyph.toLowerStr(allocator, line);
         result += upper.len + lower.len;
     }
-    std.debug.print("Ziglyph toUpperStr/toLowerStr: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph toUpperStr/toLowerStr: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 
     result = 0;
     iter.reset();
@@ -37,5 +37,5 @@ pub fn main() !void {
         if (ziglyph.isUpperStr(line)) result += 1;
         if (ziglyph.isLowerStr(line)) result += 2;
     }
-    std.debug.print("Ziglyph isUpperStr/isLowerStr: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph isUpperStr/isLowerStr: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }

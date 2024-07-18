@@ -28,7 +28,7 @@ pub fn main() !void {
         const nfkc = try normalizer.nfkc(allocator, line);
         result += nfkc.slice.len;
     }
-    std.debug.print("Ziglyph Normalizer.nfkc: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph Normalizer.nfkc: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 
     result = 0;
     iter.reset();
@@ -38,7 +38,7 @@ pub fn main() !void {
         const nfc = try normalizer.nfc(allocator, line);
         result += nfc.slice.len;
     }
-    std.debug.print("Ziglyph Normalizer.nfc: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph Normalizer.nfc: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 
     result = 0;
     iter.reset();
@@ -48,7 +48,7 @@ pub fn main() !void {
         const nfkd = try normalizer.nfkd(allocator, line);
         result += nfkd.slice.len;
     }
-    std.debug.print("Ziglyph Normalizer.nfkd: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph Normalizer.nfkd: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 
     result = 0;
     iter.reset();
@@ -58,7 +58,7 @@ pub fn main() !void {
         const nfd = try normalizer.nfd(allocator, line);
         result += nfd.slice.len;
     }
-    std.debug.print("Ziglyph Normalizer.nfd: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph Normalizer.nfd: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 
     result = 0;
     iter.reset();
@@ -71,5 +71,5 @@ pub fn main() !void {
         @memcpy(buf[0..line.len], line);
         prev_line = buf[0..line.len];
     }
-    std.debug.print("Ziglyph Normalizer.eql: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph Normalizer.eql: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }

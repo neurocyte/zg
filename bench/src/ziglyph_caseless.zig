@@ -31,5 +31,5 @@ pub fn main() !void {
         @memcpy(buf[0..line.len], line);
         prev_line = buf[0..line.len];
     }
-    std.debug.print("Ziglyph Normalizer.eqlCaseless: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap() / std.time.ns_per_ms) });
+    std.debug.print("Ziglyph Normalizer.eqlCaseless: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }
