@@ -37,7 +37,7 @@ s3: []u8 = undefined,
 
 const Self = @This();
 
-pub fn init(allocator: mem.Allocator) !Self {
+pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("gbp");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -48,20 +48,20 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     var self = Self{ .allocator = allocator };
 
-    const s1_len: u16 = try reader.readInt(u16, endian);
+    const s1_len: u16 = reader.readInt(u16, endian) catch unreachable;
     self.s1 = try allocator.alloc(u16, s1_len);
     errdefer allocator.free(self.s1);
-    for (0..s1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
+    for (0..s1_len) |i| self.s1[i] = reader.readInt(u16, endian) catch unreachable;
 
-    const s2_len: u16 = try reader.readInt(u16, endian);
+    const s2_len: u16 = reader.readInt(u16, endian) catch unreachable;
     self.s2 = try allocator.alloc(u16, s2_len);
     errdefer allocator.free(self.s2);
-    for (0..s2_len) |i| self.s2[i] = try reader.readInt(u16, endian);
+    for (0..s2_len) |i| self.s2[i] = reader.readInt(u16, endian) catch unreachable;
 
-    const s3_len: u16 = try reader.readInt(u16, endian);
+    const s3_len: u16 = reader.readInt(u16, endian) catch unreachable;
     self.s3 = try allocator.alloc(u8, s3_len);
     errdefer allocator.free(self.s3);
-    _ = try reader.readAll(self.s3);
+    _ = reader.readAll(self.s3) catch unreachable;
 
     return self;
 }
