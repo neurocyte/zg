@@ -7,10 +7,36 @@ const mem = std.mem;
 const testing = std.testing;
 const unicode = std.unicode;
 
+const grapheme = @import("grapheme");
 const Grapheme = @import("grapheme").Grapheme;
 const GraphemeData = @import("grapheme").GraphemeData;
 const GraphemeIterator = @import("grapheme").Iterator;
 const Normalize = @import("Normalize");
+
+comptime {
+    testing.refAllDecls(grapheme);
+}
+test "Iterator.peek" {
+    const peek_seq = "aΔ👨🏻‍🌾→";
+    const data = try GraphemeData.init(std.testing.allocator);
+    defer data.deinit();
+
+    var iter = grapheme.Iterator.init(peek_seq, &data);
+    const peek_a = iter.peek().?;
+    const next_a = iter.next().?;
+    try std.testing.expectEqual(peek_a, next_a);
+    try std.testing.expectEqualStrings("a", peek_a.bytes(peek_seq));
+    const peek_d1 = iter.peek().?;
+    const peek_d2 = iter.peek().?;
+    try std.testing.expectEqual(peek_d1, peek_d2);
+    const next_d = iter.next().?;
+    try std.testing.expectEqual(peek_d2, next_d);
+    try std.testing.expectEqual(iter.peek(), iter.next());
+    try std.testing.expectEqual(iter.peek(), iter.next());
+    try std.testing.expectEqual(null, iter.peek());
+    try std.testing.expectEqual(null, iter.peek());
+    try std.testing.expectEqual(iter.peek(), iter.next());
+}
 
 test "Unicode normalization tests" {
     var arena = heap.ArenaAllocator.init(testing.allocator);
