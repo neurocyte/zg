@@ -7,10 +7,36 @@ const mem = std.mem;
 const testing = std.testing;
 const unicode = std.unicode;
 
+const grapheme = @import("grapheme");
 const Grapheme = @import("grapheme").Grapheme;
 const GraphemeData = @import("grapheme").GraphemeData;
 const GraphemeIterator = @import("grapheme").Iterator;
 const Normalize = @import("Normalize");
+
+comptime {
+    testing.refAllDecls(grapheme);
+}
+test "Iterator.peek" {
+    const peek_seq = "aΔ👨🏻‍🌾→";
+    const data = try GraphemeData.init(std.testing.allocator);
+    defer data.deinit();
+
+    var iter = grapheme.Iterator.init(peek_seq, &data);
+    const peek_a = iter.peek().?;
+    const next_a = iter.next().?;
+    try std.testing.expectEqual(peek_a, next_a);
+    try std.testing.expectEqualStrings("a", peek_a.bytes(peek_seq));
+    const peek_d1 = iter.peek().?;
+    const peek_d2 = iter.peek().?;
+    try std.testing.expectEqual(peek_d1, peek_d2);
+    const next_d = iter.next().?;
+    try std.testing.expectEqual(peek_d2, next_d);
+    try std.testing.expectEqual(iter.peek(), iter.next());
+    try std.testing.expectEqual(iter.peek(), iter.next());
+    try std.testing.expectEqual(null, iter.peek());
+    try std.testing.expectEqual(null, iter.peek());
+    try std.testing.expectEqual(iter.peek(), iter.next());
+}
 
 test "Unicode normalization tests" {
     var arena = heap.ArenaAllocator.init(testing.allocator);
@@ -35,7 +61,7 @@ test "Unicode normalization tests" {
         // Skip comments or empty lines.
         if (line.len == 0 or line[0] == '#' or line[0] == '@') continue;
         // Iterate over fields.
-        var fields = mem.split(u8, line, ";");
+        var fields = mem.splitScalar(u8, line, ';');
         var field_index: usize = 0;
         var input: []u8 = undefined;
         defer allocator.free(input);
@@ -45,7 +71,7 @@ test "Unicode normalization tests" {
                 var i_buf = std.ArrayList(u8).init(allocator);
                 defer i_buf.deinit();
 
-                var i_fields = mem.split(u8, field, " ");
+                var i_fields = mem.splitScalar(u8, field, ' ');
                 while (i_fields.next()) |s| {
                     const icp = try fmt.parseInt(u21, s, 16);
                     const len = try unicode.utf8Encode(icp, &cp_buf);
@@ -59,7 +85,7 @@ test "Unicode normalization tests" {
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = mem.split(u8, field, " ");
+                var w_fields = mem.splitScalar(u8, field, ' ');
                 while (w_fields.next()) |s| {
                     const wcp = try fmt.parseInt(u21, s, 16);
                     const len = try unicode.utf8Encode(wcp, &cp_buf);
@@ -76,7 +102,7 @@ test "Unicode normalization tests" {
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = mem.split(u8, field, " ");
+                var w_fields = mem.splitScalar(u8, field, ' ');
                 while (w_fields.next()) |s| {
                     const wcp = try fmt.parseInt(u21, s, 16);
                     const len = try unicode.utf8Encode(wcp, &cp_buf);
@@ -93,7 +119,7 @@ test "Unicode normalization tests" {
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = mem.split(u8, field, " ");
+                var w_fields = mem.splitScalar(u8, field, ' ');
                 while (w_fields.next()) |s| {
                     const wcp = try fmt.parseInt(u21, s, 16);
                     const len = try unicode.utf8Encode(wcp, &cp_buf);
@@ -110,7 +136,7 @@ test "Unicode normalization tests" {
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
 
-                var w_fields = mem.split(u8, field, " ");
+                var w_fields = mem.splitScalar(u8, field, ' ');
                 while (w_fields.next()) |s| {
                     const wcp = try fmt.parseInt(u21, s, 16);
                     const len = try unicode.utf8Encode(wcp, &cp_buf);
@@ -158,11 +184,11 @@ test "Segmentation GraphemeIterator" {
         var all_bytes = std.ArrayList(u8).init(allocator);
         defer all_bytes.deinit();
 
-        var graphemes = std.mem.split(u8, line, " ÷ ");
+        var graphemes = std.mem.splitSequence(u8, line, " ÷ ");
         var bytes_index: u32 = 0;
 
         while (graphemes.next()) |field| {
-            var code_points = std.mem.split(u8, field, " ");
+            var code_points = std.mem.splitScalar(u8, field, ' ');
             var cp_buf: [4]u8 = undefined;
             var cp_index: u32 = 0;
             var gc_len: u8 = 0;

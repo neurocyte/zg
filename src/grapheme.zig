@@ -77,6 +77,75 @@ pub const Iterator = struct {
 
         return Grapheme{ .len = gc_len, .offset = gc_start };
     }
+
+    pub fn peek(self: *Self) ?Grapheme {
+        const saved_cp_iter = self.cp_iter;
+        const s0 = self.buf[0];
+        const s1 = self.buf[1];
+
+        self.advance();
+
+        // If no more
+        if (self.buf[0] == null) {
+            self.cp_iter = saved_cp_iter;
+            self.buf[0] = s0;
+            self.buf[1] = s1;
+            return null;
+        }
+        // If last one
+        if (self.buf[1] == null) {
+            const len = self.buf[0].?.len;
+            const offset = self.buf[0].?.offset;
+            self.cp_iter = saved_cp_iter;
+            self.buf[0] = s0;
+            self.buf[1] = s1;
+            return Grapheme{ .len = len, .offset = offset };
+        }
+        // If ASCII
+        if (self.buf[0].?.code != '\r' and self.buf[0].?.code < 128 and self.buf[1].?.code < 128) {
+            const len = self.buf[0].?.len;
+            const offset = self.buf[0].?.offset;
+            self.cp_iter = saved_cp_iter;
+            self.buf[0] = s0;
+            self.buf[1] = s1;
+            return Grapheme{ .len = len, .offset = offset };
+        }
+
+        const gc_start = self.buf[0].?.offset;
+        var gc_len: u8 = self.buf[0].?.len;
+        var state = State{};
+
+        if (graphemeBreak(
+            self.buf[0].?.code,
+            self.buf[1].?.code,
+            self.data,
+            &state,
+        )) {
+            self.cp_iter = saved_cp_iter;
+            self.buf[0] = s0;
+            self.buf[1] = s1;
+            return Grapheme{ .len = gc_len, .offset = gc_start };
+        }
+
+        while (true) {
+            self.advance();
+            if (self.buf[0] == null) break;
+
+            gc_len += self.buf[0].?.len;
+
+            if (graphemeBreak(
+                self.buf[0].?.code,
+                if (self.buf[1]) |ncp| ncp.code else 0,
+                self.data,
+                &state,
+            )) break;
+        }
+        self.cp_iter = saved_cp_iter;
+        self.buf[0] = s0;
+        self.buf[1] = s1;
+
+        return Grapheme{ .len = gc_len, .offset = gc_start };
+    }
 };
 
 // Predicates
