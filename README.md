@@ -1,10 +1,6 @@
 # zg
 zg provides Unicode text processing for Zig projects.
 
-## This Project Needs a New Maintainer
-If you would like to take over the development and maintenace of this project,
-let me know by opening an issue.
-
 ## Unicode Version
 The Unicode version supported by zg is 15.1.0.
 
