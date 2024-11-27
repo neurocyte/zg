@@ -1,18 +1,22 @@
 # zg
+
 zg provides Unicode text processing for Zig projects.
 
 ## Unicode Version
+
 The Unicode version supported by zg is 15.1.0.
 
 ## Zig Version
+
 The minimum Zig version required is 0.14 dev.
 
 ## Integrating zg into your Zig Project
+
 You first need to add zg as a dependency in your `build.zig.zon` file. In your
 Zig project's root directory, run:
 
 ```plain
-zig fetch --save https://codeberg.org/dude_the_builder/zg/archive/v0.13.3.tar.gz
+zig fetch --save https://codeberg.org/atman/zg/archive/v0.13.3.tar.gz
 ```
 
 Then instantiate the dependency in your `build.zig`:
@@ -22,11 +26,13 @@ const zg = b.dependency("zg", .{});
 ```
 
 ## A Modular Approach
+
 zg is a modular library. This approach minimizes binary file size and memory
 requirements by only including the Unicode data required for the specified module.
 The following sections describe the various modules and their specific use case.
 
 ## Code Points
+
 In the `code_point` module, you'll find a data structure representing a single code
 point, `CodePoint`, and an `Iterator` to iterate over the code points in a string.
 
@@ -68,6 +74,7 @@ test "Code point iterator" {
 ```
 
 ## Grapheme Clusters
+
 Many characters are composed from more than one code point. These are known as
 Grapheme Clusters and the `grapheme` module has a data structure to represent
 them, `Grapheme`, and an `Iterator` to iterate over them in a string.
@@ -115,6 +122,7 @@ test "Grapheme cluster iterator" {
 ```
 
 ## Unicode General Categories
+
 To detect the general category for a code point, use the `GenCatData` module.
 
 In your `build.zig`:
@@ -152,6 +160,7 @@ test "General Category" {
 ```
 
 ## Unicode Properties
+
 You can detect common properties of a code point with the `PropsData` module.
 
 In your `build.zig`:
@@ -182,7 +191,7 @@ test "Properties" {
     // Accents, dieresis, and other combining marks.
     try expect(pd.isDiacritic('\u{301}'));
 
-    // Unicode has a specification for valid identifiers like 
+    // Unicode has a specification for valid identifiers like
     // the ones used in programming and regular expressions.
     try expect(pd.isIdStart('Z')); // Identifier start character
     try expect(!pd.isIdStart('1'));
@@ -204,6 +213,7 @@ test "Properties" {
 ```
 
 ## Letter Case Detection and Conversion
+
 To detect and convert to and from different letter cases, use the `CaseData`
 module.
 
@@ -246,7 +256,8 @@ test "Case" {
 ```
 
 ## Normalization
-Unicode normalization is the process of converting a string into a uniform 
+
+Unicode normalization is the process of converting a string into a uniform
 representation that can guarantee a known structure by following a strict set
 of rules. There are four normalization forms:
 
@@ -260,14 +271,14 @@ by first decomposing to Compatibility Decomposition and then composing to NFKC.
 
 Canonical Decomposition (NFD)
 : Only code points with canonical decompositions
-are decomposed. This is a more compact and faster decomposition but will not 
+are decomposed. This is a more compact and faster decomposition but will not
 provide the most comprehensive normalization possible.
 
 Compatibility Decomposition (NFKD)
 : The most comprehensive decomposition method
 where both canonical and compatibility decompositions are performed recursively.
 
-zg has methods to produce all four normalization forms in the `Normalize` module. 
+zg has methods to produce all four normalization forms in the `Normalize` module.
 
 In your `build.zig`:
 
@@ -316,6 +327,7 @@ test "Normalization" {
 ```
 
 ## Caseless Matching via Case Folding
+
 Unicode provides a more efficient way of comparing strings while ignoring letter
 case differences: case folding. When you case fold a string, it's converted into a
 normalized case form suitable for efficient matching. Use the `CaseFold` module
@@ -365,10 +377,11 @@ test "Caseless matching" {
 ```
 
 ## Display Width of Characters and Strings
+
 When displaying text with a fixed-width font on a terminal screen, it's very
 important to know exactly how many columns or cells each character should take.
 Most characters will use one column, but there are many, like emoji and East-
-Asian ideographs that need more space. The `DisplayWidth` module provides 
+Asian ideographs that need more space. The `DisplayWidth` module provides
 methods for this purpose. It also has methods that use the display width calculation
 to `center`, `padLeft`, `padRight`, and `wrap` text.
 
@@ -418,18 +431,29 @@ test "Display width" {
     const wrapped = try dw.wrap(allocator, input, 10, 3);
     defer allocator.free(wrapped);
     const want =
-        \\The quick 
-        \\brown fox 
-        \\jumped 
-        \\over the 
+        \\The quick
+        \\brown fox
+        \\jumped
+        \\over the
         \\lazy dog!
     ;
     try expectEqualStrings(want, wrapped);
 }
 ```
 
+This has a build option, `"cjk"`, which will consider [ambiguous characters](https://www.unicode.org/reports/tr11/tr11-6.html) as double-width.
+
+To choose this option, add it to the dependency like so:
+
+```zig
+const zg = b.dependency("zg", .{
+    .cjk = true,
+});
+```
+
 ## Scripts
-Unicode categorizes code points by the Script in which they belong. A Script 
+
+Unicode categorizes code points by the Script in which they belong. A Script
 collects letters and other symbols that belong to a particular writing system.
 You can detect the Script for a code point with the `ScriptsData` module.
 
@@ -457,13 +481,14 @@ test "Scripts" {
 ```
 
 ## Relation to Ziglyph
+
 zg is a total re-write of some of the components of Ziglyph. The idea was to
 reduce binary size and improve performance. These goals were achieved by using
 trie-like data structures (inspired by [Ghostty's implementation](https://mitchellh.com/writing/ghostty-devlog-006))
-instead of generated functions. Where Ziglyph uses a function call, zg uses an 
+instead of generated functions. Where Ziglyph uses a function call, zg uses an
 array lookup, which is quite faster. In addition, all these data structures in
 zg are loaded at runtime from compressed versions in the binary. This allows
-for smaller binary sizes at the expense of increased memory 
+for smaller binary sizes at the expense of increased memory
 footprint at runtime.
 
 Benchmarks demonstrate the above stated goals have been met:
@@ -535,4 +560,3 @@ In contrast to Ziglyph, zg does not have:
 
 It's possible that any missing functionality will be added in future versions,
 but only if enough demand is present in the community.
-
