@@ -47,6 +47,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     self.cwcf_exceptions_max = @intCast(try reader.readInt(u24, endian));
     len = try reader.readInt(u16, endian);
     self.cwcf_exceptions = try allocator.alloc(u21, len);
+    errdefer allocator.free(self.cwcf_exceptions);
     for (0..len) |i| self.cwcf_exceptions[i] = @intCast(try reader.readInt(u24, endian));
 
     return self;
@@ -56,6 +57,7 @@ pub fn deinit(self: *const Self) void {
     self.allocator.free(self.stage1);
     self.allocator.free(self.stage2);
     self.allocator.free(self.stage3);
+    self.allocator.free(self.cwcf_exceptions);
 }
 
 /// Returns the case fold for `cp`.
