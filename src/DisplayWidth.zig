@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const options = @import("options");
 const ArrayList = std.ArrayList;
 const mem = std.mem;
 const simd = std.simd;
@@ -60,6 +61,7 @@ test "strWidth" {
     const data = try DisplayWidthData.init(testing.allocator);
     defer data.deinit();
     const self = Self{ .data = &data };
+    const c0 = options.c0_width orelse 0;
 
     try testing.expectEqual(@as(usize, 5), self.strWidth("Hello\r\n"));
     try testing.expectEqual(@as(usize, 1), self.strWidth("\u{0065}\u{0301}"));
@@ -74,19 +76,21 @@ test "strWidth" {
     try testing.expectEqual(@as(usize, 1), self.strWidth("\u{2764}")); // Default text presentation
     try testing.expectEqual(@as(usize, 1), self.strWidth("\u{2764}\u{FE0E}")); // Default text presentation with VS15 selector
     try testing.expectEqual(@as(usize, 2), self.strWidth("\u{2764}\u{FE0F}")); // Default text presentation with VS16 selector
-    try testing.expectEqual(@as(usize, 0), self.strWidth("A\x08")); // Backspace
-    try testing.expectEqual(@as(usize, 0), self.strWidth("\x7FA")); // DEL
-    try testing.expectEqual(@as(usize, 0), self.strWidth("\x7FA\x08\x08")); // never less than o
+    const expect_bs: usize = if (c0 == 0) 0 else 1 + c0;
+    try testing.expectEqual(expect_bs, self.strWidth("A\x08")); // Backspace
+    try testing.expectEqual(expect_bs, self.strWidth("\x7FA")); // DEL
+    const expect_long_del: usize = if (c0 == 0) 0 else 1 + (c0 * 3);
+    try testing.expectEqual(expect_long_del, self.strWidth("\x7FA\x08\x08")); // never less than 0
 
     // wcwidth Python lib tests. See: https://github.com/jquast/wcwidth/blob/master/tests/test_core.py
     const empty = "";
     try testing.expectEqual(@as(usize, 0), self.strWidth(empty));
     const with_null = "hello\x00world";
-    try testing.expectEqual(@as(usize, 10), self.strWidth(with_null));
+    try testing.expectEqual(@as(usize, 10 + c0), self.strWidth(with_null));
     const hello_jp = "コンニチハ, セカイ!";
     try testing.expectEqual(@as(usize, 19), self.strWidth(hello_jp));
     const control = "\x1b[0m";
-    try testing.expectEqual(@as(usize, 3), self.strWidth(control));
+    try testing.expectEqual(@as(usize, 3 + c0), self.strWidth(control));
     const balinese = "\u{1B13}\u{1B28}\u{1B2E}\u{1B44}";
     try testing.expectEqual(@as(usize, 3), self.strWidth(balinese));
 

@@ -441,7 +441,7 @@ test "Display width" {
 }
 ```
 
-This has a build option, `"cjk"`, which will consider [ambiguous characters](https://www.unicode.org/reports/tr11/tr11-6.html) as double-width.
+This module has build options.  The first is `cjk`, which will consider [ambiguous characters](https://www.unicode.org/reports/tr11/tr11-6.html) as double-width.
 
 To choose this option, add it to the dependency like so:
 
@@ -450,6 +450,8 @@ const zg = b.dependency("zg", .{
     .cjk = true,
 });
 ```
+
+The other options are `c0_width` and `c1_width`.  The standard behavior is to treat C0 and C1 control codes as zero-width, except for delete and backspace, which are -1 (the logic ensures that a `strWidth` is always at least 0).  If printing control codes with replacement characters, it's necessary to assign these a width, hence the options.  When provided these values must fit in an `i4`, this allows for C1s to be printed as `\u{80}` if desired.
 
 ## Scripts
 

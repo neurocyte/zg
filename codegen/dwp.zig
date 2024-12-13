@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 const options = @import("options");
 
 const block_size = 256;
-const Block = [block_size]i3;
+const Block = [block_size]i4;
 
 const BlockMap = std.HashMap(
     Block,
@@ -17,7 +17,7 @@ const BlockMap = std.HashMap(
         }
 
         pub fn eql(_: @This(), a: Block, b: Block) bool {
-            return std.mem.eql(i3, &a, &b);
+            return std.mem.eql(i4, &a, &b);
         }
     },
     std.hash_map.default_max_load_percentage,
@@ -28,7 +28,7 @@ pub fn main() !void {
     defer arena.deinit();
     const allocator = arena.allocator();
 
-    var flat_map = std.AutoHashMap(u21, i3).init(allocator);
+    var flat_map = std.AutoHashMap(u21, i4).init(allocator);
     defer flat_map.deinit();
 
     var line_buf: [4096]u8 = undefined;
@@ -147,10 +147,10 @@ pub fn main() !void {
     var stage1 = std.ArrayList(u16).init(allocator);
     defer stage1.deinit();
 
-    var stage2 = std.ArrayList(i3).init(allocator);
+    var stage2 = std.ArrayList(i4).init(allocator);
     defer stage2.deinit();
 
-    var block: Block = [_]i3{0} ** block_size;
+    var block: Block = [_]i4{0} ** block_size;
     var block_len: u16 = 0;
 
     for (0..0x110000) |i| {
@@ -163,8 +163,8 @@ pub fn main() !void {
             0x2e3b => width = 3,
 
             // C0/C1 control codes
-            0...0x20,
-            0x80...0xa0,
+            0...0x20 => width = if (options.c0_width) |c0| c0 else 0,
+            0x80...0x9f => width = if (options.c1_width) |c1| c1 else 0,
 
             // Line separator
             0x2028,
@@ -204,7 +204,7 @@ pub fn main() !void {
         if (cp == 0xad) width = 1;
 
         // Backspace and delete
-        if (cp == 0x8 or cp == 0x7f) width = -1;
+        if (cp == 0x8 or cp == 0x7f) width = if (options.c0_width) |c0| c0 else -1;
 
         // Process block
         block[block_len] = width;

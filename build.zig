@@ -16,9 +16,23 @@ pub fn build(b: *std.Build) void {
     const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.bin.z");
 
     // Display width
-    const cjk = b.option(bool, "cjk", "Ambiguouse code points are wide (display width: 2).") orelse false;
+    const cjk = b.option(bool, "cjk", "Ambiguous code points are wide (display width: 2).") orelse false;
     const options = b.addOptions();
     options.addOption(bool, "cjk", cjk);
+
+    // Visible Controls
+    const c0_width = b.option(
+        i4,
+        "c0_width",
+        "C0 controls have this width (default: 0, <BS> <Del> default -1)",
+    );
+    options.addOption(?i4, "c0_width", c0_width);
+    const c1_width = b.option(
+        i4,
+        "c1_width",
+        "C1 controls have this width (default: 0)",
+    );
+    options.addOption(?i4, "c1_width", c1_width);
 
     const dwp_gen_exe = b.addExecutable(.{
         .name = "dwp",
@@ -210,6 +224,7 @@ pub fn build(b: *std.Build) void {
     display_width.addImport("code_point", code_point);
     display_width.addImport("grapheme", grapheme);
     display_width.addImport("DisplayWidthData", width_data);
+    display_width.addOptions("options", options); // For testing
 
     // Normalization
     const ccc_data = b.createModule(.{
