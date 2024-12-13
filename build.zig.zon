@@ -1,17 +1,17 @@
 .{
     .name = "zg",
-    .version = "0.13.1",
+    .version = "0.13.4",
     .minimum_zig_version = "0.13.0",
 
     .paths = .{
         "build.zig",
         "build.zig.zon",
-	"codegen",
-	"data",
+        "codegen",
+        "data",
         "LICENSE",
         "README.md",
         "src",
-	"unicode_license",
-	"UNICODE_VERSION.txt",
+        "unicode_license",
+        "UNICODE_VERSION.txt",
     },
 }
