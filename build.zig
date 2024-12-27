@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) void {
     const gbp_gen_exe = b.addExecutable(.{
         .name = "gbp",
         .root_source_file = b.path("codegen/gbp.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_gbp_gen_exe = b.addRunArtifact(gbp_gen_exe);
@@ -23,7 +23,7 @@ pub fn build(b: *std.Build) void {
     const dwp_gen_exe = b.addExecutable(.{
         .name = "dwp",
         .root_source_file = b.path("codegen/dwp.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     dwp_gen_exe.root_module.addOptions("options", options);
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     const canon_gen_exe = b.addExecutable(.{
         .name = "canon",
         .root_source_file = b.path("codegen/canon.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_canon_gen_exe = b.addRunArtifact(canon_gen_exe);
@@ -43,7 +43,7 @@ pub fn build(b: *std.Build) void {
     const compat_gen_exe = b.addExecutable(.{
         .name = "compat",
         .root_source_file = b.path("codegen/compat.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_compat_gen_exe = b.addRunArtifact(compat_gen_exe);
@@ -52,7 +52,7 @@ pub fn build(b: *std.Build) void {
     const hangul_gen_exe = b.addExecutable(.{
         .name = "hangul",
         .root_source_file = b.path("codegen/hangul.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_hangul_gen_exe = b.addRunArtifact(hangul_gen_exe);
@@ -61,7 +61,7 @@ pub fn build(b: *std.Build) void {
     const normp_gen_exe = b.addExecutable(.{
         .name = "normp",
         .root_source_file = b.path("codegen/normp.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_normp_gen_exe = b.addRunArtifact(normp_gen_exe);
@@ -70,7 +70,7 @@ pub fn build(b: *std.Build) void {
     const ccc_gen_exe = b.addExecutable(.{
         .name = "ccc",
         .root_source_file = b.path("codegen/ccc.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_ccc_gen_exe = b.addRunArtifact(ccc_gen_exe);
@@ -79,7 +79,7 @@ pub fn build(b: *std.Build) void {
     const gencat_gen_exe = b.addExecutable(.{
         .name = "gencat",
         .root_source_file = b.path("codegen/gencat.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_gencat_gen_exe = b.addRunArtifact(gencat_gen_exe);
@@ -88,7 +88,7 @@ pub fn build(b: *std.Build) void {
     const fold_gen_exe = b.addExecutable(.{
         .name = "fold",
         .root_source_file = b.path("codegen/fold.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_fold_gen_exe = b.addRunArtifact(fold_gen_exe);
@@ -98,7 +98,7 @@ pub fn build(b: *std.Build) void {
     const num_gen_exe = b.addExecutable(.{
         .name = "numeric",
         .root_source_file = b.path("codegen/numeric.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_num_gen_exe = b.addRunArtifact(num_gen_exe);
@@ -108,7 +108,7 @@ pub fn build(b: *std.Build) void {
     const case_prop_gen_exe = b.addExecutable(.{
         .name = "case_prop",
         .root_source_file = b.path("codegen/case_prop.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_case_prop_gen_exe = b.addRunArtifact(case_prop_gen_exe);
@@ -118,7 +118,7 @@ pub fn build(b: *std.Build) void {
     const upper_gen_exe = b.addExecutable(.{
         .name = "upper",
         .root_source_file = b.path("codegen/upper.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_upper_gen_exe = b.addRunArtifact(upper_gen_exe);
@@ -128,7 +128,7 @@ pub fn build(b: *std.Build) void {
     const lower_gen_exe = b.addExecutable(.{
         .name = "lower",
         .root_source_file = b.path("codegen/lower.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_lower_gen_exe = b.addRunArtifact(lower_gen_exe);
@@ -137,7 +137,7 @@ pub fn build(b: *std.Build) void {
     const scripts_gen_exe = b.addExecutable(.{
         .name = "scripts",
         .root_source_file = b.path("codegen/scripts.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_scripts_gen_exe = b.addRunArtifact(scripts_gen_exe);
@@ -146,7 +146,7 @@ pub fn build(b: *std.Build) void {
     const core_gen_exe = b.addExecutable(.{
         .name = "core",
         .root_source_file = b.path("codegen/core_props.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_core_gen_exe = b.addRunArtifact(core_gen_exe);
@@ -155,7 +155,7 @@ pub fn build(b: *std.Build) void {
     const props_gen_exe = b.addExecutable(.{
         .name = "props",
         .root_source_file = b.path("codegen/props.zig"),
-        .target = b.host,
+        .target = b.graph.host,
         .optimize = .Debug,
     });
     const run_props_gen_exe = b.addRunArtifact(props_gen_exe);
