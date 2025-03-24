@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 const compress = std.compress;
 const mem = std.mem;
 
-allocator: mem.Allocator,
 cutoff: u21 = undefined,
 cwcf_exceptions_min: u21 = undefined,
 cwcf_exceptions_max: u21 = undefined,
@@ -24,7 +23,7 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     const endian = builtin.cpu.arch.endian();
 
-    var self = Self{ .allocator = allocator };
+    var self = Self{};
     self.cutoff = @intCast(try reader.readInt(u24, endian));
     self.multiple_start = @intCast(try reader.readInt(u24, endian));
 
@@ -53,11 +52,11 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *const Self) void {
-    self.allocator.free(self.stage1);
-    self.allocator.free(self.stage2);
-    self.allocator.free(self.stage3);
-    self.allocator.free(self.cwcf_exceptions);
+pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+    allocator.free(self.stage1);
+    allocator.free(self.stage2);
+    allocator.free(self.stage3);
+    allocator.free(self.cwcf_exceptions);
 }
 
 /// Returns the case fold for `cp`.

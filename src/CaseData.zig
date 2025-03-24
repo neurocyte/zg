@@ -7,7 +7,6 @@ const unicode = std.unicode;
 
 const CodePointIterator = @import("code_point").Iterator;
 
-allocator: mem.Allocator,
 case_map: [][2]u21,
 prop_s1: []u16 = undefined,
 prop_s2: []u8 = undefined,
@@ -19,7 +18,6 @@ pub fn init(allocator: mem.Allocator) !Self {
     const endian = builtin.cpu.arch.endian();
 
     var self = Self{
-        .allocator = allocator,
         .case_map = try allocator.alloc([2]u21, 0x110000),
     };
     errdefer allocator.free(self.case_map);
@@ -74,10 +72,10 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *const Self) void {
-    self.allocator.free(self.case_map);
-    self.allocator.free(self.prop_s1);
-    self.allocator.free(self.prop_s2);
+pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+    allocator.free(self.case_map);
+    allocator.free(self.prop_s1);
+    allocator.free(self.prop_s2);
 }
 
 // Returns true if `cp` is either upper, lower, or title case.

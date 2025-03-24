@@ -4,7 +4,6 @@ const compress = std.compress;
 const mem = std.mem;
 const testing = std.testing;
 
-allocator: mem.Allocator,
 core_s1: []u16 = undefined,
 core_s2: []u8 = undefined,
 props_s1: []u16 = undefined,
@@ -24,7 +23,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     var core_decomp = decompressor(.raw, core_fbs.reader());
     var core_reader = core_decomp.reader();
 
-    var self = Self{ .allocator = allocator };
+    var self = Self{};
 
     const core_stage_1_len: u16 = try core_reader.readInt(u16, endian);
     self.core_s1 = try allocator.alloc(u16, core_stage_1_len);
@@ -71,13 +70,13 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *const Self) void {
-    self.allocator.free(self.core_s1);
-    self.allocator.free(self.core_s2);
-    self.allocator.free(self.props_s1);
-    self.allocator.free(self.props_s2);
-    self.allocator.free(self.num_s1);
-    self.allocator.free(self.num_s2);
+pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+    allocator.free(self.core_s1);
+    allocator.free(self.core_s2);
+    allocator.free(self.props_s1);
+    allocator.free(self.props_s2);
+    allocator.free(self.num_s1);
+    allocator.free(self.num_s2);
 }
 
 /// True if `cp` is a mathematical symbol.

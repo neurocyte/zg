@@ -6,7 +6,6 @@ const testing = std.testing;
 
 const GraphemeData = @import("GraphemeData");
 
-allocator: mem.Allocator,
 g_data: GraphemeData,
 s1: []u16 = undefined,
 s2: []i4 = undefined,
@@ -23,10 +22,9 @@ pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
     const endian = builtin.cpu.arch.endian();
 
     var self = Self{
-        .allocator = allocator,
         .g_data = try GraphemeData.init(allocator),
     };
-    errdefer self.g_data.deinit();
+    errdefer self.g_data.deinit(allocator);
 
     const stage_1_len: u16 = reader.readInt(u16, endian) catch unreachable;
     self.s1 = try allocator.alloc(u16, stage_1_len);
@@ -41,10 +39,10 @@ pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
     return self;
 }
 
-pub fn deinit(self: *const Self) void {
-    self.allocator.free(self.s1);
-    self.allocator.free(self.s2);
-    self.g_data.deinit();
+pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+    allocator.free(self.s1);
+    allocator.free(self.s2);
+    self.g_data.deinit(allocator);
 }
 
 /// codePointWidth returns the number of cells `cp` requires when rendered

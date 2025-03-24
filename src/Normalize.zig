@@ -221,11 +221,11 @@ test "decompose" {
 
 /// Returned from various functions in this namespace. Remember to call `deinit` to free any allocated memory.
 pub const Result = struct {
-    allocator: ?mem.Allocator = null,
+    allocated: bool = false,
     slice: []const u8,
 
-    pub fn deinit(self: *const Result) void {
-        if (self.allocator) |allocator| allocator.free(self.slice);
+    pub fn deinit(self: *const Result, allocator: mem.Allocator) void {
+        if (self.allocated) allocator.free(self.slice);
     }
 };
 
@@ -291,7 +291,7 @@ fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
         try dstr_list.appendSlice(buf[0..len]);
     }
 
-    return Result{ .allocator = allocator, .slice = try dstr_list.toOwnedSlice() };
+    return Result{ .allocated = true, .slice = try dstr_list.toOwnedSlice() };
 }
 
 test "nfd ASCII / no-alloc" {
@@ -528,7 +528,7 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
                 try cstr_list.appendSlice(buf[0..len]);
             }
 
-            return Result{ .allocator = allocator, .slice = try cstr_list.toOwnedSlice() };
+            return Result{ .allocated = true, .slice = try cstr_list.toOwnedSlice() };
         }
     }
 }

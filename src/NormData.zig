@@ -18,20 +18,20 @@ const Self = @This();
 
 pub fn init(self: *Self, allocator: std.mem.Allocator) !void {
     self.canon_data = try CanonData.init(allocator);
-    errdefer self.canon_data.deinit();
+    errdefer self.canon_data.deinit(allocator);
     self.ccc_data = try CccData.init(allocator);
-    errdefer self.ccc_data.deinit();
+    errdefer self.ccc_data.deinit(allocator);
     self.compat_data = try CompatData.init(allocator);
-    errdefer self.compat_data.deinit();
+    errdefer self.compat_data.deinit(allocator);
     self.hangul_data = try HangulData.init(allocator);
-    errdefer self.hangul_data.deinit();
+    errdefer self.hangul_data.deinit(allocator);
     self.normp_data = try NormPropsData.init(allocator);
 }
 
-pub fn deinit(self: *Self) void {
-    self.canon_data.deinit();
-    self.ccc_data.deinit();
-    self.compat_data.deinit();
-    self.hangul_data.deinit();
-    self.normp_data.deinit();
+pub fn deinit(self: *Self, allocator: mem.Allocator) void {
+    self.canon_data.deinit(allocator);
+    self.ccc_data.deinit(allocator);
+    self.compat_data.deinit(allocator);
+    self.hangul_data.deinit(allocator);
+    self.normp_data.deinit(allocator);
 }

@@ -19,7 +19,7 @@ comptime {
 test "Iterator.peek" {
     const peek_seq = "aΔ👨🏻‍🌾→";
     const data = try GraphemeData.init(std.testing.allocator);
-    defer data.deinit();
+    defer data.deinit(std.testing.allocator);
 
     var iter = grapheme.Iterator.init(peek_seq, &data);
     const peek_a = iter.peek().?;
@@ -94,7 +94,7 @@ test "Unicode normalization tests" {
 
                 const want = w_buf.items;
                 var got = try n.nfc(allocator, input);
-                defer got.deinit();
+                defer got.deinit(allocator);
 
                 try testing.expectEqualStrings(want, got.slice);
             } else if (field_index == 2) {
@@ -111,7 +111,7 @@ test "Unicode normalization tests" {
 
                 const want = w_buf.items;
                 var got = try n.nfd(allocator, input);
-                defer got.deinit();
+                defer got.deinit(allocator);
 
                 try testing.expectEqualStrings(want, got.slice);
             } else if (field_index == 3) {
@@ -128,7 +128,7 @@ test "Unicode normalization tests" {
 
                 const want = w_buf.items;
                 var got = try n.nfkc(allocator, input);
-                defer got.deinit();
+                defer got.deinit(allocator);
 
                 try testing.expectEqualStrings(want, got.slice);
             } else if (field_index == 4) {
@@ -145,7 +145,7 @@ test "Unicode normalization tests" {
 
                 const want = w_buf.items;
                 const got = try n.nfkd(allocator, input);
-                defer got.deinit();
+                defer got.deinit(allocator);
 
                 try testing.expectEqualStrings(want, got.slice);
             } else {
@@ -163,7 +163,7 @@ test "Segmentation GraphemeIterator" {
     var input_stream = buf_reader.reader();
 
     const data = try GraphemeData.init(allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
 
     var buf: [4096]u8 = undefined;
     var line_no: usize = 1;

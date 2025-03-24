@@ -13,7 +13,6 @@ pub const Syllable = enum {
     T,
 };
 
-allocator: mem.Allocator,
 s1: []u16 = undefined,
 s2: []u3 = undefined,
 
@@ -27,7 +26,7 @@ pub fn init(allocator: mem.Allocator) !Self {
     var reader = in_decomp.reader();
 
     const endian = builtin.cpu.arch.endian();
-    var self = Self{ .allocator = allocator };
+    var self = Self{};
 
     const stage_1_len: u16 = try reader.readInt(u16, endian);
     self.s1 = try allocator.alloc(u16, stage_1_len);
@@ -42,9 +41,9 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *const Self) void {
-    self.allocator.free(self.s1);
-    self.allocator.free(self.s2);
+pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+    allocator.free(self.s1);
+    allocator.free(self.s2);
 }
 
 /// Returns the Hangul syllable type for `cp`.

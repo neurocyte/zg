@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 const compress = std.compress;
 const mem = std.mem;
 
-allocator: mem.Allocator,
 nfkd: [][]u21 = undefined,
 
 const Self = @This();
@@ -17,10 +16,9 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     const endian = builtin.cpu.arch.endian();
     var self = Self{
-        .allocator = allocator,
         .nfkd = try allocator.alloc([]u21, 0x110000),
     };
-    errdefer self.deinit();
+    errdefer self.deinit(allocator);
 
     @memset(self.nfkd, &.{});
 
@@ -37,11 +35,11 @@ pub fn init(allocator: mem.Allocator) !Self {
     return self;
 }
 
-pub fn deinit(self: *const Self) void {
+pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
     for (self.nfkd) |slice| {
-        if (slice.len != 0) self.allocator.free(slice);
+        if (slice.len != 0) allocator.free(slice);
     }
-    self.allocator.free(self.nfkd);
+    allocator.free(self.nfkd);
 }
 
 /// Returns compatibility decomposition for `cp`.
