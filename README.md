@@ -93,7 +93,7 @@ const grapheme = @import("grapheme");
 test "Grapheme cluster iterator" {
     // we need some Unicode data to process Grapheme Clusters.
     const gd = try grapheme.GraphemeData.init(allocator);
-    defer gd.deinit();
+    defer gd.deinit(allocator);
 
     const str = "He\u{301}"; // Hé
     var iter = grapheme.Iterator.init(str, &gd);
@@ -138,7 +138,7 @@ const GenCatData = @import("GenCatData");
 
 test "General Category" {
     const gcd = try GenCatData.init(allocator);
-    defer gcd.deinit();
+    defer gcd.deinit(allocator);
 
     // The `gc` method returns the abbreviated General Category.
     // These abbreviations and descriptive comments can be found
@@ -176,7 +176,7 @@ const PropsData = @import("PropsData");
 
 test "Properties" {
     const pd = try PropsData.init(allocator);
-    defer pd.deinit();
+    defer pd.deinit(allocator);
 
     // Mathematical symbols and letters.
     try expect(pd.isMath('+'));
@@ -230,7 +230,7 @@ const CaseData = @import("CaseData");
 
 test "Case" {
     const cd = try CaseData.init(allocator);
-    defer cd.deinit();
+    defer cd.deinit(allocator);
 
     // Upper and lower case.
     try expect(cd.isUpper('A'));
@@ -295,29 +295,29 @@ test "Normalization" {
     // We need lots of Unicode dta for normalization.
     var norm_data: Normalize.NormData = undefined;
     try Normalize.NormData.init(&norm_data, allocator);
-    defer norm_data.deinit();
+    defer norm_data.deinit(allocator);
 
     // The `Normalize` structure takes a pointer to the data.
     const n = Normalize{ .norm_data = &norm_data };
 
     // NFC: Canonical composition
     const nfc_result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
-    defer nfc_result.deinit();
+    defer nfc_result.deinit(allocator);
     try expectEqualStrings("Complex char: \u{3D3}", nfc_result.slice);
 
     // NFKC: Compatibility composition
     const nfkc_result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
-    defer nfkc_result.deinit();
+    defer nfkc_result.deinit(allocator);
     try expectEqualStrings("Complex char: \u{038E}", nfkc_result.slice);
 
     // NFD: Canonical decomposition
     const nfd_result = try n.nfd(allocator, "Héllo World! \u{3d3}");
-    defer nfd_result.deinit();
+    defer nfd_result.deinit(allocator);
     try expectEqualStrings("He\u{301}llo World! \u{3d2}\u{301}", nfd_result.slice);
 
     // NFKD: Compatibility decomposition
     const nfkd_result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
-    defer nfkd_result.deinit();
+    defer nfkd_result.deinit(allocator);
     try expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", nfkd_result.slice);
 
     // Test for equality of two strings after normalizing to NFC.
@@ -350,12 +350,12 @@ test "Caseless matching" {
     // We need to normalize during the matching process.
     var norm_data: Normalize.NormData = undefined;
     try Normalize.NormData.init(&norm_data, allocator);
-    defer norm_data.deinit();
+    defer norm_data.deinit(allocator);
     const n = Normalize{ .norm_data = &norm_data };
 
     // We need Unicode case fold data.
     const cfd = try CaseFold.FoldData.init(allocator);
-    defer cfd.deinit();
+    defer cfd.deinit(allocator);
 
     // The `CaseFold` structure takes a pointer to the data.
     const cf = CaseFold{ .fold_data = &cfd };
@@ -399,7 +399,7 @@ const DisplayWidth = @import("DisplayWidth");
 test "Display width" {
     // We need Unicode data for display width calculation.
     const dwd = try DisplayWidth.DisplayWidthData.init(allocator);
-    defer dwd.deinit();
+    defer dwd.deinit(allocator);
 
     // The `DisplayWidth` structure takes a pointer to the data.
     const dw = DisplayWidth{ .data = &dwd };
@@ -472,7 +472,7 @@ const ScriptsData = @import("ScriptsData");
 
 test "Scripts" {
     const sd = try ScriptsData.init(allocator);
-    defer sd.deinit();
+    defer sd.deinit(allocator);
 
     // To see the full list of Scripts, look at the
     // `src/ScriptsData.zig` file. They are list in an enum.
