@@ -59,7 +59,7 @@ pub fn strWidth(self: Self, str: []const u8) usize {
 
 test "strWidth" {
     const data = try DisplayWidthData.init(testing.allocator);
-    defer data.deinit();
+    defer data.deinit(testing.allocator);
     const self = Self{ .data = &data };
     const c0 = options.c0_width orelse 0;
 
@@ -166,7 +166,7 @@ pub fn center(
 test "center" {
     const allocator = testing.allocator;
     const data = try DisplayWidthData.init(allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const self = Self{ .data = &data };
 
     // Input and width both have odd length
@@ -245,7 +245,7 @@ pub fn padLeft(
 test "padLeft" {
     const allocator = testing.allocator;
     const data = try DisplayWidthData.init(allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const self = Self{ .data = &data };
 
     var right_aligned = try self.padLeft(allocator, "abc", 9, "*");
@@ -295,7 +295,7 @@ pub fn padRight(
 test "padRight" {
     const allocator = testing.allocator;
     const data = try DisplayWidthData.init(allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const self = Self{ .data = &data };
 
     var left_aligned = try self.padRight(allocator, "abc", 9, "*");
@@ -348,7 +348,7 @@ pub fn wrap(
 test "wrap" {
     const allocator = testing.allocator;
     const data = try DisplayWidthData.init(allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const self = Self{ .data = &data };
 
     const input = "The quick brown fox\r\njumped over the lazy dog!";

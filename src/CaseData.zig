@@ -99,7 +99,7 @@ pub fn isUpperStr(self: Self, str: []const u8) bool {
 
 test "isUpperStr" {
     const cd = try init(testing.allocator);
-    defer cd.deinit();
+    defer cd.deinit(testing.allocator);
 
     try testing.expect(cd.isUpperStr("HELLO, WORLD 2112!"));
     try testing.expect(!cd.isUpperStr("hello, world 2112!"));
@@ -134,7 +134,7 @@ pub fn toUpperStr(
 
 test "toUpperStr" {
     const cd = try init(testing.allocator);
-    defer cd.deinit();
+    defer cd.deinit(testing.allocator);
 
     const uppered = try cd.toUpperStr(testing.allocator, "Hello, World 2112!");
     defer testing.allocator.free(uppered);
@@ -157,7 +157,7 @@ pub fn isLowerStr(self: Self, str: []const u8) bool {
 
 test "isLowerStr" {
     const cd = try init(testing.allocator);
-    defer cd.deinit();
+    defer cd.deinit(testing.allocator);
 
     try testing.expect(cd.isLowerStr("hello, world 2112!"));
     try testing.expect(!cd.isLowerStr("HELLO, WORLD 2112!"));
@@ -192,7 +192,7 @@ pub fn toLowerStr(
 
 test "toLowerStr" {
     const cd = try init(testing.allocator);
-    defer cd.deinit();
+    defer cd.deinit(testing.allocator);
 
     const lowered = try cd.toLowerStr(testing.allocator, "Hello, World 2112!");
     defer testing.allocator.free(lowered);

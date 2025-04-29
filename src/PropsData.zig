@@ -141,7 +141,7 @@ pub fn isDecimal(self: Self, cp: u21) bool {
 
 test "Props" {
     const self = try init(testing.allocator);
-    defer self.deinit();
+    defer self.deinit(testing.allocator);
 
     try testing.expect(self.isHexDigit('F'));
     try testing.expect(self.isHexDigit('a'));

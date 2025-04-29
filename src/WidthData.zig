@@ -55,28 +55,30 @@ pub fn codePointWidth(self: Self, cp: u21) i4 {
 }
 
 test "codePointWidth" {
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x0000)); // null
-    try testing.expectEqual(@as(i4, -1), codePointWidth(0x8)); // \b
-    try testing.expectEqual(@as(i4, -1), codePointWidth(0x7f)); // DEL
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x0005)); // Cf
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x0007)); // \a BEL
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x000A)); // \n LF
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x000B)); // \v VT
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x000C)); // \f FF
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x000D)); // \r CR
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x000E)); // SQ
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x000F)); // SI
+    const wd = try Self.init(std.testing.allocator);
+    defer wd.deinit(std.testing.allocator);
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x0000)); // null
+    try testing.expectEqual(@as(i4, -1), wd.codePointWidth(0x8)); // \b
+    try testing.expectEqual(@as(i4, -1), wd.codePointWidth(0x7f)); // DEL
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x0005)); // Cf
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x0007)); // \a BEL
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x000A)); // \n LF
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x000B)); // \v VT
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x000C)); // \f FF
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x000D)); // \r CR
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x000E)); // SQ
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x000F)); // SI
 
-    try testing.expectEqual(@as(i4, 0), codePointWidth(0x070F)); // Cf
-    try testing.expectEqual(@as(i4, 1), codePointWidth(0x0603)); // Cf Arabic
+    try testing.expectEqual(@as(i4, 0), wd.codePointWidth(0x070F)); // Cf
+    try testing.expectEqual(@as(i4, 1), wd.codePointWidth(0x0603)); // Cf Arabic
 
-    try testing.expectEqual(@as(i4, 1), codePointWidth(0x00AD)); // soft-hyphen
-    try testing.expectEqual(@as(i4, 2), codePointWidth(0x2E3A)); // two-em dash
-    try testing.expectEqual(@as(i4, 3), codePointWidth(0x2E3B)); // three-em dash
+    try testing.expectEqual(@as(i4, 1), wd.codePointWidth(0x00AD)); // soft-hyphen
+    try testing.expectEqual(@as(i4, 2), wd.codePointWidth(0x2E3A)); // two-em dash
+    try testing.expectEqual(@as(i4, 3), wd.codePointWidth(0x2E3B)); // three-em dash
 
-    try testing.expectEqual(@as(i4, 1), codePointWidth(0x00BD)); // ambiguous halfwidth
+    try testing.expectEqual(@as(i4, 1), wd.codePointWidth(0x00BD)); // ambiguous halfwidth
 
-    try testing.expectEqual(@as(i4, 1), codePointWidth('é'));
-    try testing.expectEqual(@as(i4, 2), codePointWidth('😊'));
-    try testing.expectEqual(@as(i4, 2), codePointWidth('统'));
+    try testing.expectEqual(@as(i4, 1), wd.codePointWidth('é'));
+    try testing.expectEqual(@as(i4, 2), wd.codePointWidth('😊'));
+    try testing.expectEqual(@as(i4, 2), wd.codePointWidth('统'));
 }

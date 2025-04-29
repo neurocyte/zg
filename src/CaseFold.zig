@@ -95,12 +95,13 @@ pub fn compatCaselessMatch(
 test "compatCaselessMatch" {
     const allocator = testing.allocator;
 
-    const norm_data = try Normalize.NormData.init(allocator);
-    defer norm_data.deinit();
+    var norm_data = Normalize.NormData{};
+    try norm_data.init(allocator);
+    defer norm_data.deinit(allocator);
     const n = Normalize{ .norm_data = &norm_data };
 
     const fold_data = try FoldData.init(allocator);
-    defer fold_data.deinit();
+    defer fold_data.deinit(allocator);
     const caser = Self{ .fold_data = &fold_data };
 
     try testing.expect(try caser.compatCaselessMatch(allocator, &n, "ascii only!", "ASCII Only!"));
@@ -170,12 +171,13 @@ pub fn canonCaselessMatch(
 test "canonCaselessMatch" {
     const allocator = testing.allocator;
 
-    const norm_data = try Normalize.NormData.init(allocator);
-    defer norm_data.deinit();
+    var norm_data = Normalize.NormData{};
+    try norm_data.init(allocator);
+    defer norm_data.deinit(allocator);
     const n = Normalize{ .norm_data = &norm_data };
 
     const fold_data = try FoldData.init(allocator);
-    defer fold_data.deinit();
+    defer fold_data.deinit(allocator);
     const caser = Self{ .fold_data = &fold_data };
 
     try testing.expect(try caser.canonCaselessMatch(allocator, &n, "ascii only!", "ASCII Only!"));

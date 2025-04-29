@@ -229,7 +229,7 @@ pub const Result = struct {
 
     /// Ensures that the slice result is a copy of the input, by making a copy if it was not.
     pub fn toOwned(result: Result, allocator: mem.Allocator) error{OutOfMemory}!Result {
-        if (result.allocatod) return result;
+        if (result.allocated) return result;
         return .{ .allocated = true, .slice = try allocator.dupe(u8, result.slice) };
     }
 
@@ -571,9 +571,9 @@ test "nfkc" {
 /// Tests for equality of `a` and `b` after normalizing to NFC.
 pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !bool {
     const norm_result_a = try self.nfc(allocator, a);
-    defer norm_result_a.deinit();
+    defer norm_result_a.deinit(allocator);
     const norm_result_b = try self.nfc(allocator, b);
-    defer norm_result_b.deinit();
+    defer norm_result_b.deinit(allocator);
 
     return mem.eql(u8, norm_result_a.slice, norm_result_b.slice);
 }
@@ -628,4 +628,5 @@ test "isLatin1Only" {
     try testing.expect(isLatin1Only(latin1_only));
     const not_latin1_only = "Héllo, World! \u{3d3}";
     try testing.expect(!isLatin1Only(not_latin1_only));
+    try testing.expect(false);
 }

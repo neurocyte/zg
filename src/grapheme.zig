@@ -307,7 +307,7 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
     const no_joiner = seq_1 ++ seq_2;
 
     const data = try GraphemeData.init(std.testing.allocator);
-    defer data.deinit();
+    defer data.deinit(std.testing.allocator);
 
     {
         var iter = Iterator.init(with_zwj, &data);
