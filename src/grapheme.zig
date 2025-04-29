@@ -309,19 +309,24 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
     const data = try GraphemeData.init(std.testing.allocator);
     defer data.deinit();
 
-    var iter = Iterator.init(with_zwj, &data);
+    {
+        var iter = Iterator.init(with_zwj, &data);
+        var i: usize = 0;
+        while (iter.next()) |_| : (i += 1) {}
+        try std.testing.expectEqual(@as(usize, 1), i);
+    }
 
-    var i: usize = 0;
-    while (iter.next()) |_| : (i += 1) {}
-    try std.testing.expectEqual(@as(usize, 1), i);
+    {
+        var iter = Iterator.init(with_zwsp, &data);
+        var i: usize = 0;
+        while (iter.next()) |_| : (i += 1) {}
+        try std.testing.expectEqual(@as(usize, 3), i);
+    }
 
-    iter = Iterator.init(with_zwsp, &data);
-    i = 0;
-    while (iter.next()) |_| : (i += 1) {}
-    try std.testing.expectEqual(@as(usize, 3), i);
-
-    iter = Iterator.init(no_joiner, &data);
-    i = 0;
-    while (iter.next()) |_| : (i += 1) {}
-    try std.testing.expectEqual(@as(usize, 2), i);
+    {
+        var iter = Iterator.init(no_joiner, &data);
+        var i: usize = 0;
+        while (iter.next()) |_| : (i += 1) {}
+        try std.testing.expectEqual(@as(usize, 2), i);
+    }
 }
