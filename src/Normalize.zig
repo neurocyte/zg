@@ -220,9 +220,18 @@ test "decompose" {
 }
 
 /// Returned from various functions in this namespace. Remember to call `deinit` to free any allocated memory.
+/// Note that normalization functions will not copy what they're given if no normalization is needed, if you
+/// need to ensure that this Result outlasts the given string, call `try result.toOwned(allocator)`.  This
+/// will not make a third copy if the Result is already copied from the input.
 pub const Result = struct {
     allocated: bool = false,
     slice: []const u8,
+
+    /// Ensures that the slice result is a copy of the input, by making a copy if it was not.
+    pub fn toOwned(result: Result, allocator: mem.Allocator) error{OutOfMemory}!Result {
+        if (result.allocatod) return result;
+        return .{ .allocated = true, .slice = try allocator.dupe(u8, result.slice) };
+    }
 
     pub fn deinit(self: *const Result, allocator: mem.Allocator) void {
         if (self.allocated) allocator.free(self.slice);

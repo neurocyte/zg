@@ -4,11 +4,11 @@ zg provides Unicode text processing for Zig projects.
 
 ## Unicode Version
 
-The Unicode version supported by zg is 15.1.0.
+The Unicode version supported by zg is `15.1.0`.
 
 ## Zig Version
 
-The minimum Zig version required is 0.14 dev.
+The minimum Zig version required is `0.14`.
 
 ## Integrating zg into your Zig Project
 
@@ -325,6 +325,17 @@ test "Normalization" {
     try expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
 }
 ```
+The `Result` returned by normalization functions may or may not be copied from the
+inputs given.  For example, an all-ASCII input does not need to be a copy, and will
+be a view of the original slice.  Calling `result.deinit(allocator)` will only free
+an allocated `Result`, not one which is a view.  Thus it is safe to do
+unconditionally.
+
+This does mean that the validity of a `Result` can depend on the original string
+staying in memory.  To ensure that your `Result` is always a copy, you may call
+`try result.toOwned(allocator)`, which will only make a copy if one was not
+already made.
+
 
 ## Caseless Matching via Case Folding
 
