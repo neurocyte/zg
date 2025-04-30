@@ -357,20 +357,13 @@ pub fn build(b: *std.Build) void {
     const gencat_data_tr = b.addRunArtifact(gencat_data_t);
 
     // Case folding
-    const fold_data = b.createModule(.{
-        .root_source_file = b.path("src/FoldData.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    fold_data.addAnonymousImport("fold", .{ .root_source_file = fold_gen_out });
-
-    const case_fold = b.addModule("CaseFold", .{
+    const case_fold = b.addModule("CaseFolding", .{
         .root_source_file = b.path("src/CaseFold.zig"),
         .target = target,
         .optimize = optimize,
     });
+    case_fold.addAnonymousImport("fold", .{ .root_source_file = fold_gen_out });
     case_fold.addImport("ascii", ascii);
-    case_fold.addImport("FoldData", fold_data);
     case_fold.addImport("Normalize", norm);
 
     const case_fold_t = b.addTest(.{

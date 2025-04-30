@@ -17,11 +17,11 @@ pub fn init(allocator: mem.Allocator) !CanonData {
         .nfc = .empty,
         .nfd = try allocator.alloc([]u21, 0x110000),
     };
+    var _cp: u24 = undefined;
 
-    var slices: usize = 0;
     errdefer {
         cdata.nfc.deinit(allocator);
-        for (cdata.nfd[0..slices]) |slice| allocator.free(slice);
+        for (cdata.nfd[0.._cp]) |slice| allocator.free(slice);
         allocator.free(cdata.nfd);
     }
 
@@ -31,14 +31,16 @@ pub fn init(allocator: mem.Allocator) !CanonData {
         const len: u8 = try reader.readInt(u8, endian);
         if (len == 0) break;
         const cp = try reader.readInt(u24, endian);
-        cdata.nfd[cp] = try allocator.alloc(u21, len - 1);
-        slices += 1;
+        _cp = cp;
+        const nfd_cp = try allocator.alloc(u21, len - 1);
+        errdefer allocator.free(nfd_cp);
         for (0..len - 1) |i| {
-            cdata.nfd[cp][i] = @intCast(try reader.readInt(u24, endian));
+            nfd_cp[i] = @intCast(try reader.readInt(u24, endian));
         }
         if (len == 3) {
-            try cdata.nfc.put(allocator, cdata.nfd[cp][0..2].*, @intCast(cp));
+            try cdata.nfc.put(allocator, nfd_cp[0..2].*, @intCast(cp));
         }
+        cdata.nfd[cp] = nfd_cp;
     }
 
     return cdata;
