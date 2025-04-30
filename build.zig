@@ -193,7 +193,7 @@ pub fn build(b: *std.Build) void {
 
     // Graphemes
     const graphemes = b.addModule("Graphemes", .{
-        .root_source_file = b.path("src/grapheme.zig"),
+        .root_source_file = b.path("src/Graphemes.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -455,7 +455,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    unicode_tests.root_module.addImport("grapheme", graphemes);
+    unicode_tests.root_module.addImport("Graphemes", graphemes);
     unicode_tests.root_module.addImport("Normalize", norm);
 
     const run_unicode_tests = b.addRunArtifact(unicode_tests);

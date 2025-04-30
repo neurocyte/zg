@@ -7,10 +7,10 @@ const mem = std.mem;
 const testing = std.testing;
 const unicode = std.unicode;
 
-const grapheme = @import("grapheme");
-const Grapheme = @import("grapheme").Grapheme;
-const Graphemes = @import("grapheme");
-const GraphemeIterator = @import("grapheme").Iterator;
+const grapheme = @import("Graphemes");
+const Grapheme = @import("Graphemes").Grapheme;
+const Graphemes = @import("Graphemes");
+const GraphemeIterator = @import("Graphemes").Iterator;
 const Normalize = @import("Normalize");
 
 comptime {
