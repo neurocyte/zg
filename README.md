@@ -31,6 +31,24 @@ zg is a modular library. This approach minimizes binary file size and memory
 requirements by only including the Unicode data required for the specified module.
 The following sections describe the various modules and their specific use case.
 
+### Init and Setup
+
+The code examples will show the use of `Module.init(allocator)` to create the
+various modules.  All of the allocating modules have a `setup` variant, which
+takes a pointer and allocates in-place.
+
+Example use:
+
+```zig
+test "Setup form" {
+    var graphemes = try allocator.create(Graphemes);
+    defer allocator.destroy(graphemes);
+    try graphemes.setup(allocator);
+    defer graphemes.deinit(allocator);
+}
+```
+
+
 ## Code Points
 
 In the `code_point` module, you'll find a data structure representing a single code
@@ -386,6 +404,8 @@ test "Initialize With a Normalize" {
     defer case_fold.deinit(allocator);
 }
 ```
+This has a `setupWithNormalize` variant as well, but note that this also takes
+a `Normalize` struct, and not a pointer to it.
 
 
 ## Display Width of Characters and Strings

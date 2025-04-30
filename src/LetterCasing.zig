@@ -1,25 +1,31 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const compress = std.compress;
-const mem = std.mem;
-const testing = std.testing;
-const unicode = std.unicode;
-
 const CodePointIterator = @import("code_point").Iterator;
 
-case_map: [][2]u21,
+case_map: [][2]u21 = undefined,
 prop_s1: []u16 = undefined,
 prop_s2: []u8 = undefined,
 
-const Self = @This();
+const LetterCasing = @This();
 
-pub fn init(allocator: mem.Allocator) !Self {
+pub fn init(allocator: Allocator) Allocator.Error!LetterCasing {
+    var case = LetterCasing{};
+    try case.setup(allocator);
+    return case;
+}
+
+pub fn setup(case: *LetterCasing, allocator: Allocator) Allocator.Error!void {
+    case.setupInner(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
+}
+
+inline fn setupInner(self: *LetterCasing, allocator: mem.Allocator) !void {
     const decompressor = compress.flate.inflate.decompressor;
     const endian = builtin.cpu.arch.endian();
 
-    var self = Self{
-        .case_map = try allocator.alloc([2]u21, 0x110000),
-    };
+    self.case_map = try allocator.alloc([2]u21, 0x110000);
     errdefer allocator.free(self.case_map);
 
     for (0..0x110000) |i| {
@@ -68,28 +74,26 @@ pub fn init(allocator: mem.Allocator) !Self {
     self.prop_s2 = try allocator.alloc(u8, stage_2_len);
     errdefer allocator.free(self.prop_s2);
     _ = try cp_reader.readAll(self.prop_s2);
-
-    return self;
 }
 
-pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+pub fn deinit(self: *const LetterCasing, allocator: mem.Allocator) void {
     allocator.free(self.case_map);
     allocator.free(self.prop_s1);
     allocator.free(self.prop_s2);
 }
 
 // Returns true if `cp` is either upper, lower, or title case.
-pub fn isCased(self: Self, cp: u21) bool {
+pub fn isCased(self: LetterCasing, cp: u21) bool {
     return self.prop_s2[self.prop_s1[cp >> 8] + (cp & 0xff)] & 4 == 4;
 }
 
 // Returns true if `cp` is uppercase.
-pub fn isUpper(self: Self, cp: u21) bool {
+pub fn isUpper(self: LetterCasing, cp: u21) bool {
     return self.prop_s2[self.prop_s1[cp >> 8] + (cp & 0xff)] & 2 == 2;
 }
 
 /// Returns true if `str` is all uppercase.
-pub fn isUpperStr(self: Self, str: []const u8) bool {
+pub fn isUpperStr(self: LetterCasing, str: []const u8) bool {
     var iter = CodePointIterator{ .bytes = str };
 
     return while (iter.next()) |cp| {
@@ -107,14 +111,14 @@ test "isUpperStr" {
 }
 
 /// Returns uppercase mapping for `cp`.
-pub fn toUpper(self: Self, cp: u21) u21 {
+pub fn toUpper(self: LetterCasing, cp: u21) u21 {
     return self.case_map[cp][0];
 }
 
 /// Returns a new string with all letters in uppercase.
 /// Caller must free returned bytes with `allocator`.
 pub fn toUpperStr(
-    self: Self,
+    self: LetterCasing,
     allocator: mem.Allocator,
     str: []const u8,
 ) ![]u8 {
@@ -142,12 +146,12 @@ test "toUpperStr" {
 }
 
 // Returns true if `cp` is lowercase.
-pub fn isLower(self: Self, cp: u21) bool {
+pub fn isLower(self: LetterCasing, cp: u21) bool {
     return self.prop_s2[self.prop_s1[cp >> 8] + (cp & 0xff)] & 1 == 1;
 }
 
 /// Returns true if `str` is all lowercase.
-pub fn isLowerStr(self: Self, str: []const u8) bool {
+pub fn isLowerStr(self: LetterCasing, str: []const u8) bool {
     var iter = CodePointIterator{ .bytes = str };
 
     return while (iter.next()) |cp| {
@@ -165,14 +169,14 @@ test "isLowerStr" {
 }
 
 /// Returns lowercase mapping for `cp`.
-pub fn toLower(self: Self, cp: u21) u21 {
+pub fn toLower(self: LetterCasing, cp: u21) u21 {
     return self.case_map[cp][1];
 }
 
 /// Returns a new string with all letters in lowercase.
 /// Caller must free returned bytes with `allocator`.
 pub fn toLowerStr(
-    self: Self,
+    self: LetterCasing,
     allocator: mem.Allocator,
     str: []const u8,
 ) ![]u8 {
@@ -198,3 +202,11 @@ test "toLowerStr" {
     defer testing.allocator.free(lowered);
     try testing.expectEqualStrings("hello, world 2112!", lowered);
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const compress = std.compress;
+const mem = std.mem;
+const Allocator = std.mem.Allocator;
+const testing = std.testing;
+const unicode = std.unicode;

@@ -1,7 +1,8 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const compress = std.compress;
-const mem = std.mem;
+//! General Categories
+
+s1: []u16 = undefined,
+s2: []u5 = undefined,
+s3: []u5 = undefined,
 
 /// General Category
 pub const Gc = enum {
@@ -37,13 +38,15 @@ pub const Gc = enum {
     Zs, // Separator, Space
 };
 
-s1: []u16 = undefined,
-s2: []u5 = undefined,
-s3: []u5 = undefined,
+const GeneralCategories = @This();
 
-const Self = @This();
+pub fn init(allocator: Allocator) Allocator.Error!GeneralCategories {
+    var gencat = GeneralCategories{};
+    try gencat.setup(allocator);
+    return gencat;
+}
 
-pub fn init(allocator: mem.Allocator) !Self {
+pub fn setup(self: *GeneralCategories, allocator: Allocator) Allocator.Error!void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("gencat");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -52,39 +55,35 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     const endian = builtin.cpu.arch.endian();
 
-    var self = Self{};
-
-    const s1_len: u16 = try reader.readInt(u16, endian);
+    const s1_len: u16 = reader.readInt(u16, endian) catch unreachable;
     self.s1 = try allocator.alloc(u16, s1_len);
     errdefer allocator.free(self.s1);
     for (0..s1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
 
-    const s2_len: u16 = try reader.readInt(u16, endian);
+    const s2_len: u16 = reader.readInt(u16, endian) catch unreachable;
     self.s2 = try allocator.alloc(u5, s2_len);
     errdefer allocator.free(self.s2);
-    for (0..s2_len) |i| self.s2[i] = @intCast(try reader.readInt(u8, endian));
+    for (0..s2_len) |i| self.s2[i] = @intCast(reader.readInt(u8, endian) catch unreachable);
 
-    const s3_len: u16 = try reader.readInt(u8, endian);
+    const s3_len: u16 = reader.readInt(u8, endian) catch unreachable;
     self.s3 = try allocator.alloc(u5, s3_len);
     errdefer allocator.free(self.s3);
-    for (0..s3_len) |i| self.s3[i] = @intCast(try reader.readInt(u8, endian));
-
-    return self;
+    for (0..s3_len) |i| self.s3[i] = @intCast(reader.readInt(u8, endian) catch unreachable);
 }
 
-pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+pub fn deinit(self: *const GeneralCategories, allocator: mem.Allocator) void {
     allocator.free(self.s1);
     allocator.free(self.s2);
     allocator.free(self.s3);
 }
 
 /// Lookup the General Category for `cp`.
-pub fn gc(self: Self, cp: u21) Gc {
+pub fn gc(self: GeneralCategories, cp: u21) Gc {
     return @enumFromInt(self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]]);
 }
 
 /// True if `cp` has an C general category.
-pub fn isControl(self: Self, cp: u21) bool {
+pub fn isControl(self: GeneralCategories, cp: u21) bool {
     return switch (self.gc(cp)) {
         .Cc,
         .Cf,
@@ -97,7 +96,7 @@ pub fn isControl(self: Self, cp: u21) bool {
 }
 
 /// True if `cp` has an L general category.
-pub fn isLetter(self: Self, cp: u21) bool {
+pub fn isLetter(self: GeneralCategories, cp: u21) bool {
     return switch (self.gc(cp)) {
         .Ll,
         .Lm,
@@ -110,7 +109,7 @@ pub fn isLetter(self: Self, cp: u21) bool {
 }
 
 /// True if `cp` has an M general category.
-pub fn isMark(self: Self, cp: u21) bool {
+pub fn isMark(self: GeneralCategories, cp: u21) bool {
     return switch (self.gc(cp)) {
         .Mc,
         .Me,
@@ -121,7 +120,7 @@ pub fn isMark(self: Self, cp: u21) bool {
 }
 
 /// True if `cp` has an N general category.
-pub fn isNumber(self: Self, cp: u21) bool {
+pub fn isNumber(self: GeneralCategories, cp: u21) bool {
     return switch (self.gc(cp)) {
         .Nd,
         .Nl,
@@ -132,7 +131,7 @@ pub fn isNumber(self: Self, cp: u21) bool {
 }
 
 /// True if `cp` has an P general category.
-pub fn isPunctuation(self: Self, cp: u21) bool {
+pub fn isPunctuation(self: GeneralCategories, cp: u21) bool {
     return switch (self.gc(cp)) {
         .Pc,
         .Pd,
@@ -147,7 +146,7 @@ pub fn isPunctuation(self: Self, cp: u21) bool {
 }
 
 /// True if `cp` has an S general category.
-pub fn isSymbol(self: Self, cp: u21) bool {
+pub fn isSymbol(self: GeneralCategories, cp: u21) bool {
     return switch (self.gc(cp)) {
         .Sc,
         .Sk,
@@ -159,7 +158,7 @@ pub fn isSymbol(self: Self, cp: u21) bool {
 }
 
 /// True if `cp` has an Z general category.
-pub fn isSeparator(self: Self, cp: u21) bool {
+pub fn isSeparator(self: GeneralCategories, cp: u21) bool {
     return switch (self.gc(cp)) {
         .Zl,
         .Zp,
@@ -168,3 +167,9 @@ pub fn isSeparator(self: Self, cp: u21) bool {
         else => false,
     };
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const compress = std.compress;
+const mem = std.mem;
+const Allocator = mem.Allocator;

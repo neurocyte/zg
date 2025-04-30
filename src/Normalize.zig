@@ -10,22 +10,47 @@ normp_data: NormPropsData = undefined,
 
 const Normalize = @This();
 
-pub fn init(allocator: Allocator) !Normalize {
+pub fn init(allocator: Allocator) Allocator.Error!Normalize {
     var norm: Normalize = undefined;
     try norm.setup(allocator);
     return norm;
 }
 
-pub fn setup(self: *Normalize, allocator: Allocator) !void {
-    self.canon_data = try CanonData.init(allocator);
+pub fn setup(self: *Normalize, allocator: Allocator) Allocator.Error!void {
+    self.canon_data = CanonData.init(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
     errdefer self.canon_data.deinit(allocator);
-    self.ccc_data = try CccData.init(allocator);
+    self.ccc_data = CccData.init(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
     errdefer self.ccc_data.deinit(allocator);
-    self.compat_data = try CompatData.init(allocator);
+    self.compat_data = CompatData.init(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
     errdefer self.compat_data.deinit(allocator);
-    self.hangul_data = try HangulData.init(allocator);
+    self.hangul_data = HangulData.init(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
     errdefer self.hangul_data.deinit(allocator);
-    self.normp_data = try NormPropsData.init(allocator);
+    self.normp_data = NormPropsData.init(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
 }
 
 pub fn deinit(norm: *const Normalize, allocator: Allocator) void {

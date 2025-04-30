@@ -11,20 +11,21 @@ owns_normalize: bool,
 
 const CaseFolding = @This();
 
-pub fn init(allocator: Allocator) !CaseFolding {
+pub fn init(allocator: Allocator) Allocator.Error!CaseFolding {
     var case_fold: CaseFolding = undefined;
     try case_fold.setup(allocator);
     return case_fold;
 }
 
-pub fn initWithNormalize(allocator: Allocator, norm: Normalize) !CaseFolding {
+pub fn initWithNormalize(allocator: Allocator, norm: Normalize) Allocator.Error!CaseFolding {
     var casefold: CaseFolding = undefined;
     try casefold.setupWithNormalize(allocator, norm);
     return casefold;
 }
 
-pub fn setup(casefold: *CaseFolding, allocator: Allocator) !void {
+pub fn setup(casefold: *CaseFolding, allocator: Allocator) Allocator.Error!void {
     try casefold.setupImpl(allocator);
+    // Handle normalize memory separately during setup:
     casefold.owns_normalize = false;
     errdefer casefold.deinit(allocator);
     try casefold.normalize.setup(allocator);
@@ -37,7 +38,16 @@ pub fn setupWithNormalize(casefold: *CaseFolding, allocator: Allocator, norm: No
     casefold.owns_normalize = false;
 }
 
-fn setupImpl(casefold: *CaseFolding, allocator: Allocator) !void {
+fn setupImpl(casefold: *CaseFolding, allocator: Allocator) Allocator.Error!void {
+    casefold.setupImplInner(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
+}
+
+inline fn setupImplInner(casefold: *CaseFolding, allocator: Allocator) !void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("fold");
     var in_fbs = std.io.fixedBufferStream(in_bytes);

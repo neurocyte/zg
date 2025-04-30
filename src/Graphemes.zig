@@ -14,7 +14,13 @@ s3: []u8 = undefined,
 
 const Graphemes = @This();
 
-pub inline fn init(allocator: mem.Allocator) mem.Allocator.Error!Graphemes {
+pub fn init(allocator: Allocator) Allocator.Error!Graphemes {
+    var graphemes = Graphemes{};
+    try graphemes.setup(allocator);
+    return graphemes;
+}
+
+pub fn setup(graphemes: *Graphemes, allocator: Allocator) Allocator.Error!void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("gbp");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -23,27 +29,23 @@ pub inline fn init(allocator: mem.Allocator) mem.Allocator.Error!Graphemes {
 
     const endian = builtin.cpu.arch.endian();
 
-    var self = Graphemes{};
-
     const s1_len: u16 = reader.readInt(u16, endian) catch unreachable;
-    self.s1 = try allocator.alloc(u16, s1_len);
-    errdefer allocator.free(self.s1);
-    for (0..s1_len) |i| self.s1[i] = reader.readInt(u16, endian) catch unreachable;
+    graphemes.s1 = try allocator.alloc(u16, s1_len);
+    errdefer allocator.free(graphemes.s1);
+    for (0..s1_len) |i| graphemes.s1[i] = reader.readInt(u16, endian) catch unreachable;
 
     const s2_len: u16 = reader.readInt(u16, endian) catch unreachable;
-    self.s2 = try allocator.alloc(u16, s2_len);
-    errdefer allocator.free(self.s2);
-    for (0..s2_len) |i| self.s2[i] = reader.readInt(u16, endian) catch unreachable;
+    graphemes.s2 = try allocator.alloc(u16, s2_len);
+    errdefer allocator.free(graphemes.s2);
+    for (0..s2_len) |i| graphemes.s2[i] = reader.readInt(u16, endian) catch unreachable;
 
     const s3_len: u16 = reader.readInt(u16, endian) catch unreachable;
-    self.s3 = try allocator.alloc(u8, s3_len);
-    errdefer allocator.free(self.s3);
-    _ = reader.readAll(self.s3) catch unreachable;
-
-    return self;
+    graphemes.s3 = try allocator.alloc(u8, s3_len);
+    errdefer allocator.free(graphemes.s3);
+    _ = reader.readAll(graphemes.s3) catch unreachable;
 }
 
-pub fn deinit(graphemes: *const Graphemes, allocator: mem.Allocator) void {
+pub fn deinit(graphemes: *const Graphemes, allocator: Allocator) void {
     allocator.free(graphemes.s1);
     allocator.free(graphemes.s2);
     allocator.free(graphemes.s3);
