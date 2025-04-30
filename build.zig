@@ -341,24 +341,24 @@ pub fn build(b: *std.Build) void {
     const norm_tr = b.addRunArtifact(norm_t);
 
     // General Category
-    const gencat_data = b.addModule("GenCatData", .{
-        .root_source_file = b.path("src/GenCatData.zig"),
+    const gencat = b.addModule("GeneralCategories", .{
+        .root_source_file = b.path("src/GeneralCategories.zig"),
         .target = target,
         .optimize = optimize,
     });
-    gencat_data.addAnonymousImport("gencat", .{ .root_source_file = gencat_gen_out });
+    gencat.addAnonymousImport("gencat", .{ .root_source_file = gencat_gen_out });
 
-    const gencat_data_t = b.addTest(.{
-        .name = "gencat_data",
-        .root_module = gencat_data,
+    const gencat_t = b.addTest(.{
+        .name = "gencat",
+        .root_module = gencat,
         .target = target,
         .optimize = optimize,
     });
-    const gencat_data_tr = b.addRunArtifact(gencat_data_t);
+    const gencat_tr = b.addRunArtifact(gencat_t);
 
     // Case folding
     const case_fold = b.addModule("CaseFolding", .{
-        .root_source_file = b.path("src/CaseFold.zig"),
+        .root_source_file = b.path("src/CaseFolding.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -375,57 +375,57 @@ pub fn build(b: *std.Build) void {
     const case_fold_tr = b.addRunArtifact(case_fold_t);
 
     // Letter case
-    const case_data = b.addModule("CaseData", .{
-        .root_source_file = b.path("src/CaseData.zig"),
+    const letter_case = b.addModule("LetterCasing", .{
+        .root_source_file = b.path("src/LetterCasing.zig"),
         .target = target,
         .optimize = optimize,
     });
-    case_data.addImport("code_point", code_point);
-    case_data.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
-    case_data.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
-    case_data.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
+    letter_case.addImport("code_point", code_point);
+    letter_case.addAnonymousImport("case_prop", .{ .root_source_file = case_prop_gen_out });
+    letter_case.addAnonymousImport("upper", .{ .root_source_file = upper_gen_out });
+    letter_case.addAnonymousImport("lower", .{ .root_source_file = lower_gen_out });
 
-    const case_data_t = b.addTest(.{
-        .name = "case_data",
-        .root_module = case_data,
+    const letter_case_t = b.addTest(.{
+        .name = "lettercase",
+        .root_module = letter_case,
         .target = target,
         .optimize = optimize,
     });
-    const case_data_tr = b.addRunArtifact(case_data_t);
+    const letter_case_tr = b.addRunArtifact(letter_case_t);
 
     // Scripts
-    const scripts_data = b.addModule("ScriptsData", .{
-        .root_source_file = b.path("src/ScriptsData.zig"),
+    const scripts = b.addModule("Scripts", .{
+        .root_source_file = b.path("src/Scripts.zig"),
         .target = target,
         .optimize = optimize,
     });
-    scripts_data.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
+    scripts.addAnonymousImport("scripts", .{ .root_source_file = scripts_gen_out });
 
-    const scripts_data_t = b.addTest(.{
-        .name = "scripts_data",
-        .root_module = scripts_data,
+    const scripts_t = b.addTest(.{
+        .name = "scripts",
+        .root_module = scripts,
         .target = target,
         .optimize = optimize,
     });
-    const scripts_data_tr = b.addRunArtifact(scripts_data_t);
+    const scripts_tr = b.addRunArtifact(scripts_t);
 
     // Properties
-    const props_data = b.addModule("PropsData", .{
-        .root_source_file = b.path("src/PropsData.zig"),
+    const properties = b.addModule("Properties", .{
+        .root_source_file = b.path("src/Properties.zig"),
         .target = target,
         .optimize = optimize,
     });
-    props_data.addAnonymousImport("core_props", .{ .root_source_file = core_gen_out });
-    props_data.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
-    props_data.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
+    properties.addAnonymousImport("core_props", .{ .root_source_file = core_gen_out });
+    properties.addAnonymousImport("props", .{ .root_source_file = props_gen_out });
+    properties.addAnonymousImport("numeric", .{ .root_source_file = num_gen_out });
 
-    const props_data_t = b.addTest(.{
-        .name = "props_data",
-        .root_module = props_data,
+    const properties_t = b.addTest(.{
+        .name = "properties",
+        .root_module = properties,
         .target = target,
         .optimize = optimize,
     });
-    const props_data_tr = b.addRunArtifact(props_data_t);
+    const properties_tr = b.addRunArtifact(properties_t);
 
     // Unicode Tests
     const unicode_tests = b.addTest(.{
@@ -450,9 +450,9 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&hangul_data_tr.step);
     test_step.dependOn(&normp_data_tr.step);
     test_step.dependOn(&norm_tr.step);
-    test_step.dependOn(&gencat_data_tr.step);
+    test_step.dependOn(&gencat_tr.step);
     test_step.dependOn(&case_fold_tr.step);
-    test_step.dependOn(&case_data_tr.step);
-    test_step.dependOn(&scripts_data_tr.step);
-    test_step.dependOn(&props_data_tr.step);
+    test_step.dependOn(&letter_case_tr.step);
+    test_step.dependOn(&scripts_tr.step);
+    test_step.dependOn(&properties_tr.step);
 }
