@@ -1,13 +1,10 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const compress = std.compress;
-const mem = std.mem;
+//! Compatibility Data
 
 nfkd: [][]u21 = undefined,
 
-const Self = @This();
+const CompatData = @This();
 
-pub fn init(allocator: mem.Allocator) !Self {
+pub fn init(allocator: mem.Allocator) !CompatData {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("compat");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -15,34 +12,39 @@ pub fn init(allocator: mem.Allocator) !Self {
     var reader = in_decomp.reader();
 
     const endian = builtin.cpu.arch.endian();
-    var self = Self{
+    var cpdata = CompatData{
         .nfkd = try allocator.alloc([]u21, 0x110000),
     };
-    errdefer self.deinit(allocator);
+    errdefer cpdata.deinit(allocator);
 
-    @memset(self.nfkd, &.{});
+    @memset(cpdata.nfkd, &.{});
 
     while (true) {
         const len: u8 = try reader.readInt(u8, endian);
         if (len == 0) break;
         const cp = try reader.readInt(u24, endian);
-        self.nfkd[cp] = try allocator.alloc(u21, len - 1);
+        cpdata.nfkd[cp] = try allocator.alloc(u21, len - 1);
         for (0..len - 1) |i| {
-            self.nfkd[cp][i] = @intCast(try reader.readInt(u24, endian));
+            cpdata.nfkd[cp][i] = @intCast(try reader.readInt(u24, endian));
         }
     }
 
-    return self;
+    return cpdata;
 }
 
-pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
-    for (self.nfkd) |slice| {
+pub fn deinit(cpdata: *const CompatData, allocator: mem.Allocator) void {
+    for (cpdata.nfkd) |slice| {
         if (slice.len != 0) allocator.free(slice);
     }
-    allocator.free(self.nfkd);
+    allocator.free(cpdata.nfkd);
 }
 
 /// Returns compatibility decomposition for `cp`.
-pub fn toNfkd(self: Self, cp: u21) []u21 {
-    return self.nfkd[cp];
+pub fn toNfkd(cpdata: *const CompatData, cp: u21) []u21 {
+    return cpdata.nfkd[cp];
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const compress = std.compress;
+const mem = std.mem;

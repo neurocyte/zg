@@ -1,14 +1,11 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const compress = std.compress;
-const mem = std.mem;
+//! Combining Class Data
 
 s1: []u16 = undefined,
 s2: []u8 = undefined,
 
-const Self = @This();
+const CombiningData = @This();
 
-pub fn init(allocator: mem.Allocator) !Self {
+pub fn init(allocator: mem.Allocator) !CombiningData {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("ccc");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -17,32 +14,37 @@ pub fn init(allocator: mem.Allocator) !Self {
 
     const endian = builtin.cpu.arch.endian();
 
-    var self = Self{};
+    var cbdata = CombiningData{};
 
     const stage_1_len: u16 = try reader.readInt(u16, endian);
-    self.s1 = try allocator.alloc(u16, stage_1_len);
-    errdefer allocator.free(self.s1);
-    for (0..stage_1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
+    cbdata.s1 = try allocator.alloc(u16, stage_1_len);
+    errdefer allocator.free(cbdata.s1);
+    for (0..stage_1_len) |i| cbdata.s1[i] = try reader.readInt(u16, endian);
 
     const stage_2_len: u16 = try reader.readInt(u16, endian);
-    self.s2 = try allocator.alloc(u8, stage_2_len);
-    errdefer allocator.free(self.s2);
-    _ = try reader.readAll(self.s2);
+    cbdata.s2 = try allocator.alloc(u8, stage_2_len);
+    errdefer allocator.free(cbdata.s2);
+    _ = try reader.readAll(cbdata.s2);
 
-    return self;
+    return cbdata;
 }
 
-pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
-    allocator.free(self.s1);
-    allocator.free(self.s2);
+pub fn deinit(cbdata: *const CombiningData, allocator: mem.Allocator) void {
+    allocator.free(cbdata.s1);
+    allocator.free(cbdata.s2);
 }
 
 /// Returns the canonical combining class for a code point.
-pub fn ccc(self: Self, cp: u21) u8 {
-    return self.s2[self.s1[cp >> 8] + (cp & 0xff)];
+pub fn ccc(cbdata: CombiningData, cp: u21) u8 {
+    return cbdata.s2[cbdata.s1[cp >> 8] + (cp & 0xff)];
 }
 
 /// True if `cp` is a starter code point, not a combining character.
-pub fn isStarter(self: Self, cp: u21) bool {
-    return self.s2[self.s1[cp >> 8] + (cp & 0xff)] == 0;
+pub fn isStarter(cbdata: CombiningData, cp: u21) bool {
+    return cbdata.s2[cbdata.s1[cp >> 8] + (cp & 0xff)] == 0;
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const compress = std.compress;
+const mem = std.mem;

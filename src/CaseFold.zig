@@ -95,10 +95,8 @@ pub fn compatCaselessMatch(
 test "compatCaselessMatch" {
     const allocator = testing.allocator;
 
-    var norm_data = Normalize.NormData{};
-    try norm_data.init(allocator);
-    defer norm_data.deinit(allocator);
-    const n = Normalize{ .norm_data = &norm_data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const fold_data = try FoldData.init(allocator);
     defer fold_data.deinit(allocator);
@@ -171,10 +169,8 @@ pub fn canonCaselessMatch(
 test "canonCaselessMatch" {
     const allocator = testing.allocator;
 
-    var norm_data = Normalize.NormData{};
-    try norm_data.init(allocator);
-    defer norm_data.deinit(allocator);
-    const n = Normalize{ .norm_data = &norm_data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const fold_data = try FoldData.init(allocator);
     defer fold_data.deinit(allocator);

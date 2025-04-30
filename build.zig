@@ -319,25 +319,6 @@ pub fn build(b: *std.Build) void {
     });
     const normp_data_tr = b.addRunArtifact(normp_data_t);
 
-    const norm_data = b.createModule(.{
-        .root_source_file = b.path("src/NormData.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    norm_data.addImport("CanonData", canon_data);
-    norm_data.addImport("CombiningData", ccc_data);
-    norm_data.addImport("CompatData", compat_data);
-    norm_data.addImport("HangulData", hangul_data);
-    norm_data.addImport("NormPropsData", normp_data);
-
-    const norm_data_t = b.addTest(.{
-        .name = "norm_data",
-        .root_module = norm_data,
-        .target = target,
-        .optimize = optimize,
-    });
-    const norm_data_tr = b.addRunArtifact(norm_data_t);
-
     const norm = b.addModule("Normalize", .{
         .root_source_file = b.path("src/Normalize.zig"),
         .target = target,
@@ -345,7 +326,11 @@ pub fn build(b: *std.Build) void {
     });
     norm.addImport("ascii", ascii);
     norm.addImport("code_point", code_point);
-    norm.addImport("NormData", norm_data);
+    norm.addImport("CanonData", canon_data);
+    norm.addImport("CombiningData", ccc_data);
+    norm.addImport("CompatData", compat_data);
+    norm.addImport("HangulData", hangul_data);
+    norm.addImport("NormPropsData", normp_data);
 
     const norm_t = b.addTest(.{
         .name = "norm",
@@ -471,7 +456,6 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&compat_data_tr.step);
     test_step.dependOn(&hangul_data_tr.step);
     test_step.dependOn(&normp_data_tr.step);
-    test_step.dependOn(&norm_data_tr.step);
     test_step.dependOn(&norm_tr.step);
     test_step.dependOn(&gencat_data_tr.step);
     test_step.dependOn(&case_fold_tr.step);

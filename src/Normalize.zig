@@ -2,23 +2,41 @@
 //! Unicode Normalization. You can normalize strings into NFC,
 //! NFKC, NFD, and NFKD normalization forms.
 
-const std = @import("std");
-const debug = std.debug;
-const assert = debug.assert;
-const fmt = std.fmt;
-const heap = std.heap;
-const mem = std.mem;
-const simd = std.simd;
-const testing = std.testing;
-const unicode = std.unicode;
+canon_data: CanonData = undefined,
+ccc_data: CccData = undefined,
+compat_data: CompatData = undefined,
+hangul_data: HangulData = undefined,
+normp_data: NormPropsData = undefined,
 
-const ascii = @import("ascii");
-const CodePointIterator = @import("code_point").Iterator;
-pub const NormData = @import("NormData");
+const Normalize = @This();
 
-norm_data: *const NormData,
+pub fn init(allocator: Allocator) !Normalize {
+    var norm: Normalize = undefined;
+    try norm.setup(allocator);
+    return norm;
+}
 
-const Self = @This();
+pub fn setup(self: *Normalize, allocator: Allocator) !void {
+    self.canon_data = try CanonData.init(allocator);
+    errdefer self.canon_data.deinit(allocator);
+    self.ccc_data = try CccData.init(allocator);
+    errdefer self.ccc_data.deinit(allocator);
+    self.compat_data = try CompatData.init(allocator);
+    errdefer self.compat_data.deinit(allocator);
+    self.hangul_data = try HangulData.init(allocator);
+    errdefer self.hangul_data.deinit(allocator);
+    self.normp_data = try NormPropsData.init(allocator);
+}
+
+pub fn deinit(norm: *const Normalize, allocator: Allocator) void {
+    // Reasonably safe (?)
+    var mut_norm = @constCast(norm);
+    mut_norm.canon_data.deinit(allocator);
+    mut_norm.ccc_data.deinit(allocator);
+    mut_norm.compat_data.deinit(allocator);
+    mut_norm.hangul_data.deinit(allocator);
+    mut_norm.normp_data.deinit(allocator);
+}
 
 const SBase: u21 = 0xAC00;
 const LBase: u21 = 0x1100;
@@ -30,8 +48,8 @@ const TCount: u21 = 28;
 const NCount: u21 = 588; // VCount * TCount
 const SCount: u21 = 11172; // LCount * NCount
 
-fn decomposeHangul(self: Self, cp: u21, buf: []u21) ?Decomp {
-    const kind = self.norm_data.hangul_data.syllable(cp);
+fn decomposeHangul(self: Normalize, cp: u21, buf: []u21) ?Decomp {
+    const kind = self.hangul_data.syllable(cp);
     if (kind != .LV and kind != .LVT) return null;
 
     const SIndex: u21 = cp - SBase;
@@ -90,21 +108,21 @@ const Decomp = struct {
 };
 
 // `mapping` retrieves the decomposition mapping for a code point as per the UCD.
-fn mapping(self: Self, cp: u21, form: Form) Decomp {
+fn mapping(self: Normalize, cp: u21, form: Form) Decomp {
     var dc = Decomp{};
 
     switch (form) {
         .nfd => {
-            dc.cps = self.norm_data.canon_data.toNfd(cp);
+            dc.cps = self.canon_data.toNfd(cp);
             if (dc.cps.len != 0) dc.form = .nfd;
         },
 
         .nfkd => {
-            dc.cps = self.norm_data.compat_data.toNfkd(cp);
+            dc.cps = self.compat_data.toNfkd(cp);
             if (dc.cps.len != 0) {
                 dc.form = .nfkd;
             } else {
-                dc.cps = self.norm_data.canon_data.toNfd(cp);
+                dc.cps = self.canon_data.toNfd(cp);
                 if (dc.cps.len != 0) dc.form = .nfkd;
             }
         },
@@ -117,7 +135,7 @@ fn mapping(self: Self, cp: u21, form: Form) Decomp {
 
 // `decompose` a code point to the specified normalization form, which should be either `.nfd` or `.nfkd`.
 fn decompose(
-    self: Self,
+    self: Normalize,
     cp: u21,
     form: Form,
     buf: []u21,
@@ -127,8 +145,8 @@ fn decompose(
 
     // NFD / NFKD quick checks.
     switch (form) {
-        .nfd => if (self.norm_data.normp_data.isNfd(cp)) return .{},
-        .nfkd => if (self.norm_data.normp_data.isNfkd(cp)) return .{},
+        .nfd => if (self.normp_data.isNfd(cp)) return .{},
+        .nfkd => if (self.normp_data.isNfkd(cp)) return .{},
         else => @panic("Normalizer.decompose only accepts form .nfd or .nfkd."),
     }
 
@@ -175,10 +193,8 @@ fn decompose(
 
 test "decompose" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    var n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     var buf: [18]u21 = undefined;
 
@@ -228,42 +244,42 @@ pub const Result = struct {
     slice: []const u8,
 
     /// Ensures that the slice result is a copy of the input, by making a copy if it was not.
-    pub fn toOwned(result: Result, allocator: mem.Allocator) error{OutOfMemory}!Result {
+    pub fn toOwned(result: Result, allocator: Allocator) error{OutOfMemory}!Result {
         if (result.allocated) return result;
         return .{ .allocated = true, .slice = try allocator.dupe(u8, result.slice) };
     }
 
-    pub fn deinit(self: *const Result, allocator: mem.Allocator) void {
+    pub fn deinit(self: *const Result, allocator: Allocator) void {
         if (self.allocated) allocator.free(self.slice);
     }
 };
 
 // Compares code points by Canonical Combining Class order.
-fn cccLess(self: Self, lhs: u21, rhs: u21) bool {
-    return self.norm_data.ccc_data.ccc(lhs) < self.norm_data.ccc_data.ccc(rhs);
+fn cccLess(self: Normalize, lhs: u21, rhs: u21) bool {
+    return self.ccc_data.ccc(lhs) < self.ccc_data.ccc(rhs);
 }
 
 // Applies the Canonical Sorting Algorithm.
-fn canonicalSort(self: Self, cps: []u21) void {
+fn canonicalSort(self: Normalize, cps: []u21) void {
     var i: usize = 0;
     while (i < cps.len) : (i += 1) {
         const start: usize = i;
-        while (i < cps.len and self.norm_data.ccc_data.ccc(cps[i]) != 0) : (i += 1) {}
+        while (i < cps.len and self.ccc_data.ccc(cps[i]) != 0) : (i += 1) {}
         mem.sort(u21, cps[start..i], self, cccLess);
     }
 }
 
 /// Normalize `str` to NFD.
-pub fn nfd(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
+pub fn nfd(self: Normalize, allocator: Allocator, str: []const u8) Allocator.Error!Result {
     return self.nfxd(allocator, str, .nfd);
 }
 
 /// Normalize `str` to NFKD.
-pub fn nfkd(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
+pub fn nfkd(self: Normalize, allocator: Allocator, str: []const u8) Allocator.Error!Result {
     return self.nfxd(allocator, str, .nfkd);
 }
 
-pub fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.Allocator.Error![]u21 {
+pub fn nfxdCodePoints(self: Normalize, allocator: Allocator, str: []const u8, form: Form) Allocator.Error![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -284,7 +300,7 @@ pub fn nfxdCodePoints(self: Self, allocator: mem.Allocator, str: []const u8, for
     return try dcp_list.toOwnedSlice();
 }
 
-fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.Allocator.Error!Result {
+fn nfxd(self: Normalize, allocator: Allocator, str: []const u8, form: Form) Allocator.Error!Result {
     // Quick checks.
     if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
 
@@ -305,10 +321,8 @@ fn nfxd(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
 
 test "nfd ASCII / no-alloc" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    const n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const result = try n.nfd(allocator, "Hello World!");
     defer result.deinit(allocator);
@@ -318,10 +332,8 @@ test "nfd ASCII / no-alloc" {
 
 test "nfd !ASCII / alloc" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    const n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const result = try n.nfd(allocator, "Héllo World! \u{3d3}");
     defer result.deinit(allocator);
@@ -331,10 +343,8 @@ test "nfd !ASCII / alloc" {
 
 test "nfkd ASCII / no-alloc" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    const n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const result = try n.nfkd(allocator, "Hello World!");
     defer result.deinit(allocator);
@@ -344,10 +354,8 @@ test "nfkd ASCII / no-alloc" {
 
 test "nfkd !ASCII / alloc" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    const n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
     defer result.deinit(allocator);
@@ -356,10 +364,10 @@ test "nfkd !ASCII / alloc" {
 }
 
 pub fn nfdCodePoints(
-    self: Self,
-    allocator: mem.Allocator,
+    self: Normalize,
+    allocator: Allocator,
     cps: []const u21,
-) mem.Allocator.Error![]u21 {
+) Allocator.Error![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -381,10 +389,10 @@ pub fn nfdCodePoints(
 }
 
 pub fn nfkdCodePoints(
-    self: Self,
-    allocator: mem.Allocator,
+    self: Normalize,
+    allocator: Allocator,
     cps: []const u21,
-) mem.Allocator.Error![]u21 {
+) Allocator.Error![]u21 {
     var dcp_list = std.ArrayList(u21).init(allocator);
     defer dcp_list.deinit();
 
@@ -407,21 +415,21 @@ pub fn nfkdCodePoints(
 
 // Composition (NFC, NFKC)
 
-fn isHangul(self: Self, cp: u21) bool {
-    return cp >= 0x1100 and self.norm_data.hangul_data.syllable(cp) != .none;
+fn isHangul(self: Normalize, cp: u21) bool {
+    return cp >= 0x1100 and self.hangul_data.syllable(cp) != .none;
 }
 
 /// Normalizes `str` to NFC.
-pub fn nfc(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
+pub fn nfc(self: Normalize, allocator: Allocator, str: []const u8) Allocator.Error!Result {
     return self.nfxc(allocator, str, .nfc);
 }
 
 /// Normalizes `str` to NFKC.
-pub fn nfkc(self: Self, allocator: mem.Allocator, str: []const u8) mem.Allocator.Error!Result {
+pub fn nfkc(self: Normalize, allocator: Allocator, str: []const u8) Allocator.Error!Result {
     return self.nfxc(allocator, str, .nfkc);
 }
 
-fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.Allocator.Error!Result {
+fn nfxc(self: Normalize, allocator: Allocator, str: []const u8, form: Form) Allocator.Error!Result {
     // Quick checks.
     if (ascii.isAsciiOnly(str)) return Result{ .slice = str };
     if (form == .nfc and isLatin1Only(str)) return Result{ .slice = str };
@@ -446,7 +454,7 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
         block_check: while (i < dcps.len) : (i += 1) {
             const C = dcps[i];
             if (C == tombstone) continue :block_check;
-            const cc_C = self.norm_data.ccc_data.ccc(C);
+            const cc_C = self.ccc_data.ccc(C);
             var starter_index: ?usize = null;
             var j: usize = i;
 
@@ -456,11 +464,11 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
                 if (dcps[j] == tombstone) continue;
 
                 // Check for starter.
-                if (self.norm_data.ccc_data.isStarter(dcps[j])) {
+                if (self.ccc_data.isStarter(dcps[j])) {
                     // Check for blocking conditions.
                     for (dcps[(j + 1)..i]) |B| {
                         if (B == tombstone) continue;
-                        const cc_B = self.norm_data.ccc_data.ccc(B);
+                        const cc_B = self.ccc_data.ccc(B);
                         if (cc_B != 0 and self.isHangul(C)) continue :block_check;
                         if (cc_B >= cc_C) continue :block_check;
                     }
@@ -484,8 +492,8 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
                 // them algorithmically if possible.
                 if (self.isHangul(L) and self.isHangul(C)) {
                     // Get Hangul syllable types.
-                    const l_stype = self.norm_data.hangul_data.syllable(L);
-                    const c_stype = self.norm_data.hangul_data.syllable(C);
+                    const l_stype = self.hangul_data.syllable(L);
+                    const c_stype = self.hangul_data.syllable(C);
 
                     if (l_stype == .LV and c_stype == .T) {
                         // LV, T canonical composition.
@@ -508,13 +516,13 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
                 if (!processed_hangul) {
                     // L, C are not Hangul, so check for primary composite
                     // in the Unicode Character Database.
-                    if (self.norm_data.canon_data.toNfc(.{ L, C })) |P| {
+                    if (self.canon_data.toNfc(.{ L, C })) |P| {
                         // We have a primary composite P for L, C.
                         // We must check if P is not in the Full
                         // Composition Exclusions  (FCX) list,
                         // preventing it from appearing in any
                         // composed form (NFC, NFKC).
-                        if (!self.norm_data.normp_data.isFcx(P)) {
+                        if (!self.normp_data.isFcx(P)) {
                             dcps[sidx] = P;
                             dcps[i] = tombstone; // Mark for deletion.
                             deleted += 1;
@@ -544,10 +552,8 @@ fn nfxc(self: Self, allocator: mem.Allocator, str: []const u8, form: Form) mem.A
 
 test "nfc" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    const n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
     defer result.deinit(allocator);
@@ -557,10 +563,8 @@ test "nfc" {
 
 test "nfkc" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    const n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     const result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
     defer result.deinit(allocator);
@@ -569,7 +573,7 @@ test "nfkc" {
 }
 
 /// Tests for equality of `a` and `b` after normalizing to NFC.
-pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !bool {
+pub fn eql(self: Normalize, allocator: Allocator, a: []const u8, b: []const u8) !bool {
     const norm_result_a = try self.nfc(allocator, a);
     defer norm_result_a.deinit(allocator);
     const norm_result_b = try self.nfc(allocator, b);
@@ -580,10 +584,8 @@ pub fn eql(self: Self, allocator: mem.Allocator, a: []const u8, b: []const u8) !
 
 test "eql" {
     const allocator = testing.allocator;
-    var data: NormData = undefined;
-    try NormData.init(&data, allocator);
-    defer data.deinit(allocator);
-    const n = Self{ .norm_data = &data };
+    const n = try Normalize.init(allocator);
+    defer n.deinit(allocator);
 
     try testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
     try testing.expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
@@ -629,3 +631,24 @@ test "isLatin1Only" {
     const not_latin1_only = "Héllo, World! \u{3d3}";
     try testing.expect(!isLatin1Only(not_latin1_only));
 }
+
+const std = @import("std");
+const debug = std.debug;
+const assert = debug.assert;
+const fmt = std.fmt;
+const heap = std.heap;
+const mem = std.mem;
+const simd = std.simd;
+const testing = std.testing;
+const unicode = std.unicode;
+const Allocator = std.mem.Allocator;
+
+const ascii = @import("ascii");
+const CodePointIterator = @import("code_point").Iterator;
+
+const CanonData = @import("CanonData");
+const CccData = @import("CombiningData");
+const CompatData = @import("CompatData");
+const FoldData = @import("FoldData");
+const HangulData = @import("HangulData");
+const NormPropsData = @import("NormPropsData");

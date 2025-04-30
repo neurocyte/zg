@@ -1,14 +1,11 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const compress = std.compress;
-const mem = std.mem;
+//! Canonicalization Data
 
 nfc: std.AutoHashMapUnmanaged([2]u21, u21),
 nfd: [][]u21 = undefined,
 
-const Self = @This();
+const CanonData = @This();
 
-pub fn init(allocator: mem.Allocator) !Self {
+pub fn init(allocator: mem.Allocator) !CanonData {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("canon");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -16,49 +13,54 @@ pub fn init(allocator: mem.Allocator) !Self {
     var reader = in_decomp.reader();
 
     const endian = builtin.cpu.arch.endian();
-    var self = Self{
-        .nfc = .{},
+    var cdata = CanonData{
+        .nfc = .empty,
         .nfd = try allocator.alloc([]u21, 0x110000),
     };
 
     var slices: usize = 0;
     errdefer {
-        self.nfc.deinit(allocator);
-        for (self.nfd[0..slices]) |slice| allocator.free(slice);
-        allocator.free(self.nfd);
+        cdata.nfc.deinit(allocator);
+        for (cdata.nfd[0..slices]) |slice| allocator.free(slice);
+        allocator.free(cdata.nfd);
     }
 
-    @memset(self.nfd, &.{});
+    @memset(cdata.nfd, &.{});
 
     while (true) {
         const len: u8 = try reader.readInt(u8, endian);
         if (len == 0) break;
         const cp = try reader.readInt(u24, endian);
-        self.nfd[cp] = try allocator.alloc(u21, len - 1);
+        cdata.nfd[cp] = try allocator.alloc(u21, len - 1);
         slices += 1;
         for (0..len - 1) |i| {
-            self.nfd[cp][i] = @intCast(try reader.readInt(u24, endian));
+            cdata.nfd[cp][i] = @intCast(try reader.readInt(u24, endian));
         }
         if (len == 3) {
-            try self.nfc.put(allocator, self.nfd[cp][0..2].*, @intCast(cp));
+            try cdata.nfc.put(allocator, cdata.nfd[cp][0..2].*, @intCast(cp));
         }
     }
 
-    return self;
+    return cdata;
 }
 
-pub fn deinit(self: *Self, allocator: mem.Allocator) void {
-    self.nfc.deinit(allocator);
-    for (self.nfd) |slice| allocator.free(slice);
-    allocator.free(self.nfd);
+pub fn deinit(cdata: *CanonData, allocator: mem.Allocator) void {
+    cdata.nfc.deinit(allocator);
+    for (cdata.nfd) |slice| allocator.free(slice);
+    allocator.free(cdata.nfd);
 }
 
 /// Returns canonical decomposition for `cp`.
-pub fn toNfd(self: Self, cp: u21) []const u21 {
-    return self.nfd[cp];
+pub fn toNfd(cdata: *const CanonData, cp: u21) []const u21 {
+    return cdata.nfd[cp];
 }
 
 // Returns the primary composite for the codepoints in `cp`.
-pub fn toNfc(self: Self, cps: [2]u21) ?u21 {
-    return self.nfc.get(cps);
+pub fn toNfc(cdata: *const CanonData, cps: [2]u21) ?u21 {
+    return cdata.nfc.get(cps);
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const compress = std.compress;
+const mem = std.mem;
