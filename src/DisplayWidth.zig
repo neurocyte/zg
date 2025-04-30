@@ -13,10 +13,10 @@ pub const DisplayWidthData = @import("DisplayWidthData");
 
 const Graphemes = @import("Graphemes");
 
-g_data: Graphemes,
+graphemes: Graphemes,
 s1: []u16 = undefined,
 s2: []i4 = undefined,
-owns_gdata: bool,
+owns_graphemes: bool,
 
 const DisplayWidth = @This();
 
@@ -26,16 +26,16 @@ pub fn init(allocator: mem.Allocator) mem.Allocator.Error!DisplayWidth {
         allocator.free(dw.s1);
         allocator.free(dw.s2);
     }
-    dw.owns_gdata = true;
-    dw.g_data = try Graphemes.init(allocator);
-    errdefer dw.g_data.deinit(allocator);
+    dw.owns_graphemes = true;
+    dw.graphemes = try Graphemes.init(allocator);
+    errdefer dw.graphemes.deinit(allocator);
     return dw;
 }
 
-pub fn initWithGraphemeData(allocator: mem.Allocator, g_data: Graphemes) mem.Allocator.Error!DisplayWidth {
+pub fn initWithGraphemes(allocator: mem.Allocator, graphemes: Graphemes) mem.Allocator.Error!DisplayWidth {
     var dw = try DisplayWidth.setup(allocator);
-    dw.g_data = g_data;
-    dw.owns_gdata = false;
+    dw.graphemes = graphemes;
+    dw.owns_graphemes = false;
     return dw;
 }
 
@@ -67,7 +67,7 @@ fn setup(allocator: mem.Allocator) mem.Allocator.Error!DisplayWidth {
 pub fn deinit(dw: *const DisplayWidth, allocator: mem.Allocator) void {
     allocator.free(dw.s1);
     allocator.free(dw.s2);
-    if (dw.owns_gdata) dw.g_data.deinit(allocator);
+    if (dw.owns_graphemes) dw.graphemes.deinit(allocator);
 }
 
 /// codePointWidth returns the number of cells `cp` requires when rendered
@@ -119,7 +119,7 @@ pub fn strWidth(dw: DisplayWidth, str: []const u8) usize {
         return @intCast(@max(0, total));
     }
 
-    var giter = dw.g_data.iterator(str);
+    var giter = dw.graphemes.iterator(str);
 
     while (giter.next()) |gc| {
         var cp_iter = CodePointIterator{ .bytes = gc.bytes(str) };

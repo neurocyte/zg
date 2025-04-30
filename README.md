@@ -82,21 +82,20 @@ them, `Grapheme`, and an `Iterator` to iterate over them in a string.
 In your `build.zig`:
 
 ```zig
-exe.root_module.addImport("grapheme", zg.module("grapheme"));
+exe.root_module.addImport("Graphemes", zg.module("Graphemes"));
 ```
 
 In your code:
 
 ```zig
-const grapheme = @import("grapheme");
+const Graphemes = @import("Graphemes");
 
 test "Grapheme cluster iterator" {
-    // we need some Unicode data to process Grapheme Clusters.
-    const gd = try grapheme.GraphemeData.init(allocator);
-    defer gd.deinit(allocator);
+    const graph = try Graphemes.init(allocator);
+    defer graph.deinit(allocator);
 
     const str = "He\u{301}"; // Hé
-    var iter = grapheme.Iterator.init(str, &gd);
+    var iter = graph.iterator(str);
 
     var i: usize = 0;
 
@@ -123,133 +122,133 @@ test "Grapheme cluster iterator" {
 
 ## Unicode General Categories
 
-To detect the general category for a code point, use the `GenCatData` module.
+To detect the general category for a code point, use the `GeneralCategories` module.
 
 In your `build.zig`:
 
 ```zig
-exe.root_module.addImport("GenCatData", zg.module("GenCatData"));
+exe.root_module.addImport("GeneralCategories", zg.module("GeneralCategories"));
 ```
 
 In your code:
 
 ```zig
-const GenCatData = @import("GenCatData");
+const GeneralCategories = @import("GeneralCategories");
 
 test "General Category" {
-    const gcd = try GenCatData.init(allocator);
-    defer gcd.deinit(allocator);
+    const gen_cat = try GeneralCategories.init(allocator);
+    defer gen_cat.deinit(allocator);
 
     // The `gc` method returns the abbreviated General Category.
     // These abbreviations and descriptive comments can be found
     // in the source file `src/GenCatData.zig` as en enum.
-    try expect(gcd.gc('A') == .Lu); // Lu: uppercase letter
-    try expect(gcd.gc('3') == .Nd); // Nd: decimal number
+    try expect(gen_cat.gc('A') == .Lu); // Lu: uppercase letter
+    try expect(gen_cat.gc('3') == .Nd); // Nd: decimal number
 
     // The following are convenience methods for groups of General
     // Categories. For example, all letter categories start with `L`:
     // Lu, Ll, Lt, Lo.
-    try expect(gcd.isControl(0));
-    try expect(gcd.isLetter('z'));
-    try expect(gcd.isMark('\u{301}'));
-    try expect(gcd.isNumber('3'));
-    try expect(gcd.isPunctuation('['));
-    try expect(gcd.isSeparator(' '));
-    try expect(gcd.isSymbol('©'));
+    try expect(gen_cat.isControl(0));
+    try expect(gen_cat.isLetter('z'));
+    try expect(gen_cat.isMark('\u{301}'));
+    try expect(gen_cat.isNumber('3'));
+    try expect(gen_cat.isPunctuation('['));
+    try expect(gen_cat.isSeparator(' '));
+    try expect(gen_cat.isSymbol('©'));
 }
 ```
 
 ## Unicode Properties
 
-You can detect common properties of a code point with the `PropsData` module.
+You can detect common properties of a code point with the `Properties` module.
 
 In your `build.zig`:
 
 ```zig
-exe.root_module.addImport("PropsData", zg.module("PropsData"));
+exe.root_module.addImport("Properties", zg.module("Properties"));
 ```
 
 In your code:
 
 ```zig
-const PropsData = @import("PropsData");
+const Properties = @import("Properties");
 
 test "Properties" {
-    const pd = try PropsData.init(allocator);
-    defer pd.deinit(allocator);
+    const props = try Properties.init(allocator);
+    defer props.deinit(allocator);
 
     // Mathematical symbols and letters.
-    try expect(pd.isMath('+'));
+    try expect(props.isMath('+'));
     // Alphabetic only code points.
-    try expect(pd.isAlphabetic('Z'));
+    try expect(props.isAlphabetic('Z'));
     // Space, tab, and other separators.
-    try expect(pd.isWhitespace(' '));
+    try expect(props.isWhitespace(' '));
     // Hexadecimal digits and variations thereof.
-    try expect(pd.isHexDigit('f'));
-    try expect(!pd.isHexDigit('z'));
+    try expect(props.isHexDigit('f'));
+    try expect(!props.isHexDigit('z'));
 
     // Accents, dieresis, and other combining marks.
-    try expect(pd.isDiacritic('\u{301}'));
+    try expect(props.isDiacritic('\u{301}'));
 
     // Unicode has a specification for valid identifiers like
     // the ones used in programming and regular expressions.
-    try expect(pd.isIdStart('Z')); // Identifier start character
-    try expect(!pd.isIdStart('1'));
-    try expect(pd.isIdContinue('1'));
+    try expect(props.isIdStart('Z')); // Identifier start character
+    try expect(!props.isIdStart('1'));
+    try expect(props.isIdContinue('1'));
 
     // The `X` versions add some code points that can appear after
     // normalizing a string.
-    try expect(pd.isXidStart('\u{b33}')); // Extended identifier start character
-    try expect(pd.isXidContinue('\u{e33}'));
-    try expect(!pd.isXidStart('1'));
+    try expect(props.isXidStart('\u{b33}')); // Extended identifier start character
+    try expect(props.isXidContinue('\u{e33}'));
+    try expect(!props.isXidStart('1'));
 
     // Note surprising Unicode numeric type properties!
-    try expect(pd.isNumeric('\u{277f}'));
-    try expect(!pd.isNumeric('3')); // 3 is not numeric!
-    try expect(pd.isDigit('\u{2070}'));
-    try expect(!pd.isDigit('3')); // 3 is not a digit!
-    try expect(pd.isDecimal('3')); // 3 is a decimal digit
+    try expect(props.isNumeric('\u{277f}'));
+    try expect(!props.isNumeric('3')); // 3 is not numeric!
+    try expect(props.isDigit('\u{2070}'));
+    try expect(!props.isDigit('3')); // 3 is not a digit!
+    try expect(props.isDecimal('3')); // 3 is a decimal digit
 }
 ```
 
 ## Letter Case Detection and Conversion
 
-To detect and convert to and from different letter cases, use the `CaseData`
+To detect and convert to and from different letter cases, use the `LetterCasing`
 module.
 
 In your `build.zig`:
 
 ```zig
-exe.root_module.addImport("CaseData", zg.module("CaseData"));
+exe.root_module.addImport("LetterCasing", zg.module("LetterCasing"));
 ```
 
 In your code:
 
 ```zig
-const CaseData = @import("CaseData");
+const LetterCasing = @import("LetterCasing");
 
 test "Case" {
-    const cd = try CaseData.init(allocator);
-    defer cd.deinit(allocator);
+    const case = try LetterCasing.init(allocator);
+    defer case.deinit(allocator);
 
     // Upper and lower case.
-    try expect(cd.isUpper('A'));
-    try expect('A' == cd.toUpper('a'));
-    try expect(cd.isLower('a'));
-    try expect('a' == cd.toLower('A'));
+    try expect(case.isUpper('A'));
+    try expect('A' == case.toUpper('a'));
+    try expect(case.isLower('a'));
+    try expect('a' == case.toLower('A'));
 
     // Code points that have case.
-    try expect(cd.isCased('É'));
-    try expect(!cd.isCased('3'));
+    try expect(case.isCased('É'));
+    try expect(!case.isCased('3'));
 
     // Case detection and conversion for strings.
-    try expect(cd.isUpperStr("HELLO 123!"));
-    const ucased = try cd.toUpperStr(allocator, "hello 123");
+    try expect(case.isUpperStr("HELLO 123!"));
+    const ucased = try case.toUpperStr(allocator, "hello 123");
     defer allocator.free(ucased);
     try expectEqualStrings("HELLO 123", ucased);
 
-    try expect(cd.isLowerStr("hello 123!"));
-    const lcased = try cd.toLowerStr(allocator, "HELLO 123");
+    try expect(case.isLowerStr("hello 123!"));
+    const lcased = try case.toLowerStr(allocator, "HELLO 123");
     defer allocator.free(lcased);
     try expectEqualStrings("hello 123", lcased);
 }
@@ -292,37 +291,32 @@ In your code:
 const Normalize = @import("Normalize");
 
 test "Normalization" {
-    // We need lots of Unicode dta for normalization.
-    var norm_data: Normalize.NormData = undefined;
-    try Normalize.NormData.init(&norm_data, allocator);
-    defer norm_data.deinit(allocator);
-
-    // The `Normalize` structure takes a pointer to the data.
-    const n = Normalize{ .norm_data = &norm_data };
+    const normalize = try Normalize.init(allocator);
+    defer normalize.deinit(allocator);
 
     // NFC: Canonical composition
-    const nfc_result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
+    const nfc_result = try normalize.nfc(allocator, "Complex char: \u{3D2}\u{301}");
     defer nfc_result.deinit(allocator);
     try expectEqualStrings("Complex char: \u{3D3}", nfc_result.slice);
 
     // NFKC: Compatibility composition
-    const nfkc_result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
+    const nfkc_result = try normalize.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
     defer nfkc_result.deinit(allocator);
     try expectEqualStrings("Complex char: \u{038E}", nfkc_result.slice);
 
     // NFD: Canonical decomposition
-    const nfd_result = try n.nfd(allocator, "Héllo World! \u{3d3}");
+    const nfd_result = try normalize.nfd(allocator, "Héllo World! \u{3d3}");
     defer nfd_result.deinit(allocator);
     try expectEqualStrings("He\u{301}llo World! \u{3d2}\u{301}", nfd_result.slice);
 
     // NFKD: Compatibility decomposition
-    const nfkd_result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
+    const nfkd_result = try normalize.nfkd(allocator, "Héllo World! \u{3d3}");
     defer nfkd_result.deinit(allocator);
     try expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", nfkd_result.slice);
 
     // Test for equality of two strings after normalizing to NFC.
-    try expect(try n.eql(allocator, "foé", "foe\u{0301}"));
-    try expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
+    try expect(try normalize.eql(allocator, "foé", "foe\u{0301}"));
+    try expect(try normalize.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
 }
 ```
 The `Result` returned by normalization functions may or may not be copied from the
@@ -347,45 +341,52 @@ for this.
 In your `build.zig`:
 
 ```zig
-exe.root_module.addImport("Normalize", zg.module("Normalize"));
-exe.root_module.addImport("CaseFold", zg.module("CaseFold"));
+exe.root_module.addImport("CaseFolding", zg.module("CaseFolding"));
 ```
 
 In your code:
 
 ```zig
-const Normalize = @import("Normalize");
-const CaseFold = @import("CaseFold");
+const CaseFolding = @import("CaseFolding");
 
 test "Caseless matching" {
-    // We need to normalize during the matching process.
-    var norm_data: Normalize.NormData = undefined;
-    try Normalize.NormData.init(&norm_data, allocator);
-    defer norm_data.deinit(allocator);
-    const n = Normalize{ .norm_data = &norm_data };
-
     // We need Unicode case fold data.
-    const cfd = try CaseFold.FoldData.init(allocator);
-    defer cfd.deinit(allocator);
-
-    // The `CaseFold` structure takes a pointer to the data.
-    const cf = CaseFold{ .fold_data = &cfd };
+    const case_fold = try CaseFolding.init(allocator);
+    defer case_fold.deinit(allocator);
 
     // `compatCaselessMatch` provides the deepest level of caseless
     // matching because it decomposes fully to NFKD.
     const a = "Héllo World! \u{3d3}";
     const b = "He\u{301}llo World! \u{3a5}\u{301}";
-    try expect(try cf.compatCaselessMatch(allocator, &n, a, b));
+    try expect(try case_fold.compatCaselessMatch(allocator, &n, a, b));
 
     const c = "He\u{301}llo World! \u{3d2}\u{301}";
-    try expect(try cf.compatCaselessMatch(allocator, &n, a, c));
+    try expect(try case_fold.compatCaselessMatch(allocator, &n, a, c));
 
     // `canonCaselessMatch` isn't as comprehensive as `compatCaselessMatch`
     // because it only decomposes to NFD. Naturally, it's faster because of this.
-    try expect(!try cf.canonCaselessMatch(allocator, &n, a, b));
-    try expect(try cf.canonCaselessMatch(allocator, &n, a, c));
+    try expect(!try case_fold.canonCaselessMatch(allocator, &n, a, b));
+    try expect(try case_fold.canonCaselessMatch(allocator, &n, a, c));
 }
 ```
+Case folding needs to use the `Normalize` module in order to produce the compatibility
+forms for comparison.  If you are already using a `Normalize` for other purposes,
+`CaseFolding` can borrow it:
+
+```zig
+const CaseFolding = @import("CaseFolding");
+const Normalize = @import("Normalize");
+
+test "Initialize With a Normalize" {
+    const normalize = try Normalize.init(allocator);
+    // You're responsible for freeing this:
+    defer normalize.deinit(allocator);
+    const case_fold = try CaseFolding.initWithNormalize(allocator, normalize);
+    // This will not free your normalize when it runs first.
+    defer case_fold.deinit(allocator);
+}
+```
+
 
 ## Display Width of Characters and Strings
 
@@ -408,12 +409,8 @@ In your code:
 const DisplayWidth = @import("DisplayWidth");
 
 test "Display width" {
-    // We need Unicode data for display width calculation.
-    const dwd = try DisplayWidth.DisplayWidthData.init(allocator);
-    defer dwd.deinit(allocator);
-
-    // The `DisplayWidth` structure takes a pointer to the data.
-    const dw = DisplayWidth{ .data = &dwd };
+    const dw = try DisplayWidth.init(allocator);
+    defer dw.deinit(allocator);
 
     // String display width
     try expectEqual(@as(usize, 5), dw.strWidth("Hello\r\n"));
@@ -462,34 +459,43 @@ const zg = b.dependency("zg", .{
 });
 ```
 
-The other options are `c0_width` and `c1_width`.  The standard behavior is to treat C0 and C1 control codes as zero-width, except for delete and backspace, which are -1 (the logic ensures that a `strWidth` is always at least 0).  If printing control codes with replacement characters, it's necessary to assign these a width, hence the options.  When provided these values must fit in an `i4`, this allows for C1s to be printed as `\u{80}` if desired.
+The other options are `c0_width` and `c1_width`.  The standard behavior is to treat
+C0 and C1 control codes as zero-width, except for delete and backspace, which are
+-1 (the logic ensures that a `strWidth` is always at least 0).  If printing
+control codes with replacement characters, it's necessary to assign these a width,
+hence the options.  When provided these values must fit in an `i4`, this allows
+for C1s to be printed as `\u{80}` if desired.
+
+`DisplayWidth` uses the `Graphemes` module internally.  If you already have one,
+it can be borrowed using `DisplayWidth.initWithGraphemes(allocator, graphemes)`
+in the same fashion as shown for `CaseFolding` and `Normalize`.
 
 ## Scripts
 
 Unicode categorizes code points by the Script in which they belong. A Script
 collects letters and other symbols that belong to a particular writing system.
-You can detect the Script for a code point with the `ScriptsData` module.
+You can detect the Script for a code point with the `Scripts` module.
 
 In your `build.zig`:
 
 ```zig
-exe.root_module.addImport("ScriptsData", zg.module("ScriptsData"));
+exe.root_module.addImport("Scripts", zg.module("Scripts"));
 ```
 
 In your code:
 
 ```zig
-const ScriptsData = @import("ScriptsData");
+const Scripts= @import("Scripts");
 
 test "Scripts" {
-    const sd = try ScriptsData.init(allocator);
-    defer sd.deinit(allocator);
+    const scripts = try Scripts.init(allocator);
+    defer scripts.deinit(allocator);
 
     // To see the full list of Scripts, look at the
-    // `src/ScriptsData.zig` file. They are list in an enum.
-    try expect(sd.script('A') == .Latin);
-    try expect(sd.script('Ω') == .Greek);
-    try expect(sd.script('צ') == .Hebrew);
+    // `src/Scripts.zig` file. They are list in an enum.
+    try expect(scripts.script('A') == .Latin);
+    try expect(scripts.script('Ω') == .Greek);
+    try expect(scripts.script('צ') == .Hebrew);
 }
 ```
 
