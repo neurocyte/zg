@@ -1,10 +1,99 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const mem = std.mem;
+const Allocator = mem.Allocator;
+const compress = std.compress;
 const unicode = std.unicode;
 
 const CodePoint = @import("code_point").CodePoint;
 const CodePointIterator = @import("code_point").Iterator;
-pub const GraphemeData = @import("GraphemeData");
+
+s1: []u16 = undefined,
+s2: []u16 = undefined,
+s3: []u8 = undefined,
+
+const Graphemes = @This();
+
+pub inline fn init(allocator: mem.Allocator) mem.Allocator.Error!Graphemes {
+    const decompressor = compress.flate.inflate.decompressor;
+    const in_bytes = @embedFile("gbp");
+    var in_fbs = std.io.fixedBufferStream(in_bytes);
+    var in_decomp = decompressor(.raw, in_fbs.reader());
+    var reader = in_decomp.reader();
+
+    const endian = builtin.cpu.arch.endian();
+
+    var self = Graphemes{};
+
+    const s1_len: u16 = reader.readInt(u16, endian) catch unreachable;
+    self.s1 = try allocator.alloc(u16, s1_len);
+    errdefer allocator.free(self.s1);
+    for (0..s1_len) |i| self.s1[i] = reader.readInt(u16, endian) catch unreachable;
+
+    const s2_len: u16 = reader.readInt(u16, endian) catch unreachable;
+    self.s2 = try allocator.alloc(u16, s2_len);
+    errdefer allocator.free(self.s2);
+    for (0..s2_len) |i| self.s2[i] = reader.readInt(u16, endian) catch unreachable;
+
+    const s3_len: u16 = reader.readInt(u16, endian) catch unreachable;
+    self.s3 = try allocator.alloc(u8, s3_len);
+    errdefer allocator.free(self.s3);
+    _ = reader.readAll(self.s3) catch unreachable;
+
+    return self;
+}
+
+pub fn deinit(graphemes: *const Graphemes, allocator: mem.Allocator) void {
+    allocator.free(graphemes.s1);
+    allocator.free(graphemes.s2);
+    allocator.free(graphemes.s3);
+}
+
+/// Lookup the grapheme break property for a code point.
+pub fn gbp(graphemes: Graphemes, cp: u21) Gbp {
+    return @enumFromInt(graphemes.s3[graphemes.s2[graphemes.s1[cp >> 8] + (cp & 0xff)]] >> 4);
+}
+
+/// Lookup the indic syllable type for a code point.
+pub fn indic(graphemes: Graphemes, cp: u21) Indic {
+    return @enumFromInt((graphemes.s3[graphemes.s2[graphemes.s1[cp >> 8] + (cp & 0xff)]] >> 1) & 0x7);
+}
+
+/// Lookup the emoji property for a code point.
+pub fn isEmoji(graphemes: Graphemes, cp: u21) bool {
+    return graphemes.s3[graphemes.s2[graphemes.s1[cp >> 8] + (cp & 0xff)]] & 1 == 1;
+}
+
+pub fn iterator(graphemes: *const Graphemes, string: []const u8) Iterator {
+    return Iterator.init(string, graphemes);
+}
+
+/// Indic syllable type.
+pub const Indic = enum {
+    none,
+
+    Consonant,
+    Extend,
+    Linker,
+};
+
+/// Grapheme break property.
+pub const Gbp = enum {
+    none,
+    Control,
+    CR,
+    Extend,
+    L,
+    LF,
+    LV,
+    LVT,
+    Prepend,
+    Regional_Indicator,
+    SpacingMark,
+    T,
+    V,
+    ZWJ,
+};
 
 /// `Grapheme` represents a Unicode grapheme cluster by its length and offset in the source bytes.
 pub const Grapheme = struct {
@@ -22,12 +111,12 @@ pub const Grapheme = struct {
 pub const Iterator = struct {
     buf: [2]?CodePoint = .{ null, null },
     cp_iter: CodePointIterator,
-    data: *const GraphemeData,
+    data: *const Graphemes,
 
     const Self = @This();
 
     /// Assumes `src` is valid UTF-8.
-    pub fn init(str: []const u8, data: *const GraphemeData) Self {
+    pub fn init(str: []const u8, data: *const Graphemes) Self {
         var self = Self{ .cp_iter = .{ .bytes = str }, .data = data };
         self.advance();
         return self;
@@ -149,7 +238,7 @@ pub const Iterator = struct {
 };
 
 // Predicates
-fn isBreaker(cp: u21, data: *const GraphemeData) bool {
+fn isBreaker(cp: u21, data: *const Graphemes) bool {
     // Extract relevant properties.
     const cp_gbp_prop = data.gbp(cp);
     return cp == '\x0d' or cp == '\x0a' or cp_gbp_prop == .Control;
@@ -202,7 +291,7 @@ pub const State = struct {
 pub fn graphemeBreak(
     cp1: u21,
     cp2: u21,
-    data: *const GraphemeData,
+    data: *const Graphemes,
     state: *State,
 ) bool {
     // Extract relevant properties.
@@ -306,25 +395,25 @@ test "Segmentation ZWJ and ZWSP emoji sequences" {
     const with_zwsp = seq_1 ++ "\u{200B}" ++ seq_2;
     const no_joiner = seq_1 ++ seq_2;
 
-    const data = try GraphemeData.init(std.testing.allocator);
-    defer data.deinit(std.testing.allocator);
+    const graphemes = try Graphemes.init(std.testing.allocator);
+    defer graphemes.deinit(std.testing.allocator);
 
     {
-        var iter = Iterator.init(with_zwj, &data);
+        var iter = graphemes.iterator(with_zwj);
         var i: usize = 0;
         while (iter.next()) |_| : (i += 1) {}
         try std.testing.expectEqual(@as(usize, 1), i);
     }
 
     {
-        var iter = Iterator.init(with_zwsp, &data);
+        var iter = graphemes.iterator(with_zwsp);
         var i: usize = 0;
         while (iter.next()) |_| : (i += 1) {}
         try std.testing.expectEqual(@as(usize, 3), i);
     }
 
     {
-        var iter = Iterator.init(no_joiner, &data);
+        var iter = graphemes.iterator(no_joiner);
         var i: usize = 0;
         while (iter.next()) |_| : (i += 1) {}
         try std.testing.expectEqual(@as(usize, 2), i);

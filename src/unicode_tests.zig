@@ -9,7 +9,7 @@ const unicode = std.unicode;
 
 const grapheme = @import("grapheme");
 const Grapheme = @import("grapheme").Grapheme;
-const GraphemeData = @import("grapheme").GraphemeData;
+const Graphemes = @import("grapheme");
 const GraphemeIterator = @import("grapheme").Iterator;
 const Normalize = @import("Normalize");
 
@@ -18,10 +18,10 @@ comptime {
 }
 test "Iterator.peek" {
     const peek_seq = "aΔ👨🏻‍🌾→";
-    const data = try GraphemeData.init(std.testing.allocator);
+    const data = try Graphemes.init(std.testing.allocator);
     defer data.deinit(std.testing.allocator);
 
-    var iter = grapheme.Iterator.init(peek_seq, &data);
+    var iter = data.iterator(peek_seq);
     const peek_a = iter.peek().?;
     const next_a = iter.next().?;
     try std.testing.expectEqual(peek_a, next_a);
@@ -162,7 +162,7 @@ test "Segmentation GraphemeIterator" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var input_stream = buf_reader.reader();
 
-    const data = try GraphemeData.init(allocator);
+    const data = try Graphemes.init(allocator);
     defer data.deinit(allocator);
 
     var buf: [4096]u8 = undefined;
@@ -207,7 +207,7 @@ test "Segmentation GraphemeIterator" {
         }
 
         // std.debug.print("\nline {}: {s}\n", .{ line_no, all_bytes.items });
-        var iter = GraphemeIterator.init(all_bytes.items, &data);
+        var iter = data.iterator(all_bytes.items);
 
         // Chaeck.
         for (want.items) |want_gc| {

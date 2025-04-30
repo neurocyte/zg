@@ -177,7 +177,7 @@ test "decompose" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     var n = Self{ .norm_data = &data };
 
     var buf: [18]u21 = undefined;
@@ -307,11 +307,11 @@ test "nfd ASCII / no-alloc" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const n = Self{ .norm_data = &data };
 
     const result = try n.nfd(allocator, "Hello World!");
-    defer result.deinit();
+    defer result.deinit(allocator);
 
     try testing.expectEqualStrings("Hello World!", result.slice);
 }
@@ -320,11 +320,11 @@ test "nfd !ASCII / alloc" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const n = Self{ .norm_data = &data };
 
     const result = try n.nfd(allocator, "Héllo World! \u{3d3}");
-    defer result.deinit();
+    defer result.deinit(allocator);
 
     try testing.expectEqualStrings("He\u{301}llo World! \u{3d2}\u{301}", result.slice);
 }
@@ -333,11 +333,11 @@ test "nfkd ASCII / no-alloc" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const n = Self{ .norm_data = &data };
 
     const result = try n.nfkd(allocator, "Hello World!");
-    defer result.deinit();
+    defer result.deinit(allocator);
 
     try testing.expectEqualStrings("Hello World!", result.slice);
 }
@@ -346,11 +346,11 @@ test "nfkd !ASCII / alloc" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const n = Self{ .norm_data = &data };
 
     const result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
-    defer result.deinit();
+    defer result.deinit(allocator);
 
     try testing.expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", result.slice);
 }
@@ -546,11 +546,11 @@ test "nfc" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const n = Self{ .norm_data = &data };
 
     const result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
-    defer result.deinit();
+    defer result.deinit(allocator);
 
     try testing.expectEqualStrings("Complex char: \u{3D3}", result.slice);
 }
@@ -559,11 +559,11 @@ test "nfkc" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const n = Self{ .norm_data = &data };
 
     const result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
-    defer result.deinit();
+    defer result.deinit(allocator);
 
     try testing.expectEqualStrings("Complex char: \u{038E}", result.slice);
 }
@@ -582,7 +582,7 @@ test "eql" {
     const allocator = testing.allocator;
     var data: NormData = undefined;
     try NormData.init(&data, allocator);
-    defer data.deinit();
+    defer data.deinit(allocator);
     const n = Self{ .norm_data = &data };
 
     try testing.expect(try n.eql(allocator, "foé", "foe\u{0301}"));
@@ -628,5 +628,4 @@ test "isLatin1Only" {
     try testing.expect(isLatin1Only(latin1_only));
     const not_latin1_only = "Héllo, World! \u{3d3}";
     try testing.expect(!isLatin1Only(not_latin1_only));
-    try testing.expect(false);
 }

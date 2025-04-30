@@ -191,33 +191,18 @@ pub fn build(b: *std.Build) void {
     });
     const code_point_tr = b.addRunArtifact(code_point_t);
 
-    // Grapheme clusters
-    const grapheme_data = b.createModule(.{
-        .root_source_file = b.path("src/GraphemeData.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    grapheme_data.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
-
-    const grapheme_data_t = b.addTest(.{
-        .name = "grapheme_data",
-        .root_module = grapheme_data,
-        .target = target,
-        .optimize = optimize,
-    });
-    const grapheme_data_tr = b.addRunArtifact(grapheme_data_t);
-
-    const grapheme = b.addModule("grapheme", .{
+    // Graphemes
+    const graphemes = b.addModule("Graphemes", .{
         .root_source_file = b.path("src/grapheme.zig"),
         .target = target,
         .optimize = optimize,
     });
-    grapheme.addImport("code_point", code_point);
-    grapheme.addImport("GraphemeData", grapheme_data);
+    graphemes.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
+    graphemes.addImport("code_point", code_point);
 
     const grapheme_t = b.addTest(.{
-        .name = "grapheme",
-        .root_module = grapheme,
+        .name = "Graphemes",
+        .root_module = graphemes,
         .target = target,
         .optimize = optimize,
     });
@@ -239,31 +224,15 @@ pub fn build(b: *std.Build) void {
     const ascii_tr = b.addRunArtifact(ascii_t);
 
     // Fixed pitch font display width
-    const width_data = b.createModule(.{
-        .root_source_file = b.path("src/WidthData.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    width_data.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
-    width_data.addImport("GraphemeData", grapheme_data);
-
-    const width_data_t = b.addTest(.{
-        .name = "width_data",
-        .root_module = width_data,
-        .target = target,
-        .optimize = optimize,
-    });
-    const width_data_tr = b.addRunArtifact(width_data_t);
-
     const display_width = b.addModule("DisplayWidth", .{
         .root_source_file = b.path("src/DisplayWidth.zig"),
         .target = target,
         .optimize = optimize,
     });
+    display_width.addAnonymousImport("dwp", .{ .root_source_file = dwp_gen_out });
     display_width.addImport("ascii", ascii);
     display_width.addImport("code_point", code_point);
-    display_width.addImport("grapheme", grapheme);
-    display_width.addImport("DisplayWidthData", width_data);
+    display_width.addImport("Graphemes", graphemes);
     display_width.addOptions("options", options); // For testing
 
     const display_width_t = b.addTest(.{
@@ -361,6 +330,14 @@ pub fn build(b: *std.Build) void {
     norm_data.addImport("HangulData", hangul_data);
     norm_data.addImport("NormPropsData", normp_data);
 
+    const norm_data_t = b.addTest(.{
+        .name = "norm_data",
+        .root_module = norm_data,
+        .target = target,
+        .optimize = optimize,
+    });
+    const norm_data_tr = b.addRunArtifact(norm_data_t);
+
     const norm = b.addModule("Normalize", .{
         .root_source_file = b.path("src/Normalize.zig"),
         .target = target,
@@ -370,13 +347,13 @@ pub fn build(b: *std.Build) void {
     norm.addImport("code_point", code_point);
     norm.addImport("NormData", norm_data);
 
-    const norm_data_t = b.addTest(.{
-        .name = "norm_data",
-        .root_module = norm_data,
+    const norm_t = b.addTest(.{
+        .name = "norm",
+        .root_module = norm,
         .target = target,
         .optimize = optimize,
     });
-    const norm_data_tr = b.addRunArtifact(norm_data_t);
+    const norm_tr = b.addRunArtifact(norm_t);
 
     // General Category
     const gencat_data = b.addModule("GenCatData", .{
@@ -478,18 +455,14 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    unicode_tests.root_module.addImport("grapheme", grapheme);
+    unicode_tests.root_module.addImport("grapheme", graphemes);
     unicode_tests.root_module.addImport("Normalize", norm);
 
     const run_unicode_tests = b.addRunArtifact(unicode_tests);
 
-    const unicode_test_step = b.step("unicode-test", "Run Unicode tests");
-    unicode_test_step.dependOn(&run_unicode_tests.step);
-
-    const test_step = b.step("test", "Run general tests");
+    const test_step = b.step("test", "Run all module tests");
+    test_step.dependOn(&run_unicode_tests.step);
     test_step.dependOn(&code_point_tr.step);
-    test_step.dependOn(&grapheme_data_tr.step);
-    test_step.dependOn(&width_data_tr.step);
     test_step.dependOn(&display_width_tr.step);
     test_step.dependOn(&grapheme_tr.step);
     test_step.dependOn(&ascii_tr.step);
@@ -499,6 +472,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&hangul_data_tr.step);
     test_step.dependOn(&normp_data_tr.step);
     test_step.dependOn(&norm_data_tr.step);
+    test_step.dependOn(&norm_tr.step);
     test_step.dependOn(&gencat_data_tr.step);
     test_step.dependOn(&case_fold_tr.step);
     test_step.dependOn(&case_data_tr.step);

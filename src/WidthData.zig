@@ -4,15 +4,36 @@ const compress = std.compress;
 const mem = std.mem;
 const testing = std.testing;
 
-const GraphemeData = @import("GraphemeData");
+const Graphemes = @import("Graphemes");
 
-g_data: GraphemeData,
+g_data: Graphemes,
 s1: []u16 = undefined,
 s2: []i4 = undefined,
+owns_gdata: bool,
 
 const Self = @This();
 
 pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
+    var self: Self = try Self.setup(allocator);
+    errdefer {
+        allocator.free(self.s1);
+        allocator.free(self.s2);
+    }
+    self.owns_gdata = true;
+    self.g_data = try Graphemes.init(allocator);
+    errdefer self.g_data.deinit(allocator);
+    return self;
+}
+
+pub fn initWithGraphemeData(allocator: mem.Allocator, g_data: Graphemes) mem.Allocator.Error!Self {
+    var self = try Self.setup(allocator);
+    self.g_data = g_data;
+    self.owns_gdata = false;
+    return self;
+}
+
+// Sets up the DisplayWidthData, leaving the GraphemeData undefined.
+fn setup(allocator: mem.Allocator) mem.Allocator.Error!Self {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("dwp");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -21,10 +42,7 @@ pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
 
     const endian = builtin.cpu.arch.endian();
 
-    var self = Self{
-        .g_data = try GraphemeData.init(allocator),
-    };
-    errdefer self.g_data.deinit(allocator);
+    var self: Self = undefined;
 
     const stage_1_len: u16 = reader.readInt(u16, endian) catch unreachable;
     self.s1 = try allocator.alloc(u16, stage_1_len);
@@ -42,7 +60,7 @@ pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
 pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
     allocator.free(self.s1);
     allocator.free(self.s2);
-    self.g_data.deinit(allocator);
+    if (self.owns_gdata) self.g_data.deinit(allocator);
 }
 
 /// codePointWidth returns the number of cells `cp` requires when rendered

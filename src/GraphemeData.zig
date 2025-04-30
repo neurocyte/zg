@@ -36,7 +36,7 @@ s3: []u8 = undefined,
 
 const Self = @This();
 
-pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
+pub inline fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("gbp");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -65,23 +65,23 @@ pub fn init(allocator: mem.Allocator) mem.Allocator.Error!Self {
     return self;
 }
 
-pub fn deinit(self: *const Self, allocator: mem.Allocator) void {
+pub inline fn deinit(self: *const Self, allocator: mem.Allocator) void {
     allocator.free(self.s1);
     allocator.free(self.s2);
     allocator.free(self.s3);
 }
 
 /// Lookup the grapheme break property for a code point.
-pub fn gbp(self: Self, cp: u21) Gbp {
+pub inline fn gbp(self: Self, cp: u21) Gbp {
     return @enumFromInt(self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]] >> 4);
 }
 
 /// Lookup the indic syllable type for a code point.
-pub fn indic(self: Self, cp: u21) Indic {
+pub inline fn indic(self: Self, cp: u21) Indic {
     return @enumFromInt((self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]] >> 1) & 0x7);
 }
 
-/// Lookup the indic syllable type for a code point.
-pub fn isEmoji(self: Self, cp: u21) bool {
+/// Lookup the emoji property for a code point.
+pub inline fn isEmoji(self: Self, cp: u21) bool {
     return self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]] & 1 == 1;
 }
