@@ -4,6 +4,13 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // 'magic' module
+    const magic = b.createModule(.{
+        .root_source_file = b.path("src/magic_numbers.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     // Code generation
     // Grapheme break
     const gbp_gen_exe = b.addExecutable(.{
@@ -265,6 +272,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     canon_data.addAnonymousImport("canon", .{ .root_source_file = canon_gen_out });
+    canon_data.addImport("magic", magic);
 
     const canon_data_t = b.addTest(.{
         .name = "canon_data",
@@ -280,6 +288,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     compat_data.addAnonymousImport("compat", .{ .root_source_file = compat_gen_out });
+    compat_data.addImport("magic", magic);
 
     const compat_data_t = b.addTest(.{
         .name = "compat_data",

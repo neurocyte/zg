@@ -46,6 +46,7 @@ pub const Script = enum {
     Elbasan,
     Elymaic,
     Ethiopic,
+    Garay,
     Georgian,
     Glagolitic,
     Gothic,
@@ -54,6 +55,7 @@ pub const Script = enum {
     Gujarati,
     Gunjala_Gondi,
     Gurmukhi,
+    Gurung_Khema,
     Han,
     Hangul,
     Hanifi_Rohingya,
@@ -76,6 +78,7 @@ pub const Script = enum {
     Khmer,
     Khojki,
     Khudawadi,
+    Kirat_Rai,
     Lao,
     Latin,
     Lepcha,
@@ -113,6 +116,7 @@ pub const Script = enum {
     Nyiakeng_Puachue_Hmong,
     Ogham,
     Ol_Chiki,
+    Ol_Onal,
     Old_Hungarian,
     Old_Italic,
     Old_North_Arabian,
@@ -144,6 +148,7 @@ pub const Script = enum {
     Sora_Sompeng,
     Soyombo,
     Sundanese,
+    Sunuwar,
     Syloti_Nagri,
     Syriac,
     Tagalog,
@@ -161,7 +166,9 @@ pub const Script = enum {
     Tibetan,
     Tifinagh,
     Tirhuta,
+    Todhri,
     Toto,
+    Tulu_Tigalari,
     Ugaritic,
     Vai,
     Vithkuqi,
@@ -171,7 +178,6 @@ pub const Script = enum {
     Yi,
     Zanabazar_Square,
 };
-
 const Scripts = @This();
 
 pub fn init(allocator: Allocator) Allocator.Error!Scripts {
