@@ -1,6 +1,6 @@
 # Contributors
 
-These are the contributors referred to in the (license)[./LICENSE].  New
+These are the contributors referred to in the [license](./LICENSE).  New
 contributors to `zg`, please add your name at the bottom of the list and
 sign a commit.  This constitutes an agreement to license your changes,
 as defined in the project license.
