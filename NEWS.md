@@ -25,7 +25,7 @@ module.
 
 Instead there's just `Graphemes`, and the same for a couple of other modules
 which worked the same way.  This means that the cases where functionality
-was provided by a wrapped pointer is now provided directly from the struct
+was provided by a wrapped pointer are now provided directly from the struct
 with the necessary data.
 
 This would make user structs larger in some cases, while eliminating a
@@ -115,13 +115,13 @@ the use of the new `DisplayWidth` options.
 
 ### Tests
 
-Is is now possible to run all the tests, not just the `unicode-test` subset.
+It is now possible to run all the tests, not just the `unicode-test` subset.
 Accordingly, that step is removed, and `zig build test` runs everything.
 
 #### Allocations Tested
 
 Every allocate-able now has a `checkAllAllocationFailures` test.  This
-process turned up two bugs.  Also discovered were 8,663 allocations which
+process turned up two bugs.  Also discovered were 8,663 allocations, which
 were reduced to two, these were also being individually freed on deinit.
 So that's nice.
 
