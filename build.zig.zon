@@ -11,6 +11,8 @@
         "data",
         "LICENSE",
         "README.md",
+        "NEWS.md",
+        "CONTRIBUTORS.md",
         "src",
         "unicode_license",
         "UNICODE_VERSION.txt",

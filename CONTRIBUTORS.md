@@ -12,3 +12,4 @@ Tim Culverhouse <tim@timculverhouse.com>
 Ryan Liptak <squeek502@hotmail.com>
 Jonathan Raphaelson <jon@accidental.cc>
 Sam Atman <atmanistan@gmail.com>
+lch361 <author@lch361.net>
