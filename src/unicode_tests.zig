@@ -16,6 +16,7 @@ const Normalize = @import("Normalize");
 comptime {
     testing.refAllDecls(grapheme);
 }
+
 test "Iterator.peek" {
     const peek_seq = "aΔ👨🏻‍🌾→";
     const data = try Graphemes.init(std.testing.allocator);

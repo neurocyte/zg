@@ -4,7 +4,7 @@ zg provides Unicode text processing for Zig projects.
 
 ## Unicode Version
 
-The Unicode version supported by zg is `15.1.0`.
+The Unicode version supported by zg is `16.0.0`.
 
 ## Zig Version
 
@@ -404,7 +404,7 @@ test "Initialize With a Normalize" {
     defer case_fold.deinit(allocator);
 }
 ```
-This has a `setupWithNormalize` variant as well, but note that this also takes
+This has a `setupWithNormalize` variant as well, note that this also takes
 a `Normalize` struct, and not a pointer to it.
 
 
