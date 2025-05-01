@@ -3,7 +3,7 @@
 ## zg v0.14.0 Release Notes
 
 This is the first minor point release since Sam Atman (me) took over
-maintenance of `zg` from the inimitable José Colon, aka
+maintenance of `zg` from the inimitable José Colon Rodriguez, aka
 @dude_the_builder.  We're all grateful for everything he's done for
 the Zig community.
 
