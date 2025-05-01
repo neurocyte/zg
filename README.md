@@ -16,7 +16,7 @@ You first need to add zg as a dependency in your `build.zig.zon` file. In your
 Zig project's root directory, run:
 
 ```plain
-zig fetch --save https://codeberg.org/atman/zg/archive/v0.13.5.tar.gz
+zig fetch --save https://codeberg.org/atman/zg/archive/v0.14.0-rc1.tar.gz
 ```
 
 Then instantiate the dependency in your `build.zig`:
