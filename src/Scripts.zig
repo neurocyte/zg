@@ -233,6 +233,15 @@ test "script" {
     try testing.expectEqual(Script.Latin, self.script('A').?);
 }
 
+fn testAllocator(allocator: Allocator) !void {
+    var prop = try Scripts.init(allocator);
+    prop.deinit(allocator);
+}
+
+test "Allocation failure" {
+    try testing.checkAllAllocationFailures(testing.allocator, testAllocator, .{});
+}
+
 const std = @import("std");
 const builtin = @import("builtin");
 const compress = std.compress;

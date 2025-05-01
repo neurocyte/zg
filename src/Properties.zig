@@ -169,6 +169,15 @@ test "Props" {
     try testing.expect(!self.isDecimal('g'));
 }
 
+fn testAllocator(allocator: Allocator) !void {
+    var prop = try Properties.init(allocator);
+    prop.deinit(allocator);
+}
+
+test "Allocation failure" {
+    try testing.checkAllAllocationFailures(testing.allocator, testAllocator, .{});
+}
+
 const std = @import("std");
 const builtin = @import("builtin");
 const compress = std.compress;

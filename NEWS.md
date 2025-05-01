@@ -4,23 +4,55 @@
 
 This is the first minor point release since Sam Atman (me) took over
 maintenance of `zg` from the inimitable José Colon, aka
-@dude_the_builder.
+@dude_the_builder.  We're all grateful for everything he's done for
+the Zig community.
 
-As it's a fairly complex project, I'm adding a NEWS.md so that users
-have a place to check for changes.
+The changes are fairly large, and most user code will need to be updated.
+The result is substantially streamlined and easier to use, and updating
+will mainly take place around importing, creating, and deinitializing.
 
-### Data is Unmanaged
+### The Great Renaming
 
-This is the biggest change.  Prior to `v0.14`, all structs which need
-heap allocation no longer have a copy of their allocator.  It was felt
-that this was redundant, especially when several such structures were
-in use, and it reflects a general trend in the standard library toward
-fewer managed data structures.
+The most obvious change is on the surface API: more than half of the modules
+have been renamed.  There are no user-facing modules with `Data` in the name,
+and some abbreviations have been spelled in full.
+
+### No More Separation of Data and Functionality
+
+It is no longer necessary to separately create, for example, a `GraphemeData`
+structure, in order to use the functionality provided by the `grapheme`
+module.
+
+Instead there's just `Graphemes`, and the same for a couple of other modules
+which worked the same way.  This means that the cases where functionality
+was provided by a wrapped pointer is not provided directly from the struct
+with the necessary data.
+
+This would make user structs larger in some cases, while eliminating a
+pointer chase.  If that isn't a desirable trade off for your code,
+read on.
+
+### All Allocated Data is Unmanaged
+
+Prior to `v0.14`, all structs which need heap allocation no longer
+have a copy of their allocator.  We felt that this was redundant,
+especially when several such structures were in use, and it reflects
+a general trend in the standard library toward fewer managed data
+structures.
 
 Getting up to speed is a matter of passing the allocator to `deinit`.
 
 This change comes courtesy of [lch361](https://lch361.net), in his
 first contribution to the repo.  Thanks Lich!
+
+### DisplayWidth and CaseFolding Can Share Data
+
+Both of these modules use another module to get the job done, `Graphemes`
+for `DisplayWidth`, and `Normalize` for `CaseFolding`.
+
+It is now possible to initialize them with a borrowed copy of those
+modules, to make it simpler to write code which also needs the base
+modules.
 
 ### Grapheme Iterator Creation
 
@@ -37,10 +69,65 @@ var iter = grapheme.Iterator.init("🤘🏻some rad string! 🤘🏿", &gd);
 Now:
 
 ```zig
-const gd = try grapheme.GraphemeData.init(allocator);
-defer gd.deinit(allocator);
-var iter = gd.iterator("🤘🏻some rad string! 🤘🏿");
+const graphemes = try Graphemes.init(allocator);
+defer graphemes.deinit(allocator);
+var iter = graphemes.iterator("🤘🏻some rad string! 🤘🏿");
 ```
 
-You can still make an iterator with `grapheme.Iterator.init`, but the
-second argument has to be `&gd.gd`.
+It remains possible to use
+
+```zig
+var iter = Graphemes.Iterator.init("stri̵̢̡̡̡̨̧̡̨̡̡̡̨̫̗̗̱̳̼̖͚͉̩̬̬͚̟̣̮̬̙̖̗͇̮͓̻̫͍͎͉͎̹̩̗͖͈̙̻̭̝̭̼̙̯̪͚̙͉͎͎͖̥̹͈̫͍̹͓̘̙͎͖̝̦͎̤̼̹͕͈̪̙̪̯̯͙̝͈͕̬̪̗̭͎͖̟͚̦̣̘͙̞̮̹̙͚̼̤̟͉̭͔̩͍͔͈̯͎̘͎̭̥̖̜͙̖̖͍̼͙͎͚̦̮̹̞̺͍̳̖̹̼̲̠̩̰̳͂̌̈́̓̄͋̇̎͜͜͠ͅͅͅͅng", &graphemes);
+```
+
+If one were to prefer doing so.
+
+### Initialization vs. Setup
+
+Every allocating module now has both an `init` function, which
+returns the created struct, and a `setup` function.  The latter
+takes a mutable pointer, and an `Allocator`, returning
+`Allocator.Error!void`.
+
+So those who might prefer a single-pointer home for such modules
+can allocate the struct on the heap with `allocator.create`, or
+add a pointer field to some other struct, then use `setup` to
+populate it.
+
+In the process, the various spurious reader and decompression errors
+have been turned `unreachable`, leaving only `error.OutOfMemory`.
+Encountering any of the other errors would indicate an internal problem,
+so we no longer make user code deal with that unlikely event.
+
+### New DisplayWidth options
+
+A `DisplayWidth` can now be compiled to treat `c0` and `c1` control codes
+as having a width.  Canonically, terminals don't print them, so they would
+have a width of 0.  However, some applications (`vim` for example) need to
+escape control codes to make them visible.  Setting these options will let
+`DisplayWidth` return the correct widths when this is done.
+
+### Unicode 16.0
+
+This updates `zg` to use the latest Unicode edition.  This should be
+the only change which will change behavior of user code, other than through
+the use of the new `DisplayWidth` options.
+
+### Tests
+
+Is is now possible to run all the tests, not just the `unicode-test` subset.
+Accordingly, that step is removed, and `zig build test` runs everything.
+
+#### Allocations Tested
+
+Every allocate-able now has a `checkAllAllocationFailures` test.  This
+process turned up two bugs.  Also discovered were 8,663 allocations which
+were reduced to two, these were also being individually freed on deinit.
+So that's nice.
+
+#### That's It!
+
+I hope you find converting over `zg v0.13` code to be fairly painless and
+straightforward.  There should be no need to make changes of this magnitude
+in the future.
+

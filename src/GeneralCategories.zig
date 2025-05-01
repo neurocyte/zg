@@ -46,7 +46,16 @@ pub fn init(allocator: Allocator) Allocator.Error!GeneralCategories {
     return gencat;
 }
 
-pub fn setup(self: *GeneralCategories, allocator: Allocator) Allocator.Error!void {
+pub fn setup(gencat: *GeneralCategories, allocator: Allocator) Allocator.Error!void {
+    gencat.setupInner(allocator) catch |err| {
+        switch (err) {
+            error.OutOfMemory => |e| return e,
+            else => unreachable,
+        }
+    };
+}
+
+inline fn setupInner(gencat: *GeneralCategories, allocator: Allocator) !void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("gencat");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -56,35 +65,35 @@ pub fn setup(self: *GeneralCategories, allocator: Allocator) Allocator.Error!voi
     const endian = builtin.cpu.arch.endian();
 
     const s1_len: u16 = reader.readInt(u16, endian) catch unreachable;
-    self.s1 = try allocator.alloc(u16, s1_len);
-    errdefer allocator.free(self.s1);
-    for (0..s1_len) |i| self.s1[i] = try reader.readInt(u16, endian);
+    gencat.s1 = try allocator.alloc(u16, s1_len);
+    errdefer allocator.free(gencat.s1);
+    for (0..s1_len) |i| gencat.s1[i] = try reader.readInt(u16, endian);
 
     const s2_len: u16 = reader.readInt(u16, endian) catch unreachable;
-    self.s2 = try allocator.alloc(u5, s2_len);
-    errdefer allocator.free(self.s2);
-    for (0..s2_len) |i| self.s2[i] = @intCast(reader.readInt(u8, endian) catch unreachable);
+    gencat.s2 = try allocator.alloc(u5, s2_len);
+    errdefer allocator.free(gencat.s2);
+    for (0..s2_len) |i| gencat.s2[i] = @intCast(reader.readInt(u8, endian) catch unreachable);
 
     const s3_len: u16 = reader.readInt(u8, endian) catch unreachable;
-    self.s3 = try allocator.alloc(u5, s3_len);
-    errdefer allocator.free(self.s3);
-    for (0..s3_len) |i| self.s3[i] = @intCast(reader.readInt(u8, endian) catch unreachable);
+    gencat.s3 = try allocator.alloc(u5, s3_len);
+    errdefer allocator.free(gencat.s3);
+    for (0..s3_len) |i| gencat.s3[i] = @intCast(reader.readInt(u8, endian) catch unreachable);
 }
 
-pub fn deinit(self: *const GeneralCategories, allocator: mem.Allocator) void {
-    allocator.free(self.s1);
-    allocator.free(self.s2);
-    allocator.free(self.s3);
+pub fn deinit(gencat: *const GeneralCategories, allocator: mem.Allocator) void {
+    allocator.free(gencat.s1);
+    allocator.free(gencat.s2);
+    allocator.free(gencat.s3);
 }
 
 /// Lookup the General Category for `cp`.
-pub fn gc(self: GeneralCategories, cp: u21) Gc {
-    return @enumFromInt(self.s3[self.s2[self.s1[cp >> 8] + (cp & 0xff)]]);
+pub fn gc(gencat: GeneralCategories, cp: u21) Gc {
+    return @enumFromInt(gencat.s3[gencat.s2[gencat.s1[cp >> 8] + (cp & 0xff)]]);
 }
 
 /// True if `cp` has an C general category.
-pub fn isControl(self: GeneralCategories, cp: u21) bool {
-    return switch (self.gc(cp)) {
+pub fn isControl(gencat: GeneralCategories, cp: u21) bool {
+    return switch (gencat.gc(cp)) {
         .Cc,
         .Cf,
         .Cn,
@@ -96,8 +105,8 @@ pub fn isControl(self: GeneralCategories, cp: u21) bool {
 }
 
 /// True if `cp` has an L general category.
-pub fn isLetter(self: GeneralCategories, cp: u21) bool {
-    return switch (self.gc(cp)) {
+pub fn isLetter(gencat: GeneralCategories, cp: u21) bool {
+    return switch (gencat.gc(cp)) {
         .Ll,
         .Lm,
         .Lo,
@@ -109,8 +118,8 @@ pub fn isLetter(self: GeneralCategories, cp: u21) bool {
 }
 
 /// True if `cp` has an M general category.
-pub fn isMark(self: GeneralCategories, cp: u21) bool {
-    return switch (self.gc(cp)) {
+pub fn isMark(gencat: GeneralCategories, cp: u21) bool {
+    return switch (gencat.gc(cp)) {
         .Mc,
         .Me,
         .Mn,
@@ -120,8 +129,8 @@ pub fn isMark(self: GeneralCategories, cp: u21) bool {
 }
 
 /// True if `cp` has an N general category.
-pub fn isNumber(self: GeneralCategories, cp: u21) bool {
-    return switch (self.gc(cp)) {
+pub fn isNumber(gencat: GeneralCategories, cp: u21) bool {
+    return switch (gencat.gc(cp)) {
         .Nd,
         .Nl,
         .No,
@@ -131,8 +140,8 @@ pub fn isNumber(self: GeneralCategories, cp: u21) bool {
 }
 
 /// True if `cp` has an P general category.
-pub fn isPunctuation(self: GeneralCategories, cp: u21) bool {
-    return switch (self.gc(cp)) {
+pub fn isPunctuation(gencat: GeneralCategories, cp: u21) bool {
+    return switch (gencat.gc(cp)) {
         .Pc,
         .Pd,
         .Pe,
@@ -146,8 +155,8 @@ pub fn isPunctuation(self: GeneralCategories, cp: u21) bool {
 }
 
 /// True if `cp` has an S general category.
-pub fn isSymbol(self: GeneralCategories, cp: u21) bool {
-    return switch (self.gc(cp)) {
+pub fn isSymbol(gencat: GeneralCategories, cp: u21) bool {
+    return switch (gencat.gc(cp)) {
         .Sc,
         .Sk,
         .Sm,
@@ -158,8 +167,8 @@ pub fn isSymbol(self: GeneralCategories, cp: u21) bool {
 }
 
 /// True if `cp` has an Z general category.
-pub fn isSeparator(self: GeneralCategories, cp: u21) bool {
-    return switch (self.gc(cp)) {
+pub fn isSeparator(gencat: GeneralCategories, cp: u21) bool {
+    return switch (gencat.gc(cp)) {
         .Zl,
         .Zp,
         .Zs,
@@ -168,8 +177,18 @@ pub fn isSeparator(self: GeneralCategories, cp: u21) bool {
     };
 }
 
+fn testAllocator(allocator: Allocator) !void {
+    var gen_cat = try GeneralCategories.init(allocator);
+    gen_cat.deinit(allocator);
+}
+
+test "Allocation failure" {
+    try testing.checkAllAllocationFailures(testing.allocator, testAllocator, .{});
+}
+
 const std = @import("std");
 const builtin = @import("builtin");
 const compress = std.compress;
 const mem = std.mem;
+const testing = std.testing;
 const Allocator = mem.Allocator;

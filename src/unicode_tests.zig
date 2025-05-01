@@ -208,7 +208,7 @@ test "Segmentation GraphemeIterator" {
         // std.debug.print("\nline {}: {s}\n", .{ line_no, all_bytes.items });
         var iter = data.iterator(all_bytes.items);
 
-        // Chaeck.
+        // Check.
         for (want.items) |want_gc| {
             const got_gc = (iter.next()).?;
             try std.testing.expectEqualStrings(

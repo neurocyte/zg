@@ -657,21 +657,6 @@ test "isLatin1Only" {
     try testing.expect(!isLatin1Only(not_latin1_only));
 }
 
-// NOTE: These tests take way waaaaay too long to run, because
-// the amount of allocations in a couple of the inflators is
-// completely excessive and is also costing memory for metadata.
-// I'm leaving this here for when I fix that.
-//
-// fn testAllocations(allocator: Allocator) !void {
-//     const norm = try Normalize.init(allocator);
-//     norm.deinit(allocator);
-// }
-//
-// test "allocation failures" {
-//     if (true) return error.SkipZigTest;
-//     try testing.checkAllAllocationFailures(testing.allocator, testAllocations, .{});
-// }
-
 const std = @import("std");
 const debug = std.debug;
 const assert = debug.assert;

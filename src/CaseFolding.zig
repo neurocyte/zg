@@ -310,14 +310,13 @@ fn testAllocations(allocator: Allocator) !void {
     }
 }
 
-// test "Allocation Failures" {
-//     if (true) return error.SkipZigTest; // XXX: remove
-//     try testing.checkAllAllocationFailures(
-//         testing.allocator,
-//         testAllocations,
-//         .{},
-//     );
-// }
+test "Allocation Failures" {
+    try testing.checkAllAllocationFailures(
+        testing.allocator,
+        testAllocations,
+        .{},
+    );
+}
 
 const std = @import("std");
 const builtin = @import("builtin");

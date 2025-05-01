@@ -1,27 +1,18 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const options = @import("options");
-const ArrayList = std.ArrayList;
-const compress = std.compress;
-const mem = std.mem;
-const simd = std.simd;
-const testing = std.testing;
+//! Display Width module
+//!
+//! Answers questions about the printable width in monospaced fonts of the
+//! string of interest.
 
-const ascii = @import("ascii");
-const CodePointIterator = @import("code_point").Iterator;
-pub const DisplayWidthData = @import("DisplayWidthData");
-
-const Graphemes = @import("Graphemes");
-
-graphemes: Graphemes,
+graphemes: Graphemes = undefined,
 s1: []u16 = undefined,
 s2: []i4 = undefined,
-owns_graphemes: bool,
+owns_graphemes: bool = true,
 
 const DisplayWidth = @This();
 
-pub fn init(allocator: mem.Allocator) mem.Allocator.Error!DisplayWidth {
-    var dw: DisplayWidth = try DisplayWidth.setup(allocator);
+pub fn init(allocator: Allocator) Allocator.Error!DisplayWidth {
+    var dw = DisplayWidth{};
+    try dw.setup(allocator);
     errdefer {
         allocator.free(dw.s1);
         allocator.free(dw.s2);
@@ -32,15 +23,16 @@ pub fn init(allocator: mem.Allocator) mem.Allocator.Error!DisplayWidth {
     return dw;
 }
 
-pub fn initWithGraphemes(allocator: mem.Allocator, graphemes: Graphemes) mem.Allocator.Error!DisplayWidth {
-    var dw = try DisplayWidth.setup(allocator);
+pub fn initWithGraphemes(allocator: Allocator, graphemes: Graphemes) Allocator.Error!DisplayWidth {
+    var dw = DisplayWidth{};
+    try dw.setup(allocator);
     dw.graphemes = graphemes;
     dw.owns_graphemes = false;
     return dw;
 }
 
 // Sets up the DisplayWidthData, leaving the GraphemeData undefined.
-fn setup(allocator: mem.Allocator) mem.Allocator.Error!DisplayWidth {
+fn setup(dw: *DisplayWidth, allocator: Allocator) Allocator.Error!void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("dwp");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -48,8 +40,6 @@ fn setup(allocator: mem.Allocator) mem.Allocator.Error!DisplayWidth {
     var reader = in_decomp.reader();
 
     const endian = builtin.cpu.arch.endian();
-
-    var dw: DisplayWidth = undefined;
 
     const stage_1_len: u16 = reader.readInt(u16, endian) catch unreachable;
     dw.s1 = try allocator.alloc(u16, stage_1_len);
@@ -60,11 +50,9 @@ fn setup(allocator: mem.Allocator) mem.Allocator.Error!DisplayWidth {
     dw.s2 = try allocator.alloc(i4, stage_2_len);
     errdefer allocator.free(dw.s2);
     for (0..stage_2_len) |i| dw.s2[i] = @intCast(reader.readInt(i8, endian) catch unreachable);
-
-    return dw;
 }
 
-pub fn deinit(dw: *const DisplayWidth, allocator: mem.Allocator) void {
+pub fn deinit(dw: *const DisplayWidth, allocator: Allocator) void {
     allocator.free(dw.s1);
     allocator.free(dw.s2);
     if (dw.owns_graphemes) dw.graphemes.deinit(allocator);
@@ -445,3 +433,35 @@ test "wrap" {
     const want = "The quick \nbrown fox \njumped \nover the \nlazy dog!";
     try testing.expectEqualStrings(want, got);
 }
+
+fn testAllocation(allocator: Allocator) !void {
+    {
+        var dw = try DisplayWidth.init(allocator);
+        dw.deinit(allocator);
+    }
+    {
+        var graph = try Graphemes.init(allocator);
+        defer graph.deinit(allocator);
+        var dw = try DisplayWidth.initWithGraphemes(allocator, graph);
+        dw.deinit(allocator);
+    }
+}
+
+test "allocation test" {
+    try testing.checkAllAllocationFailures(testing.allocator, testAllocation, .{});
+}
+
+const std = @import("std");
+const builtin = @import("builtin");
+const options = @import("options");
+const ArrayList = std.ArrayList;
+const compress = std.compress;
+const mem = std.mem;
+const Allocator = mem.Allocator;
+const simd = std.simd;
+const testing = std.testing;
+
+const ascii = @import("ascii");
+const CodePointIterator = @import("code_point").Iterator;
+
+const Graphemes = @import("Graphemes");
