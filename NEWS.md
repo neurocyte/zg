@@ -25,7 +25,7 @@ module.
 
 Instead there's just `Graphemes`, and the same for a couple of other modules
 which worked the same way.  This means that the cases where functionality
-was provided by a wrapped pointer is not provided directly from the struct
+was provided by a wrapped pointer is now provided directly from the struct
 with the necessary data.
 
 This would make user structs larger in some cases, while eliminating a
