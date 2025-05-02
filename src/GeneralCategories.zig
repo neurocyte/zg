@@ -47,15 +47,6 @@ pub fn init(allocator: Allocator) Allocator.Error!GeneralCategories {
 }
 
 pub fn setup(gencat: *GeneralCategories, allocator: Allocator) Allocator.Error!void {
-    gencat.setupInner(allocator) catch |err| {
-        switch (err) {
-            error.OutOfMemory => |e| return e,
-            else => unreachable,
-        }
-    };
-}
-
-inline fn setupInner(gencat: *GeneralCategories, allocator: Allocator) !void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("gencat");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -67,7 +58,7 @@ inline fn setupInner(gencat: *GeneralCategories, allocator: Allocator) !void {
     const s1_len: u16 = reader.readInt(u16, endian) catch unreachable;
     gencat.s1 = try allocator.alloc(u16, s1_len);
     errdefer allocator.free(gencat.s1);
-    for (0..s1_len) |i| gencat.s1[i] = try reader.readInt(u16, endian);
+    for (0..s1_len) |i| gencat.s1[i] = reader.readInt(u16, endian) catch unreachable;
 
     const s2_len: u16 = reader.readInt(u16, endian) catch unreachable;
     gencat.s2 = try allocator.alloc(u5, s2_len);

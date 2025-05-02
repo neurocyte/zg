@@ -94,7 +94,7 @@ test "Code point iterator" {
 ## Grapheme Clusters
 
 Many characters are composed from more than one code point. These are known as
-Grapheme Clusters and the `grapheme` module has a data structure to represent
+Grapheme Clusters, and the `Graphemes` module has a data structure to represent
 them, `Grapheme`, and an `Iterator` to iterate over them in a string.
 
 In your `build.zig`:
