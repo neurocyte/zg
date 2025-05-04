@@ -31,8 +31,14 @@ pub fn initWithGraphemes(allocator: Allocator, graphemes: Graphemes) Allocator.E
     return dw;
 }
 
+pub fn setupWithGraphemes(dw: *DisplayWidth, allocator: Allocator, graphemes: Graphemes) Allocator.Error!void {
+    try dw.setup(allocator);
+    dw.graphemes = graphemes;
+    dw.owns_graphemes = false;
+}
+
 // Sets up the DisplayWidthData, leaving the GraphemeData undefined.
-fn setup(dw: *DisplayWidth, allocator: Allocator) Allocator.Error!void {
+pub fn setup(dw: *DisplayWidth, allocator: Allocator) Allocator.Error!void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("dwp");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
