@@ -94,6 +94,45 @@ pub const Iterator = struct {
     }
 };
 
+pub const ReverseIterator = struct {
+    bytes: []const u8,
+    i: ?u32,
+
+    pub fn init(str: []const u8) ReverseIterator {
+        var r_iter: ReverseIterator = undefined;
+        r_iter.bytes = str;
+        r_iter.i = if (str.len == 0) 0 else @intCast(str.len - 1);
+        return r_iter;
+    }
+
+    pub fn prev(iter: *ReverseIterator) ?CodePoint {
+        if (iter.i == null) return null;
+        var i_prev = iter.i.?;
+
+        while (i_prev > 0) : (i_prev -= 1) {
+            if (!followbyte(iter.bytes[i_prev])) break;
+            if (i_prev == 0) break;
+        }
+
+        if (i_prev > 0)
+            iter.i = i_prev - 1
+        else
+            iter.i = null;
+
+        return decode(iter.bytes[i_prev..], i_prev);
+    }
+
+    pub fn peek(iter: *ReverseIterator) ?CodePoint {
+        const saved_i = iter.i;
+        defer iter.i = saved_i;
+        return iter.prev();
+    }
+};
+
+inline fn followbyte(b: u8) bool {
+    return 0x80 <= b and b <= 0xbf;
+}
+
 test "decode" {
     const bytes = "🌩️";
     const res = decode(bytes, 0);
@@ -107,12 +146,42 @@ test "decode" {
     }
 }
 
-test "peek" {
+test Iterator {
     var iter = Iterator{ .bytes = "Hi" };
 
-    try std.testing.expectEqual(@as(u21, 'H'), iter.next().?.code);
-    try std.testing.expectEqual(@as(u21, 'i'), iter.peek().?.code);
-    try std.testing.expectEqual(@as(u21, 'i'), iter.next().?.code);
-    try std.testing.expectEqual(@as(?CodePoint, null), iter.peek());
-    try std.testing.expectEqual(@as(?CodePoint, null), iter.next());
+    try testing.expectEqual(@as(u21, 'H'), iter.next().?.code);
+    try testing.expectEqual(@as(u21, 'i'), iter.peek().?.code);
+    try testing.expectEqual(@as(u21, 'i'), iter.next().?.code);
+    try testing.expectEqual(@as(?CodePoint, null), iter.peek());
+    try testing.expectEqual(@as(?CodePoint, null), iter.next());
+    try testing.expectEqual(@as(?CodePoint, null), iter.next());
 }
+
+test ReverseIterator {
+    {
+        var r_iter: ReverseIterator = .init("ABC");
+        try testing.expectEqual(@as(u21, 'C'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, 'B'), r_iter.peek().?.code);
+        try testing.expectEqual(@as(u21, 'B'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, 'A'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(?CodePoint, null), r_iter.peek());
+        try testing.expectEqual(@as(?CodePoint, null), r_iter.prev());
+        try testing.expectEqual(@as(?CodePoint, null), r_iter.prev());
+    }
+    {
+        var r_iter: ReverseIterator = .init("∅δq🦾ă");
+        try testing.expectEqual(@as(u21, 'ă'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, '🦾'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, 'q'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, 'δ'), r_iter.peek().?.code);
+        try testing.expectEqual(@as(u21, 'δ'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, '∅'), r_iter.peek().?.code);
+        try testing.expectEqual(@as(u21, '∅'), r_iter.peek().?.code);
+        try testing.expectEqual(@as(u21, '∅'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(?CodePoint, null), r_iter.peek());
+        try testing.expectEqual(@as(?CodePoint, null), r_iter.prev());
+        try testing.expectEqual(@as(?CodePoint, null), r_iter.prev());
+    }
+}
+
+const testing = std.testing;
