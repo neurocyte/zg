@@ -22,6 +22,15 @@ pub fn build(b: *std.Build) void {
     const run_gbp_gen_exe = b.addRunArtifact(gbp_gen_exe);
     const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.bin.z");
 
+    const wbp_gen_exe = b.addExecutable(.{
+        .name = "wbp",
+        .root_source_file = b.path("codegen/wbp.zig"),
+        .target = b.graph.host,
+        .optimize = .Debug,
+    });
+    const run_wbp_gen_exe = b.addRunArtifact(wbp_gen_exe);
+    const wbp_gen_out = run_wbp_gen_exe.addOutputFileArg("wbp.bin.z");
+
     // Display width
     const cjk = b.option(bool, "cjk", "Ambiguous code points are wide (display width: 2).") orelse false;
     const options = b.addOptions();
@@ -183,6 +192,7 @@ pub fn build(b: *std.Build) void {
     const props_gen_out = run_props_gen_exe.addOutputFileArg("props.bin.z");
 
     // Modules we provide
+
     // Code points
     const code_point = b.addModule("code_point", .{
         .root_source_file = b.path("src/code_point.zig"),
@@ -214,6 +224,23 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const grapheme_tr = b.addRunArtifact(grapheme_t);
+
+    // Word Breaking
+    const word_break = b.addModule("WordBreak", .{
+        .root_source_file = b.path("src/WordBreak.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    word_break.addAnonymousImport("wbp", .{ .root_source_file = wbp_gen_out });
+    word_break.addImport("code_point", code_point);
+
+    const word_break_t = b.addTest(.{
+        .name = "WordBreak",
+        .root_module = word_break,
+        .target = target,
+        .optimize = optimize,
+    });
+    const word_break_tr = b.addRunArtifact(word_break_t);
 
     // ASCII utilities
     const ascii = b.addModule("ascii", .{
@@ -452,6 +479,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&code_point_tr.step);
     test_step.dependOn(&display_width_tr.step);
     test_step.dependOn(&grapheme_tr.step);
+    test_step.dependOn(&word_break_tr.step);
     test_step.dependOn(&ascii_tr.step);
     test_step.dependOn(&ccc_data_tr.step);
     test_step.dependOn(&canon_data_tr.step);
