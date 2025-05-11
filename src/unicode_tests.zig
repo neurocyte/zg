@@ -1,17 +1,4 @@
-const std = @import("std");
-const fmt = std.fmt;
-const fs = std.fs;
-const io = std.io;
-const heap = std.heap;
-const mem = std.mem;
-const testing = std.testing;
-const unicode = std.unicode;
-
-const grapheme = @import("Graphemes");
-const Grapheme = @import("Graphemes").Grapheme;
-const Graphemes = @import("Graphemes");
-const GraphemeIterator = @import("Graphemes").Iterator;
-const Normalize = @import("Normalize");
+const dbg_print = false;
 
 comptime {
     testing.refAllDecls(grapheme);
@@ -50,16 +37,14 @@ test "Unicode normalization tests" {
     var file = try fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
     defer file.close();
     var buf_reader = io.bufferedReader(file.reader());
-    const input_stream = buf_reader.reader();
+    var input_stream = buf_reader.reader();
 
-    var line_no: usize = 0;
     var buf: [4096]u8 = undefined;
     var cp_buf: [4]u8 = undefined;
 
-    while (try input_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        line_no += 1;
-        // Skip comments or empty lines.
-        if (line.len == 0 or line[0] == '#' or line[0] == '@') continue;
+    var line_iter: IterRead = .{ .read = &input_stream };
+
+    while (try line_iter.next(&buf)) |line| {
         // Iterate over fields.
         var fields = mem.splitScalar(u8, line, ';');
         var field_index: usize = 0;
@@ -80,7 +65,7 @@ test "Unicode normalization tests" {
 
                 input = try i_buf.toOwnedSlice();
             } else if (field_index == 1) {
-                //debug.print("\n*** {s} ***\n", .{line});
+                if (dbg_print) debug.print("\n*** {s} ***\n", .{line});
                 // NFC, time to test.
                 var w_buf = std.ArrayList(u8).init(allocator);
                 defer w_buf.deinit();
@@ -166,16 +151,15 @@ test "Segmentation GraphemeIterator" {
     defer data.deinit(allocator);
 
     var buf: [4096]u8 = undefined;
-    var line_no: usize = 1;
+    var line_iter: IterRead = .{ .read = &input_stream };
 
-    while (try input_stream.readUntilDelimiterOrEof(&buf, '\n')) |raw| : (line_no += 1) {
+    while (try line_iter.next(&buf)) |raw| {
         // Skip comments or empty lines.
-        if (raw.len == 0 or raw[0] == '#' or raw[0] == '@') continue;
-
+        // if (raw.len == 0 or raw[0] == '#' or raw[0] == '@') continue;
         // Clean up.
         var line = std.mem.trimLeft(u8, raw, "÷ ");
-        if (std.mem.indexOf(u8, line, " ÷\t#")) |octo| {
-            line = line[0..octo];
+        if (std.mem.indexOf(u8, line, " ÷\t")) |final| {
+            line = line[0..final];
         }
         // Iterate over fields.
         var want = std.ArrayList(Grapheme).init(allocator);
@@ -206,7 +190,6 @@ test "Segmentation GraphemeIterator" {
             bytes_index += cp_index;
         }
 
-        // std.debug.print("\nline {}: {s}\n", .{ line_no, all_bytes.items });
         var iter = data.iterator(all_bytes.items);
 
         // Check.
@@ -219,3 +202,41 @@ test "Segmentation GraphemeIterator" {
         }
     }
 }
+
+const IterRead = struct {
+    read: *Reader,
+    line: usize = 0,
+
+    pub fn next(iter: *IterRead, buf: []u8) !?[]const u8 {
+        defer iter.line += 1;
+        const maybe_line = try iter.read.readUntilDelimiterOrEof(buf, '#');
+        if (maybe_line) |this_line| {
+            try iter.read.skipUntilDelimiterOrEof('\n');
+            if (this_line.len == 0 or this_line[0] == '@') {
+                // comment, next line
+                return iter.next(buf);
+            } else {
+                return this_line;
+            }
+        } else {
+            return null;
+        }
+    }
+};
+
+const std = @import("std");
+const fmt = std.fmt;
+const fs = std.fs;
+const io = std.io;
+const Reader = io.BufferedReader(4096, fs.File.Reader).Reader;
+const heap = std.heap;
+const mem = std.mem;
+const debug = std.debug;
+const testing = std.testing;
+const unicode = std.unicode;
+
+const grapheme = @import("Graphemes");
+const Grapheme = @import("Graphemes").Grapheme;
+const Graphemes = @import("Graphemes");
+const GraphemeIterator = @import("Graphemes").Iterator;
+const Normalize = @import("Normalize");

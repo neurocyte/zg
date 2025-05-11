@@ -300,13 +300,13 @@ fn testAllocations(allocator: Allocator) !void {
     {
         const normalize = try Normalize.init(allocator);
         defer normalize.deinit(allocator);
-        const caser1 = try CaseFolding.initWithNormalize(allocator, normalize);
-        defer caser1.deinit(allocator);
+        const caser = try CaseFolding.initWithNormalize(allocator, normalize);
+        defer caser.deinit(allocator);
     }
     // With normalize owned
     {
-        const caser2 = try CaseFolding.init(allocator);
-        defer caser2.deinit(allocator);
+        const caser = try CaseFolding.init(allocator);
+        defer caser.deinit(allocator);
     }
 }
 
