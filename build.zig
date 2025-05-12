@@ -471,6 +471,7 @@ pub fn build(b: *std.Build) void {
     });
     unicode_tests.root_module.addImport("Graphemes", graphemes);
     unicode_tests.root_module.addImport("Normalize", norm);
+    unicode_tests.root_module.addImport("WordBreak", word_break);
 
     const run_unicode_tests = b.addRunArtifact(unicode_tests);
 

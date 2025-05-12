@@ -10,6 +10,11 @@ pub const CodePoint = struct {
     code: u21,
     len: u3,
     offset: u32,
+
+    /// Return the slice of this codepoint, given the original string.
+    pub fn bytes(cp: CodePoint, str: []const u8) []const u8 {
+        return str[cp.offset..][0..cp.len];
+    }
 };
 
 /// This function is deprecated and will be removed in a later release.

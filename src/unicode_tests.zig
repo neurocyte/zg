@@ -1,31 +1,5 @@
 const dbg_print = false;
 
-comptime {
-    testing.refAllDecls(grapheme);
-}
-
-test "Iterator.peek" {
-    const peek_seq = "aΔ👨🏻‍🌾→";
-    const data = try Graphemes.init(std.testing.allocator);
-    defer data.deinit(std.testing.allocator);
-
-    var iter = data.iterator(peek_seq);
-    const peek_a = iter.peek().?;
-    const next_a = iter.next().?;
-    try std.testing.expectEqual(peek_a, next_a);
-    try std.testing.expectEqualStrings("a", peek_a.bytes(peek_seq));
-    const peek_d1 = iter.peek().?;
-    const peek_d2 = iter.peek().?;
-    try std.testing.expectEqual(peek_d1, peek_d2);
-    const next_d = iter.next().?;
-    try std.testing.expectEqual(peek_d2, next_d);
-    try std.testing.expectEqual(iter.peek(), iter.next());
-    try std.testing.expectEqual(iter.peek(), iter.next());
-    try std.testing.expectEqual(null, iter.peek());
-    try std.testing.expectEqual(null, iter.peek());
-    try std.testing.expectEqual(iter.peek(), iter.next());
-}
-
 test "Unicode normalization tests" {
     var arena = heap.ArenaAllocator.init(testing.allocator);
     defer arena.deinit();
@@ -147,15 +121,13 @@ test "Segmentation GraphemeIterator" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var input_stream = buf_reader.reader();
 
-    const data = try Graphemes.init(allocator);
-    defer data.deinit(allocator);
+    const graph = try Graphemes.init(allocator);
+    defer graph.deinit(allocator);
 
     var buf: [4096]u8 = undefined;
     var line_iter: IterRead = .{ .read = &input_stream };
 
     while (try line_iter.next(&buf)) |raw| {
-        // Skip comments or empty lines.
-        // if (raw.len == 0 or raw[0] == '#' or raw[0] == '@') continue;
         // Clean up.
         var line = std.mem.trimLeft(u8, raw, "÷ ");
         if (std.mem.indexOf(u8, line, " ÷\t")) |final| {
@@ -190,7 +162,7 @@ test "Segmentation GraphemeIterator" {
             bytes_index += cp_index;
         }
 
-        var iter = data.iterator(all_bytes.items);
+        var iter = graph.iterator(all_bytes.items);
 
         // Check.
         for (want.items) |want_gc| {
@@ -199,6 +171,71 @@ test "Segmentation GraphemeIterator" {
                 want_gc.bytes(all_bytes.items),
                 got_gc.bytes(all_bytes.items),
             );
+        }
+    }
+}
+
+test "Segmentation Word Iterator" {
+    const allocator = std.testing.allocator;
+    var file = try std.fs.cwd().openFile("data/unicode/auxiliary/WordBreakTest.txt", .{});
+    defer file.close();
+    var buf_reader = std.io.bufferedReader(file.reader());
+    var input_stream = buf_reader.reader();
+
+    const wb = try WordBreak.init(allocator);
+    defer wb.deinit(allocator);
+
+    var buf: [4096]u8 = undefined;
+    var line_iter: IterRead = .{ .read = &input_stream };
+
+    while (try line_iter.next(&buf)) |raw| {
+        // Clean up.
+        var line = std.mem.trimLeft(u8, raw, "÷ ");
+        if (std.mem.indexOf(u8, line, " ÷\t")) |final| {
+            line = line[0..final];
+        }
+        // Iterate over fields.
+        var want = std.ArrayList(Grapheme).init(allocator);
+        defer want.deinit();
+
+        var all_bytes = std.ArrayList(u8).init(allocator);
+        defer all_bytes.deinit();
+
+        var words = std.mem.splitSequence(u8, line, " ÷ ");
+        var bytes_index: u32 = 0;
+
+        while (words.next()) |field| {
+            var code_points = std.mem.splitScalar(u8, field, ' ');
+            var cp_buf: [4]u8 = undefined;
+            var cp_index: u32 = 0;
+            var gc_len: u8 = 0;
+
+            while (code_points.next()) |code_point| {
+                if (std.mem.eql(u8, code_point, "×")) continue;
+                const cp: u21 = try std.fmt.parseInt(u21, code_point, 16);
+                const len = try unicode.utf8Encode(cp, &cp_buf);
+                try all_bytes.appendSlice(cp_buf[0..len]);
+                cp_index += len;
+                gc_len += len;
+            }
+
+            try want.append(Grapheme{ .len = gc_len, .offset = bytes_index });
+            bytes_index += cp_index;
+        }
+
+        var iter = wb.iterator(all_bytes.items);
+
+        // Check.
+        for (want.items, 1..) |want_word, i| {
+            const got_word = (iter.next()).?;
+            std.testing.expectEqualSlices(
+                u8,
+                want_word.bytes(all_bytes.items),
+                got_word.bytes(all_bytes.items),
+            ) catch |err| {
+                debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, i });
+                return err;
+            };
         }
     }
 }
@@ -235,8 +272,9 @@ const debug = std.debug;
 const testing = std.testing;
 const unicode = std.unicode;
 
-const grapheme = @import("Graphemes");
 const Grapheme = @import("Graphemes").Grapheme;
 const Graphemes = @import("Graphemes");
 const GraphemeIterator = @import("Graphemes").Iterator;
 const Normalize = @import("Normalize");
+
+const WordBreak = @import("WordBreak");

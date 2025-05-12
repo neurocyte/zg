@@ -88,6 +88,11 @@ pub fn breakProperty(wordbreak: *const WordBreak, cp: u21) WordBreakProperty {
     return @enumFromInt(wordbreak.s2[wordbreak.s1[cp >> 8] + (cp & 0xff)]);
 }
 
+/// Returns an iterator over words in `slice`
+pub fn iterator(wordbreak: *const WordBreak, slice: []const u8) Iterator {
+    return Iterator.init(wordbreak, slice);
+}
+
 const IterState = packed struct {
     mid_punct: bool, // AHLetter (MidLetter | MidNumLetQ) × AHLetter
     mid_num: bool, // Numeric (MidNum | MidNumLetQ) × Numeric
@@ -113,7 +118,7 @@ pub const Iterator = struct {
     pub fn init(wb: *const WordBreak, str: []const u8) Iterator {
         var wb_iter: Iterator = .{ .cp_iter = .{ .bytes = str }, .wb = wb };
         wb_iter.advance();
-        return wb;
+        return wb_iter;
     }
 
     pub fn next(iter: *Iterator) ?Word {
@@ -132,12 +137,18 @@ pub const Iterator = struct {
         scan: while (true) : (iter.advance()) {
             const this = iter.this.?;
             word_len += this.len;
+            var ignored = false;
             if (iter.that) |that| {
                 const that_p = iter.wb.breakProperty(that.code);
                 const this_p = this_p: {
                     if (!isIgnorable(that_p) and iter.cache != null) {
+                        // TODO: might not need these what with peekPast
+                        ignored = true;
                         defer iter.cache = null;
-                        break :this_p iter.cache.?;
+                        // Fixup some state, apply pre-4 rules
+                        const restore = iter.cache.?;
+                        if (restore == .WSegSpace) break :this_p .none;
+                        break :this_p restore;
                     } else {
                         break :this_p iter.wb.breakProperty(this.code);
                     }
@@ -149,11 +160,22 @@ pub const Iterator = struct {
                 // WB3b  ÷ (Newline | CR | LF)
                 if (isNewline(that_p)) break :scan;
                 // WB3c  ZWJ × \p{Extended_Pictographic}
-                // The right way to do this one is a RuneSet, TODO: circle back
+                if (this_p == .ZWJ and ext_pict.isMatch(that.bytes(iter.cp_iter.bytes))) {
+                    // Invalid after ignoring
+                    if (ignored) break :scan else continue :scan;
+                }
                 // WB3d  WSegSpace × WSegSpace
                 if (this_p == .WSegSpace and that_p == .WSegSpace) continue :scan;
                 // WB4  X (Extend | Format | ZWJ)* → X
                 if (isIgnorable(that_p)) {
+                    if (that_p == .ZWJ) {
+                        const next_val = iter.peekPast();
+                        if (next_val) |next_cp| {
+                            if (ext_pict.isMatch(next_cp.bytes(iter.cp_iter.bytes))) {
+                                continue :scan;
+                            }
+                        }
+                    }
                     if (iter.cache == null) {
                         iter.cache = this_p;
                     }
@@ -164,14 +186,14 @@ pub const Iterator = struct {
                     if (isAHLetter(that_p)) continue :scan;
                     // WB6  AHLetter × (MidLetter | MidNumLetQ) AHLetter
                     if (isMidVal(that_p)) {
-                        const next_val = iter.cp_iter.peek();
+                        const next_val = iter.peekPast();
                         if (next_val) |next_cp| {
                             const next_p = iter.wb.breakProperty(next_cp.code);
                             if (isAHLetter(next_p)) {
                                 state.mid_punct = true;
                                 continue :scan;
                             }
-                        } else break :scan;
+                        }
                     }
                 }
                 // AHLetter (MidLetter | MidNumLetQ) × AHLetter
@@ -187,7 +209,7 @@ pub const Iterator = struct {
                     if (that_p == .Single_Quote) continue :scan;
                     // WB7b  Hebrew_Letter × Double_Quote Hebrew_Letter
                     if (that_p == .Double_Quote) {
-                        const next_val = iter.cp_iter.peek();
+                        const next_val = iter.peekPast();
                         if (next_val) |next_cp| {
                             const next_p = iter.wb.breakProperty(next_cp.code);
                             if (next_p == .Hebrew_Letter) {
@@ -212,8 +234,8 @@ pub const Iterator = struct {
                 // WB10  Numeric ×  AHLetter
                 if (this_p == .Numeric and isAHLetter(that_p)) continue :scan;
                 // WB12  Numeric × (MidNum | MidNumLetQ) Numeric
-                if (this_p == .Numeric and isMidVal(that_p)) {
-                    const next_val = iter.cp_iter.peek();
+                if (this_p == .Numeric and isMidNum(that_p)) {
+                    const next_val = iter.peekPast();
                     if (next_val) |next_cp| {
                         const next_p = iter.wb.breakProperty(next_cp.code);
                         if (next_p == .Numeric) {
@@ -224,7 +246,7 @@ pub const Iterator = struct {
                 }
                 // WB11  Numeric (MidNum | MidNumLetQ) × Numeric
                 if (state.mid_num) {
-                    assert(isMidVal(this_p));
+                    assert(isMidNum(this_p));
                     assert(that_p == .Numeric);
                     state.mid_num = false;
                     continue :scan;
@@ -235,25 +257,18 @@ pub const Iterator = struct {
                 if (isExtensible(this_p) and that_p == .ExtendNumLet) continue :scan;
                 // WB13b  ExtendNumLet × (AHLetter | Numeric | Katakana)
                 if (this_p == .ExtendNumLet and isExtensible(that_p)) continue :scan;
-                // WB15, WB16  ([^RI] ! sot) (RI RI)* RI × RI
-                if (that_p == .Regional_Indicator) {
-                    if (this_p == .Regional_Indicator) {
-                        if (state.regional) {
+                // WB15, WB16  ([^RI] | sot) (RI RI)* RI × RI
+                if (this_p == .Regional_Indicator) {
+                    if (that_p == .Regional_Indicator) {
+                        if (state.regional == true or this.offset == 0) {
                             state.regional = false;
                             continue :scan;
-                        } else {
-                            break :scan;
                         }
                     } else {
-                        const next_val = iter.cp_iter.peek();
-                        if (next_val) |next_cp| {
-                            const next_p = iter.wb.breakProperty(next_cp.code);
-                            if (next_p == .Regional_Indicator) {
-                                state.regional = true;
-                                continue :scan;
-                            }
-                        } else break :scan;
+                        state.regional = true;
                     }
+                } else if (that_p == .Regional_Indicator) {
+                    state.regional = true;
                 }
                 // WB999  Any ÷ Any
                 break :scan;
@@ -265,9 +280,19 @@ pub const Iterator = struct {
         return Word{ .len = word_len, .offset = word_start };
     }
 
-    fn advance(wb_iter: *Iterator) void {
-        wb_iter.this = wb_iter.that;
-        wb_iter.that = wb_iter.cp_iter.next();
+    fn advance(iter: *Iterator) void {
+        iter.this = iter.that;
+        iter.that = iter.cp_iter.next();
+    }
+
+    fn peekPast(iter: *Iterator) ?CodePoint {
+        const save_cp = iter.cp_iter;
+        defer iter.cp_iter = save_cp;
+        while (iter.cp_iter.peek()) |peeked| {
+            if (!isIgnorable(iter.wb.breakProperty(peeked.code))) return peeked;
+            _ = iter.cp_iter.next();
+        }
+        return null;
     }
 };
 
@@ -290,6 +315,10 @@ inline fn isAHLetter(wbp: WordBreakProperty) bool {
 
 inline fn isMidVal(wbp: WordBreakProperty) bool {
     return wbp == .MidLetter or wbp == .MidNumLet or wbp == .Single_Quote;
+}
+
+inline fn isMidNum(wbp: WordBreakProperty) bool {
+    return wbp == .MidNum or wbp == .MidNumLet or wbp == .Single_Quote;
 }
 
 inline fn isExtensible(wbp: WordBreakProperty) bool {
@@ -328,3 +357,5 @@ const testing = std.testing;
 const code_point = @import("code_point");
 const CodepointIterator = code_point.Iterator;
 const CodePoint = code_point.CodePoint;
+
+const ext_pict = @import("micro_runeset.zig").Extended_Pictographic;
