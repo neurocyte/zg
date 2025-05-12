@@ -18,3 +18,5 @@ Jonathan Raphaelson <jon@accidental.cc>
 Sam Atman <atmanistan@gmail.com>
 
 lch361 <author@lch361.net>
+
+Matteo Romano <mr.matteo.romano.02@gmail.com>
