@@ -258,7 +258,7 @@ pub const State = struct {
         self.bits |= 1;
     }
     fn unsetXpic(self: *State) void {
-        self.bits ^= 1;
+        self.bits &= ~@as(u3, 1);
     }
 
     // Regional Indicatior (flags)
@@ -269,7 +269,7 @@ pub const State = struct {
         self.bits |= 2;
     }
     fn unsetRegional(self: *State) void {
-        self.bits ^= 2;
+        self.bits &= ~@as(u3, 2);
     }
 
     // Indic Conjunct
@@ -280,7 +280,7 @@ pub const State = struct {
         self.bits |= 4;
     }
     fn unsetIndic(self: *State) void {
-        self.bits ^= 4;
+        self.bits &= ~@as(u3, 4);
     }
 };
 
