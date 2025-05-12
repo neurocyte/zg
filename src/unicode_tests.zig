@@ -228,8 +228,7 @@ test "Segmentation Word Iterator" {
         // Check.
         for (want.items, 1..) |want_word, i| {
             const got_word = (iter.next()).?;
-            std.testing.expectEqualSlices(
-                u8,
+            std.testing.expectEqualStrings(
                 want_word.bytes(all_bytes.items),
                 got_word.bytes(all_bytes.items),
             ) catch |err| {
