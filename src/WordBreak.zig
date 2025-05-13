@@ -42,30 +42,6 @@ pub fn setup(wb: *WordBreak, allocator: Allocator) Allocator.Error!void {
     };
 }
 
-inline fn setupImpl(wb: *WordBreak, allocator: Allocator) !void {
-    const decompressor = compress.flate.inflate.decompressor;
-    const in_bytes = @embedFile("wbp");
-    var in_fbs = std.io.fixedBufferStream(in_bytes);
-    var in_decomp = decompressor(.raw, in_fbs.reader());
-    var reader = in_decomp.reader();
-
-    const endian = builtin.cpu.arch.endian();
-
-    const stage_1_len: u16 = try reader.readInt(u16, endian);
-    wb.s1 = try allocator.alloc(u16, stage_1_len);
-    errdefer allocator.free(wb.s1);
-    for (0..stage_1_len) |i| wb.s1[i] = try reader.readInt(u16, endian);
-
-    const stage_2_len: u16 = try reader.readInt(u16, endian);
-    wb.s2 = try allocator.alloc(u5, stage_2_len);
-    errdefer allocator.free(wb.s2);
-    for (0..stage_2_len) |i| wb.s2[i] = @intCast(try reader.readInt(u8, endian));
-    var count_0: usize = 0;
-    for (wb.s2) |nyb| {
-        if (nyb == 0) count_0 += 1;
-    }
-}
-
 pub fn deinit(wordbreak: *const WordBreak, allocator: mem.Allocator) void {
     allocator.free(wordbreak.s1);
     allocator.free(wordbreak.s2);
@@ -88,29 +64,48 @@ pub fn breakProperty(wordbreak: *const WordBreak, cp: u21) WordBreakProperty {
     return @enumFromInt(wordbreak.s2[wordbreak.s1[cp >> 8] + (cp & 0xff)]);
 }
 
+fn breakProp(wb: *const WordBreak, point: CodePoint) WordBreakProperty {
+    return @enumFromInt(wb.s2[wb.s1[point.code >> 8] + (point.code & 0xff)]);
+}
+
+/// Returns the Word at the given index.  Asserts that the index is valid for
+/// the provided string.  Always returns a word.  This algorithm is O(n^2) for
+/// the size of the word before the cursor.
+pub fn wordAtCursor(wordbreak: *const WordBreak, string: []const u8, index: usize) Word {
+    assert(index < string.len);
+    var i = index;
+    var iter1 = wordbreak.iterator(string[index..]);
+    var last_word = iter1.next();
+    if (index == 0) return if (last_word) |word| word else Word{ .offset = 0, .len = 0 };
+    var this_word: ?Word = undefined;
+    while (last_word) |l_word| : (i -= 1) {
+        var iter2 = wordbreak.iterator(string[i..]);
+        this_word = iter2.next();
+        if (this_word) |t_word| {
+            if (false) std.debug.print("last_word: '{s}'\n", .{l_word.bytes(string[i + 1 ..])});
+            if (false) std.debug.print("this_word: '{s}'\n", .{t_word.bytes(string[i..])});
+            // Check if we've captured a previous word
+            const t_end = t_word.offset + t_word.len + i - 1;
+            const l_start = l_word.offset + i + 1;
+            if (false) std.debug.print("t_end {d}, l_start {d}\n", .{ t_end, l_start });
+            if (t_end < l_start) {
+                return .{ .offset = @intCast(l_start), .len = l_word.len };
+            }
+            last_word = this_word;
+        } else unreachable;
+        if (i == 0) break;
+    }
+    return this_word.?;
+}
+
 /// Returns an iterator over words in `slice`
 pub fn iterator(wordbreak: *const WordBreak, slice: []const u8) Iterator {
     return Iterator.init(wordbreak, slice);
 }
 
-const IterState = packed struct {
-    mid_punct: bool, // AHLetter (MidLetter | MidNumLetQ) × AHLetter
-    mid_num: bool, // Numeric (MidNum | MidNumLetQ) × Numeric
-    quote_heb: bool, // Hebrew_Letter Double_Quote × Hebrew_Letter
-    regional: bool, // [^RI] (RI RI)* RI × RI
-
-    pub const initial: IterState = .{
-        .mid_punct = false,
-        .mid_num = false,
-        .quote_heb = false,
-        .regional = false,
-    };
-};
-
 pub const Iterator = struct {
     this: ?CodePoint = null,
     that: ?CodePoint = null,
-    cache: ?WordBreakProperty = null,
     cp_iter: CodepointIterator,
     wb: *const WordBreak,
 
@@ -121,6 +116,16 @@ pub const Iterator = struct {
         return wb_iter;
     }
 
+    /// Returns the next word segment, without advancing.
+    pub fn peek(iter: *Iterator) ?Word {
+        const cache = .{ iter.this, iter.that, iter.cp_iter };
+        defer {
+            iter.this, iter.that, iter.cp_iter = cache;
+        }
+        return iter.next();
+    }
+
+    /// Returns the next word segment.
     pub fn next(iter: *Iterator) ?Word {
         iter.advance();
 
@@ -132,7 +137,7 @@ pub const Iterator = struct {
         const word_start = iter.this.?.offset;
         var word_len: u32 = 0;
 
-        // state variables
+        // State variables.
         var last_p: WordBreakProperty = .none;
         var last_last_p: WordBreakProperty = .none;
         var ri_count: usize = 0;
@@ -141,12 +146,13 @@ pub const Iterator = struct {
             const this = iter.this.?;
             word_len += this.len;
             if (iter.that) |that| {
-                const this_p = iter.wb.breakProperty(this.code); // WB3  CR × LF
-                const that_p = iter.wb.breakProperty(that.code);
+                const this_p = iter.wb.breakProp(this);
+                const that_p = iter.wb.breakProp(that);
                 if (!isIgnorable(this_p)) {
                     last_last_p = last_p;
                     last_p = this_p;
                 }
+                // WB3  CR × LF
                 if (this_p == .CR and that_p == .LF) continue :scan;
                 // WB3a  (Newline | CR | LF) ÷
                 if (isNewline(this_p)) break :scan;
@@ -169,7 +175,7 @@ pub const Iterator = struct {
                     if (isMidVal(that_p)) {
                         const next_val = iter.peekPast();
                         if (next_val) |next_cp| {
-                            const next_p = iter.wb.breakProperty(next_cp.code);
+                            const next_p = iter.wb.breakProp(next_cp);
                             if (isAHLetter(next_p)) {
                                 continue :scan;
                             }
@@ -187,7 +193,7 @@ pub const Iterator = struct {
                     if (that_p == .Double_Quote) {
                         const next_val = iter.peekPast();
                         if (next_val) |next_cp| {
-                            const next_p = iter.wb.breakProperty(next_cp.code);
+                            const next_p = iter.wb.breakProp(next_cp);
                             if (next_p == .Hebrew_Letter) {
                                 continue :scan;
                             }
@@ -210,7 +216,7 @@ pub const Iterator = struct {
                 if (last_p == .Numeric and isMidNum(that_p)) {
                     const next_val = iter.peekPast();
                     if (next_val) |next_cp| {
-                        const next_p = iter.wb.breakProperty(next_cp.code);
+                        const next_p = iter.wb.breakProp(next_cp);
                         if (next_p == .Numeric) {
                             continue :scan;
                         }
@@ -247,12 +253,36 @@ pub const Iterator = struct {
         const save_cp = iter.cp_iter;
         defer iter.cp_iter = save_cp;
         while (iter.cp_iter.peek()) |peeked| {
-            if (!isIgnorable(iter.wb.breakProperty(peeked.code))) return peeked;
+            if (!isIgnorable(iter.wb.breakProp(peeked))) return peeked;
             _ = iter.cp_iter.next();
         }
         return null;
     }
 };
+
+inline fn setupImpl(wb: *WordBreak, allocator: Allocator) !void {
+    const decompressor = compress.flate.inflate.decompressor;
+    const in_bytes = @embedFile("wbp");
+    var in_fbs = std.io.fixedBufferStream(in_bytes);
+    var in_decomp = decompressor(.raw, in_fbs.reader());
+    var reader = in_decomp.reader();
+
+    const endian = builtin.cpu.arch.endian();
+
+    const stage_1_len: u16 = try reader.readInt(u16, endian);
+    wb.s1 = try allocator.alloc(u16, stage_1_len);
+    errdefer allocator.free(wb.s1);
+    for (0..stage_1_len) |i| wb.s1[i] = try reader.readInt(u16, endian);
+
+    const stage_2_len: u16 = try reader.readInt(u16, endian);
+    wb.s2 = try allocator.alloc(u5, stage_2_len);
+    errdefer allocator.free(wb.s2);
+    for (0..stage_2_len) |i| wb.s2[i] = @intCast(try reader.readInt(u8, endian));
+    var count_0: usize = 0;
+    for (wb.s2) |nyb| {
+        if (nyb == 0) count_0 += 1;
+    }
+}
 
 //| Predicates
 
@@ -293,11 +323,33 @@ test "Word Break Properties" {
     try testing.expectEqual(.LF, wb.breakProperty('\n'));
     try testing.expectEqual(.Hebrew_Letter, wb.breakProperty('ש'));
     try testing.expectEqual(.Katakana, wb.breakProperty('\u{30ff}'));
+    var iter = wb.iterator("xxx");
+    _ = iter.peek();
 }
 
-test "ext_pic" {
+test "ext_pict" {
     try testing.expect(ext_pict.isMatch("👇"));
-    try testing.expect(ext_pict.isMatch("\u{2704}"));
+    try testing.expect(ext_pict.isMatch("\u{2701}"));
+}
+
+test wordAtCursor {
+    const wb = try WordBreak.init(testing.allocator);
+    defer wb.deinit(testing.allocator);
+    const t_string = "first second third";
+    const second = wb.wordAtCursor(t_string, 8);
+    try testing.expectEqualStrings("second", second.bytes(t_string));
+    const third = wb.wordAtCursor(t_string, 14);
+    try testing.expectEqualStrings("third", third.bytes(t_string));
+    {
+        const first = wb.wordAtCursor(t_string, 3);
+        try testing.expectEqualStrings("first", first.bytes(t_string));
+    }
+    {
+        const first = wb.wordAtCursor(t_string, 0);
+        try testing.expectEqualStrings("first", first.bytes(t_string));
+    }
+    const last = wb.wordAtCursor(t_string, 14);
+    try testing.expectEqualStrings("third", last.bytes(t_string));
 }
 
 fn testAllocations(allocator: Allocator) !void {
