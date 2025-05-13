@@ -42,7 +42,7 @@ pub fn decode(bytes: []const u8, offset: u32) ?CodePoint {
         .offset = offset,
     };
 
-    // Return replacement if we don' have a complete codepoint remaining. Consumes only one byte
+    // Return replacement if we don't have a complete codepoint remaining. Consumes only one byte.
     if (cp.len > bytes.len) {
         // Unicode replacement code point.
         return .{
@@ -76,21 +76,30 @@ pub const Iterator = struct {
     bytes: []const u8,
     i: u32 = 0,
 
-    pub fn next(self: *Iterator) ?CodePoint {
-        if (self.i >= self.bytes.len) return null;
+    pub fn next(iter: *Iterator) ?CodePoint {
+        if (iter.i >= iter.bytes.len) return null;
 
-        const res = decode(self.bytes[self.i..], self.i);
+        const res = decode(iter.bytes[iter.i..], iter.i);
         if (res) |cp| {
-            self.i += cp.len;
+            iter.i += cp.len;
         }
 
         return res;
     }
 
-    pub fn peek(self: *Iterator) ?CodePoint {
-        const saved_i = self.i;
-        defer self.i = saved_i;
-        return self.next();
+    pub fn peek(iter: *Iterator) ?CodePoint {
+        const saved_i = iter.i;
+        defer iter.i = saved_i;
+        return iter.next();
+    }
+
+    /// Create a backward iterator at this point.  It will repeat
+    /// the last CodePoint seen.
+    pub fn reverseIterator(iter: *Iterator) ReverseIterator {
+        if (iter.i == iter.bytes.len) {
+            return .init(iter.bytes);
+        }
+        return .{ .i = iter.i, .bytes = iter.bytes };
     }
 };
 
@@ -126,6 +135,17 @@ pub const ReverseIterator = struct {
         const saved_i = iter.i;
         defer iter.i = saved_i;
         return iter.prev();
+    }
+
+    /// Create a forward iterator at this point.  It will repeat the
+    /// last CodePoint seen.
+    pub fn forwardIterator(iter: *ReverseIterator) Iterator {
+        if (iter.i) |i| {
+            var fwd: Iterator = .{ .i = i, .bytes = iter.bytes };
+            _ = fwd.next();
+            return fwd;
+        }
+        return .{ .i = 0, .bytes = iter.bytes };
     }
 };
 
@@ -181,6 +201,23 @@ test ReverseIterator {
         try testing.expectEqual(@as(?CodePoint, null), r_iter.peek());
         try testing.expectEqual(@as(?CodePoint, null), r_iter.prev());
         try testing.expectEqual(@as(?CodePoint, null), r_iter.prev());
+    }
+    {
+        var r_iter: ReverseIterator = .init("123");
+        try testing.expectEqual(@as(u21, '3'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, '2'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, '1'), r_iter.prev().?.code);
+        var iter = r_iter.forwardIterator();
+        try testing.expectEqual(@as(u21, '1'), iter.next().?.code);
+        try testing.expectEqual(@as(u21, '2'), iter.next().?.code);
+        try testing.expectEqual(@as(u21, '3'), iter.next().?.code);
+        r_iter = iter.reverseIterator();
+        try testing.expectEqual(@as(u21, '3'), r_iter.prev().?.code);
+        try testing.expectEqual(@as(u21, '2'), r_iter.prev().?.code);
+        iter = r_iter.forwardIterator();
+        r_iter = iter.reverseIterator();
+        try testing.expectEqual(@as(u21, '2'), iter.next().?.code);
+        try testing.expectEqual(@as(u21, '2'), r_iter.prev().?.code);
     }
 }
 
