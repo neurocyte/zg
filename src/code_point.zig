@@ -53,22 +53,12 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
     };
     // Multibyte
 
-<<<<<<< HEAD
     // Second:
     var class: u4 = @intCast(u8dfa[byte]);
     var st: u32 = state_dfa[class];
     if (st == RUNE_REJECT or cursor.* == bytes.len) {
         @branchHint(.cold);
         // First one is never a truncation
-||||||| parent of ad4b046 (Various small iterator improvements)
-    // Return replacement if we don' have a complete codepoint remaining. Consumes only one byte
-    if (cp.len > bytes.len) {
-        // Unicode replacement code point.
-=======
-    // Return replacement if we don't have a complete codepoint remaining. Consumes only one byte.
-    if (cp.len > bytes.len) {
-        // Unicode replacement code point.
->>>>>>> ad4b046 (Various small iterator improvements)
         return .{
             .code = 0xfffd,
             .len = 1,

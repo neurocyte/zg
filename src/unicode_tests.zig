@@ -195,7 +195,7 @@ test "Segmentation Word Iterator" {
             line = line[0..final];
         }
         // Iterate over fields.
-        var want = std.ArrayList(Grapheme).init(allocator);
+        var want = std.ArrayList(Word).init(allocator);
         defer want.deinit();
 
         var all_bytes = std.ArrayList(u8).init(allocator);
@@ -219,22 +219,40 @@ test "Segmentation Word Iterator" {
                 gc_len += len;
             }
 
-            try want.append(Grapheme{ .len = gc_len, .offset = bytes_index });
+            try want.append(Word{ .len = gc_len, .offset = bytes_index });
             bytes_index += cp_index;
         }
+        {
+            var iter = wb.iterator(all_bytes.items);
 
-        var iter = wb.iterator(all_bytes.items);
-
-        // Check.
-        for (want.items, 1..) |want_word, i| {
-            const got_word = (iter.next()).?;
-            std.testing.expectEqualStrings(
-                want_word.bytes(all_bytes.items),
-                got_word.bytes(all_bytes.items),
-            ) catch |err| {
-                debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, i });
-                return err;
-            };
+            // Check.
+            for (want.items, 1..) |want_word, i| {
+                const got_word = (iter.next()).?;
+                std.testing.expectEqualStrings(
+                    want_word.bytes(all_bytes.items),
+                    got_word.bytes(all_bytes.items),
+                ) catch |err| {
+                    debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, i });
+                    return err;
+                };
+            }
+        }
+        {
+            var r_iter = wb.reverseIterator(all_bytes.items);
+            var idx = want.items.len - 1;
+            while (true) : (idx -= 1) {
+                const want_word = want.items[idx];
+                const got_word = r_iter.prev().?;
+                std.testing.expectEqualSlices(
+                    u8,
+                    want_word.bytes(all_bytes.items),
+                    got_word.bytes(all_bytes.items),
+                ) catch |err| {
+                    debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, idx + 1 });
+                    return err;
+                };
+                if (idx == 0) break;
+            }
         }
     }
 }
@@ -277,3 +295,4 @@ const GraphemeIterator = @import("Graphemes").Iterator;
 const Normalize = @import("Normalize");
 
 const WordBreak = @import("WordBreak");
+const Word = WordBreak.Word;

@@ -98,9 +98,14 @@ pub fn wordAtCursor(wordbreak: *const WordBreak, string: []const u8, index: usiz
     return this_word.?;
 }
 
-/// Returns an iterator over words in `slice`
+/// Returns an iterator over words in `slice`.
 pub fn iterator(wordbreak: *const WordBreak, slice: []const u8) Iterator {
     return Iterator.init(wordbreak, slice);
+}
+
+/// Returns a reverse iterator over the words in `slice`.
+pub fn reverseIterator(wordbreak: *const WordBreak, slice: []const u8) ReverseIterator {
+    return ReverseIterator.init(wordbreak, slice);
 }
 
 pub const Iterator = struct {
@@ -111,7 +116,7 @@ pub const Iterator = struct {
 
     /// Assumes `str` is valid UTF-8.
     pub fn init(wb: *const WordBreak, str: []const u8) Iterator {
-        var wb_iter: Iterator = .{ .cp_iter = .{ .bytes = str }, .wb = wb };
+        var wb_iter: Iterator = .{ .cp_iter = .init(str), .wb = wb };
         wb_iter.advance();
         return wb_iter;
     }
@@ -267,8 +272,8 @@ pub const ReverseIterator = struct {
     wb: *const WordBreak,
 
     /// Assumes `str` is valid UTF-8.
-    pub fn init(wb: *const WordBreak, str: []const u8) Iterator {
-        var wb_iter: Iterator = .{ .cp_iter = .init(str), .wb = wb };
+    pub fn init(wb: *const WordBreak, str: []const u8) ReverseIterator {
+        var wb_iter: ReverseIterator = .{ .cp_iter = .init(str), .wb = wb };
         wb_iter.advance();
         return wb_iter;
     }
@@ -299,12 +304,19 @@ pub const ReverseIterator = struct {
         var last_last_p: WordBreakProperty = .none;
         var ri_count: usize = 0;
 
+        // TODO: Ignorables have to be handled completely differently, unfortunately.
+        // We have to find whatever is before it, match against that, and use that
+        // decision to handle the break we're currently working on.
+        // --
+        // This is achieveable I think. Just need to use peekPast to get that, and then
+        // take it from there.  Probably as long as an ignorable is an after_p we just keep
+        // going.
         scan: while (true) : (iter.advance()) {
             const after = iter.after.?;
             word_len += after.len;
             if (iter.before) |before| {
                 const after_p = iter.wb.breakProp(after);
-                const before_p = iter.wb.breakProp(before);
+                var before_p = iter.wb.breakProp(before);
                 if (!isIgnorable(after_p)) {
                     last_last_p = last_p;
                     last_p = after_p;
@@ -322,9 +334,18 @@ pub const ReverseIterator = struct {
                 // WB3d  WSegSpace × WSegSpace
                 if (before_p == .WSegSpace and after_p == .WSegSpace) continue :scan;
                 // WB4  X (Extend | Format | ZWJ)* → X
-                if (isIgnorable(after_p)) {
-                    continue :scan;
-                } // Now we use last_p instead of after_p for ignorable's sake
+                if (isIgnorable(before_p)) {
+                    const maybe_before = iter.peekPast();
+                    if (maybe_before) |valid_before| {
+                        before_p = iter.wb.breakProp(valid_before);
+                    } else if (isIgnorable(after_p)) {
+                        continue :scan;
+                        // We're done
+                    } else {
+                        break :scan;
+                    }
+                }
+                if (isIgnorable(after_p)) continue :scan;
                 // WB5  AHLetter × AHLetter
                 if (isAHLetter(last_p) and isAHLetter(before_p)) {
                     continue :scan;
@@ -334,7 +355,7 @@ pub const ReverseIterator = struct {
                     continue :scan;
                 }
                 // WB7 AHLetter (MidLetter | MidNumLetQ) × AHLetter
-                if (isMidVal(before_p)) {
+                if (isMidVal(before_p) and isAHLetter(last_p)) {
                     const prev_val = iter.peekPast();
                     if (prev_val) |prev_cp| {
                         const prev_p = iter.wb.breakProp(prev_cp);
