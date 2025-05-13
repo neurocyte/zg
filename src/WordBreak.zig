@@ -260,6 +260,161 @@ pub const Iterator = struct {
     }
 };
 
+pub const ReverseIterator = struct {
+    after: ?CodePoint = null,
+    before: ?CodePoint = null,
+    cp_iter: ReverseCodepointIterator,
+    wb: *const WordBreak,
+
+    /// Assumes `str` is valid UTF-8.
+    pub fn init(wb: *const WordBreak, str: []const u8) Iterator {
+        var wb_iter: Iterator = .{ .cp_iter = .init(str), .wb = wb };
+        wb_iter.advance();
+        return wb_iter;
+    }
+
+    /// Returns the previous word segment, without advancing.
+    pub fn peek(iter: *ReverseIterator) ?Word {
+        const cache = .{ iter.before, iter.after, iter.cp_iter };
+        defer {
+            iter.before, iter.after, iter.cp_iter = cache;
+        }
+        return iter.prev();
+    }
+
+    /// Return the previous word, if any.
+    pub fn prev(iter: *ReverseIterator) ?Word {
+        iter.advance();
+
+        // Done?
+        if (iter.after == null) return null;
+        // Last?
+        if (iter.before == null) return Word{ .len = iter.after.?.len, .offset = 0 };
+
+        const word_end = iter.after.?.offset + iter.after.?.len;
+        var word_len: u32 = 0;
+
+        // State variables.
+        var last_p: WordBreakProperty = .none;
+        var last_last_p: WordBreakProperty = .none;
+        var ri_count: usize = 0;
+
+        scan: while (true) : (iter.advance()) {
+            const after = iter.after.?;
+            word_len += after.len;
+            if (iter.before) |before| {
+                const after_p = iter.wb.breakProp(after);
+                const before_p = iter.wb.breakProp(before);
+                if (!isIgnorable(after_p)) {
+                    last_last_p = last_p;
+                    last_p = after_p;
+                }
+                // WB3  CR × LF
+                if (before_p == .CR and after_p == .LF) continue :scan;
+                // WB3a  (Newline | CR | LF) ÷
+                if (isNewline(before_p)) break :scan;
+                // WB3b  ÷ (Newline | CR | LF)
+                if (isNewline(after_p)) break :scan;
+                // WB3c  ZWJ × \p{Extended_Pictographic}
+                if (before_p == .ZWJ and ext_pict.isMatch(after.bytes(iter.cp_iter.bytes))) {
+                    continue :scan;
+                }
+                // WB3d  WSegSpace × WSegSpace
+                if (before_p == .WSegSpace and after_p == .WSegSpace) continue :scan;
+                // WB4  X (Extend | Format | ZWJ)* → X
+                if (isIgnorable(after_p)) {
+                    continue :scan;
+                } // Now we use last_p instead of after_p for ignorable's sake
+                // WB5  AHLetter × AHLetter
+                if (isAHLetter(last_p) and isAHLetter(before_p)) {
+                    continue :scan;
+                }
+                // WB6  AHLetter × (MidLetter | MidNumLetQ) AHLetter
+                if (isAHLetter(before_p) and isMidVal(last_p) and isAHLetter(last_last_p)) {
+                    continue :scan;
+                }
+                // WB7 AHLetter (MidLetter | MidNumLetQ) × AHLetter
+                if (isMidVal(before_p)) {
+                    const prev_val = iter.peekPast();
+                    if (prev_val) |prev_cp| {
+                        const prev_p = iter.wb.breakProp(prev_cp);
+                        if (isAHLetter(prev_p)) {
+                            continue :scan;
+                        }
+                    }
+                }
+                // WB7a  Hebrew_Letter × Single_Quote
+                if (before_p == .Hebrew_Letter and last_p == .Single_Quote) continue :scan;
+                // WB7b  Hebrew_Letter × Double_Quote Hebrew_Letter
+                if (before_p == .Hebrew_Letter and last_p == .Double_Quote and last_last_p == .Hebrew_Letter) {
+                    continue :scan;
+                }
+                // WB7c  Hebrew_Letter Double_Quote × Hebrew_Letter
+                if (before_p == .Double_Quote and last_p == .Hebrew_Letter) {
+                    const prev_val = iter.peekPast();
+                    if (prev_val) |prev_cp| {
+                        const prev_p = iter.wb.breakProp(prev_cp);
+                        if (prev_p == .Hebrew_Letter) {
+                            continue :scan;
+                        }
+                    }
+                }
+                // WB8  Numeric × Numeric
+                if (before_p == .Numeric and last_p == .Numeric) continue :scan;
+                // WB9  AHLetter × Numeric
+                if (isAHLetter(before_p) and last_p == .Numeric) continue :scan;
+                // WB10  Numeric ×  AHLetter
+                if (before_p == .Numeric and isAHLetter(last_p)) continue :scan;
+                // WB11  Numeric (MidNum | MidNumLetQ) × Numeric
+                if (isMidNum(before_p) and last_p == .Numeric) {
+                    const prev_val = iter.peekPast();
+                    if (prev_val) |prev_cp| {
+                        const prev_p = iter.wb.breakProp(prev_cp);
+                        if (prev_p == .Numeric) {
+                            continue :scan;
+                        }
+                    }
+                }
+                // WB12  Numeric × (MidNum | MidNumLetQ) Numeric
+                if (before_p == .Numeric and isMidNum(last_p) and last_last_p == .Numeric) {
+                    continue :scan;
+                }
+                // WB13  Katakana × Katakana
+                if (before_p == .Katakana and last_p == .Katakana) continue :scan;
+                // WB13a  (AHLetter | Numeric | Katakana | ExtendNumLet) × ExtendNumLet
+                if (isExtensible(before_p) and last_p == .ExtendNumLet) continue :scan;
+                // WB13b  ExtendNumLet × (AHLetter | Numeric | Katakana)
+                if (before_p == .ExtendNumLet and isExtensible(last_p)) continue :scan;
+                // WB15, WB16  ([^RI] | sot) (RI RI)* RI × RI
+                const maybe_flag = before_p == .Regional_Indicator and last_p == .Regional_Indicator;
+                if (maybe_flag) {
+                    ri_count += 1;
+                    if (ri_count % 2 == 1) continue :scan;
+                }
+                // WB999  Any ÷ Any
+                break :scan;
+            }
+            break :scan;
+        }
+        return Word{ .len = word_len, .offset = word_end - word_len };
+    }
+
+    fn peekPast(iter: *ReverseIterator) ?CodePoint {
+        const save_cp = iter.cp_iter;
+        defer iter.cp_iter = save_cp;
+        while (iter.cp_iter.peek()) |peeked| {
+            if (!isIgnorable(iter.wb.breakProp(peeked))) return peeked;
+            _ = iter.cp_iter.prev();
+        }
+        return null;
+    }
+
+    fn advance(iter: *ReverseIterator) void {
+        iter.after = iter.before;
+        iter.before = iter.cp_iter.prev();
+    }
+};
+
 inline fn setupImpl(wb: *WordBreak, allocator: Allocator) !void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("wbp");
@@ -371,6 +526,7 @@ const testing = std.testing;
 
 const code_point = @import("code_point");
 const CodepointIterator = code_point.Iterator;
+const ReverseCodepointIterator = code_point.ReverseIterator;
 const CodePoint = code_point.CodePoint;
 
 const ext_pict = @import("micro_runeset.zig").Extended_Pictographic;
