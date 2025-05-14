@@ -270,6 +270,7 @@ pub const ReverseIterator = struct {
     before: ?CodePoint = null,
     cp_iter: ReverseCodepointIterator,
     wb: *const WordBreak,
+    flags: usize = 0,
 
     /// Assumes `str` is valid UTF-8.
     pub fn init(wb: *const WordBreak, str: []const u8) ReverseIterator {
@@ -302,19 +303,12 @@ pub const ReverseIterator = struct {
         // State variables.
         var last_p: WordBreakProperty = .none;
         var last_last_p: WordBreakProperty = .none;
-        var ri_count: usize = 0;
 
-        // TODO: Ignorables have to be handled completely differently, unfortunately.
-        // We have to find whatever is before it, match against that, and use that
-        // decision to handle the break we're currently working on.
-        // --
-        // This is achieveable I think. Just need to use peekPast to get that, and then
-        // take it from there.  Probably as long as an ignorable is an after_p we just keep
-        // going.
         scan: while (true) : (iter.advance()) {
             const after = iter.after.?;
             word_len += after.len;
             if (iter.before) |before| {
+                var sneak = sneaky(iter); // 'sneaks' past ignorables
                 const after_p = iter.wb.breakProp(after);
                 var before_p = iter.wb.breakProp(before);
                 if (!isIgnorable(after_p)) {
@@ -335,13 +329,11 @@ pub const ReverseIterator = struct {
                 if (before_p == .WSegSpace and after_p == .WSegSpace) continue :scan;
                 // WB4  X (Extend | Format | ZWJ)* → X
                 if (isIgnorable(before_p)) {
-                    const maybe_before = iter.peekPast();
+                    const maybe_before = sneak.prev();
                     if (maybe_before) |valid_before| {
                         before_p = iter.wb.breakProp(valid_before);
-                    } else if (isIgnorable(after_p)) {
-                        continue :scan;
+                    } else if (!isIgnorable(after_p)) {
                         // We're done
-                    } else {
                         break :scan;
                     }
                 }
@@ -356,7 +348,7 @@ pub const ReverseIterator = struct {
                 }
                 // WB7 AHLetter (MidLetter | MidNumLetQ) × AHLetter
                 if (isMidVal(before_p) and isAHLetter(last_p)) {
-                    const prev_val = iter.peekPast();
+                    const prev_val = sneak.peek();
                     if (prev_val) |prev_cp| {
                         const prev_p = iter.wb.breakProp(prev_cp);
                         if (isAHLetter(prev_p)) {
@@ -372,7 +364,7 @@ pub const ReverseIterator = struct {
                 }
                 // WB7c  Hebrew_Letter Double_Quote × Hebrew_Letter
                 if (before_p == .Double_Quote and last_p == .Hebrew_Letter) {
-                    const prev_val = iter.peekPast();
+                    const prev_val = sneak.peek();
                     if (prev_val) |prev_cp| {
                         const prev_p = iter.wb.breakProp(prev_cp);
                         if (prev_p == .Hebrew_Letter) {
@@ -388,7 +380,7 @@ pub const ReverseIterator = struct {
                 if (before_p == .Numeric and isAHLetter(last_p)) continue :scan;
                 // WB11  Numeric (MidNum | MidNumLetQ) × Numeric
                 if (isMidNum(before_p) and last_p == .Numeric) {
-                    const prev_val = iter.peekPast();
+                    const prev_val = sneak.peek();
                     if (prev_val) |prev_cp| {
                         const prev_p = iter.wb.breakProp(prev_cp);
                         if (prev_p == .Numeric) {
@@ -407,10 +399,23 @@ pub const ReverseIterator = struct {
                 // WB13b  ExtendNumLet × (AHLetter | Numeric | Katakana)
                 if (before_p == .ExtendNumLet and isExtensible(last_p)) continue :scan;
                 // WB15, WB16  ([^RI] | sot) (RI RI)* RI × RI
-                const maybe_flag = before_p == .Regional_Indicator and last_p == .Regional_Indicator;
-                if (maybe_flag) {
-                    ri_count += 1;
-                    if (ri_count % 2 == 1) continue :scan;
+                // NOTE:
+                // So here we simply have to know whether a run of flags is even or odd.
+                // The whole run.  To avoid quadratic behavior (and long flag runs are
+                // actually a thing in the wild), we have to count them once, store that
+                // on the iterator, and decrement each time we see two, possibly breaking
+                // once extra at the beginning. They break up one per flag, once we hit
+                // zero, that's all the flags.  If we see another flag we do it again.
+                if (before_p == .Regional_Indicator and last_p == .Regional_Indicator) {
+                    defer {
+                        if (iter.flags > 0) iter.flags -= 1;
+                    }
+                    if (iter.flags == 0) {
+                        iter.flags = sneak.countFlags();
+                    }
+                    if (iter.flags % 2 == 0) {
+                        continue :scan;
+                    }
                 }
                 // WB999  Any ÷ Any
                 break :scan;
@@ -433,6 +438,46 @@ pub const ReverseIterator = struct {
     fn advance(iter: *ReverseIterator) void {
         iter.after = iter.before;
         iter.before = iter.cp_iter.prev();
+    }
+};
+
+fn sneaky(iter: *const ReverseIterator) SneakIterator {
+    return .{ .cp_iter = iter.cp_iter, .wb = iter.wb };
+}
+
+const SneakIterator = struct {
+    cp_iter: ReverseCodepointIterator,
+    wb: *const WordBreak,
+
+    fn peek(iter: *SneakIterator) ?CodePoint {
+        const save_cp = iter.cp_iter;
+        defer iter.cp_iter = save_cp;
+        while (iter.cp_iter.peek()) |peeked| {
+            if (!isIgnorable(iter.wb.breakProp(peeked))) return peeked;
+            _ = iter.cp_iter.prev();
+        }
+        return null;
+    }
+
+    fn countFlags(iter: *SneakIterator) usize {
+        var flags: usize = 0;
+        const save_cp = iter.cp_iter;
+        defer iter.cp_iter = save_cp;
+        while (iter.cp_iter.prev()) |cp| {
+            const prop = iter.wb.breakProp(cp);
+            if (isIgnorable(prop)) continue;
+            if (prop == .Regional_Indicator) {
+                flags += 1;
+            } else break;
+        }
+        return flags;
+    }
+
+    fn prev(iter: *SneakIterator) ?CodePoint {
+        while (iter.cp_iter.prev()) |peeked| {
+            if (!isIgnorable(iter.wb.breakProp(peeked))) return peeked;
+        }
+        return null;
     }
 };
 
