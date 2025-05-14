@@ -130,6 +130,22 @@ pub const Iterator = struct {
         return iter.next();
     }
 
+    /// Return a reverse iterator from the point this iterator is paused
+    /// at.  Usually, calling `prev()` will return the word just seen.
+    pub fn reverseIterator(iter: *Iterator) ReverseIterator {
+        var cp_it = iter.cp_iter.reverseIterator();
+        if (iter.that) |_|
+            _ = cp_it.prev();
+        if (iter.cp_iter.peek()) |_|
+            _ = cp_it.prev();
+        return .{
+            .wb = iter.wb,
+            .before = cp_it.prev(),
+            .after = iter.that,
+            .cp_iter = cp_it,
+        };
+    }
+
     /// Returns the next word segment.
     pub fn next(iter: *Iterator) ?Word {
         iter.advance();
@@ -249,6 +265,13 @@ pub const Iterator = struct {
         return Word{ .len = word_len, .offset = word_start };
     }
 
+    pub fn format(iter: Iterator, _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "Iterator {{ .this = {any}, .that = {any} }}",
+            .{ iter.this, iter.that },
+        );
+    }
+
     fn advance(iter: *Iterator) void {
         iter.this = iter.that;
         iter.that = iter.cp_iter.next();
@@ -281,11 +304,25 @@ pub const ReverseIterator = struct {
 
     /// Returns the previous word segment, without advancing.
     pub fn peek(iter: *ReverseIterator) ?Word {
-        const cache = .{ iter.before, iter.after, iter.cp_iter };
+        const cache = .{ iter.before, iter.after, iter.cp_iter, iter.flags };
         defer {
-            iter.before, iter.after, iter.cp_iter = cache;
+            iter.before, iter.after, iter.cp_iter, iter.flags = cache;
         }
         return iter.prev();
+    }
+
+    /// Return a forward iterator from where this iterator paused.  Usually,
+    /// calling `next()` will return the word just seen.
+    pub fn forwardIterator(iter: *ReverseIterator) Iterator {
+        var cp_it = iter.cp_iter.forwardIterator();
+        if (iter.before) |_|
+            _ = cp_it.next();
+        return .{
+            .wb = iter.wb,
+            .this = cp_it.next(),
+            .that = iter.after,
+            .cp_iter = cp_it,
+        };
     }
 
     /// Return the previous word, if any.
@@ -423,6 +460,13 @@ pub const ReverseIterator = struct {
             break :scan;
         }
         return Word{ .len = word_len, .offset = word_end - word_len };
+    }
+
+    pub fn format(iter: ReverseIterator, _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print(
+            "ReverseIterator {{ .before = {any}, .after = {any}, .flags = {d} }}",
+            .{ iter.before, iter.after, iter.flags },
+        );
     }
 
     fn peekPast(iter: *ReverseIterator) ?CodePoint {
@@ -571,6 +615,41 @@ test wordAtCursor {
     }
     const last = wb.wordAtCursor(t_string, 14);
     try testing.expectEqualStrings("third", last.bytes(t_string));
+}
+
+const testr = "don't a:ka fin!";
+
+test "reversal" {
+    const wb = try WordBreak.init(testing.allocator);
+    defer wb.deinit(testing.allocator);
+    {
+        var fwd = wb.iterator(testr);
+        var this_word: ?Word = fwd.next();
+
+        while (this_word) |this| : (this_word = fwd.next()) {
+            var back = fwd.reverseIterator();
+            const that_word = back.prev();
+            if (that_word) |that| {
+                try testing.expectEqualStrings(this.bytes(testr), that.bytes(testr));
+            } else {
+                try testing.expect(false);
+            }
+        }
+    }
+    {
+        var back = wb.reverseIterator(testr);
+        var this_word: ?Word = back.prev();
+
+        while (this_word) |this| : (this_word = back.prev()) {
+            var fwd = back.forwardIterator();
+            const that_word = fwd.next();
+            if (that_word) |that| {
+                try testing.expectEqualStrings(this.bytes(testr), that.bytes(testr));
+            } else {
+                try testing.expect(false);
+            }
+        }
+    }
 }
 
 fn testAllocations(allocator: Allocator) !void {
