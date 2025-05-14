@@ -1,5 +1,3 @@
-const std = @import("std");
-
 /// `CodePoint` represents a Unicode code point by its code,
 /// length, and offset in the source bytes.
 pub const CodePoint = struct {
@@ -116,3 +114,18 @@ test "peek" {
     try std.testing.expectEqual(@as(?CodePoint, null), iter.peek());
     try std.testing.expectEqual(@as(?CodePoint, null), iter.next());
 }
+
+test "overlongs" {
+    // Should not pass!
+    const bytes = "\xC0\xAF";
+    const res = decode(bytes, 0);
+    if (res) |cp| {
+        try testing.expectEqual(@as(u21, '/'), cp.code);
+        try testing.expectEqual(2, cp.len);
+    } else {
+        try testing.expect(false);
+    }
+}
+
+const std = @import("std");
+const testing = std.testing;
