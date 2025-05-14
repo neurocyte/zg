@@ -69,33 +69,53 @@ fn breakProp(wb: *const WordBreak, point: CodePoint) WordBreakProperty {
 }
 
 /// Returns the Word at the given index.  Asserts that the index is valid for
-/// the provided string.  Always returns a word.  This algorithm is O(n^2) for
-/// the size of the word before the cursor.
+/// the provided string, and that the string is not empty. Always returns a word.
+/// The index does not have to be the start of a codepoint in the word.
 pub fn wordAtCursor(wordbreak: *const WordBreak, string: []const u8, index: usize) Word {
-    assert(index < string.len);
-    var i = index;
-    var iter1 = wordbreak.iterator(string[index..]);
-    var last_word = iter1.next();
-    if (index == 0) return if (last_word) |word| word else Word{ .offset = 0, .len = 0 };
-    var this_word: ?Word = undefined;
-    while (last_word) |l_word| : (i -= 1) {
-        var iter2 = wordbreak.iterator(string[i..]);
-        this_word = iter2.next();
-        if (this_word) |t_word| {
-            if (false) std.debug.print("last_word: '{s}'\n", .{l_word.bytes(string[i + 1 ..])});
-            if (false) std.debug.print("this_word: '{s}'\n", .{t_word.bytes(string[i..])});
-            // Check if we've captured a previous word
-            const t_end = t_word.offset + t_word.len + i - 1;
-            const l_start = l_word.offset + i + 1;
-            if (false) std.debug.print("t_end {d}, l_start {d}\n", .{ t_end, l_start });
-            if (t_end < l_start) {
-                return .{ .offset = @intCast(l_start), .len = l_word.len };
+    assert(index < string.len and string.len > 0);
+    var iter_fwd: Iterator = .initAtIndex(wordbreak, string, index);
+    if (iter_fwd.next()) |_| {
+        // This is a bit tricky because we may have been in the middle of various
+        // stateful things.  So we go forward again:
+        if (iter_fwd.next()) |_| {
+            // Make a back iterator:
+            var iter_back = iter_fwd.reverseIterator();
+            const last_word = iter_back.prev().?; // Always works.
+            const no_flags = iter_back.flags == 0;
+            if (no_flags) {
+                // Next previous is our word.
+                const the_word = iter_back.prev();
+                if (the_word) |word| {
+                    assert(word.offset <= index and index <= word.offset + word.len);
+                    return word;
+                } else { // Can happen, at least I think so
+                    assert(last_word.offset <= index and index <= last_word.offset + last_word.len);
+                    return last_word;
+                }
+            } else {
+                // Scan past all the flags.
+                while (iter_back.flags > 0) {
+                    _ = iter_back.prev();
+                }
+                // Now just look for our word
+                iter_fwd = iter_back.forwardIterator();
+                while (iter_fwd.next()) |word| {
+                    if (word.offset <= index and index <= word.offset + word.len) {
+                        return word;
+                    }
+                }
+                unreachable;
             }
-            last_word = this_word;
-        } else unreachable;
-        if (i == 0) break;
+        } else { // We can just reverse here
+            var iter_back = iter_fwd.reverseIterator();
+            const word = iter_back.prev().?;
+            assert(word.offset <= index and index <= word.offset + word.len);
+            return word;
+        }
+    } else { // last word then
+        var iter_back = iter_fwd.reverseIterator();
+        return iter_back.prev().?;
     }
-    return this_word.?;
 }
 
 /// Returns an iterator over words in `slice`.
@@ -128,6 +148,36 @@ pub const Iterator = struct {
             iter.this, iter.that, iter.cp_iter = cache;
         }
         return iter.next();
+    }
+
+    /// Initialize an Iterator at the provided index.  Assumes str is valid
+    /// UTF-8, asserts that `index` is less than str.len, and that `str` is not
+    /// empty.  Note that for various stateful reasons, this may give spurious
+    /// results if used naïvely.  If you want to reliably iterate from an index,
+    /// use `wb.wordAtIndex(string, index)` to obtain the word, then start an
+    /// iterator at `wb.initAtIndex(string, word.offset)`.
+    pub fn initAtIndex(wb: *const WordBreak, string: []const u8, index: usize) Iterator {
+        assert(index < string.len and string.len > 0);
+        // Just in case...
+        if (index == 0) return wb.iterator(string);
+        var idx: u32 = @intCast(index);
+        // Back up past any any follow bytes:
+        while (idx > 0 and 0x80 <= string[idx] and string[idx] <= 0xBf) : (idx -= 1) {}
+        var iter: Iterator = undefined;
+        iter.wb = wb;
+        // We need to populate the CodePoints, and the codepoint iterator.
+        // Consider "abc |def" with the cursor on d.
+        // We need `this` to be ` ` and `that` to be 'd',
+        // and `cp_iter.next()` to be `e`.
+        var cp_back: ReverseCodepointIterator = .{ .bytes = string, .i = idx };
+        // Reverse gives us before `d`:
+        iter.this = cp_back.prev(); // that == ` `
+        // This iterator will give us `d`:
+        iter.cp_iter = .{ .bytes = string, .i = idx };
+        iter.that = iter.cp_iter.next();
+        // So that the next call will will give us `e`,
+        // thus the word will be `def`.
+        return iter;
     }
 
     /// Return a reverse iterator from the point this iterator is paused
@@ -300,6 +350,15 @@ pub const ReverseIterator = struct {
         var wb_iter: ReverseIterator = .{ .cp_iter = .init(str), .wb = wb };
         wb_iter.advance();
         return wb_iter;
+    }
+
+    /// Initialize a ReverseIterator at the provided index.  Assumes str is valid
+    /// UTF-8, asserts that `index` is less than str.len, and that `str` is not
+    /// empty.  You should prefer not to use this function, see Iterator.initAtIndex
+    /// for more details.
+    pub fn initAtIndex(wb: *const WordBreak, string: []const u8, index: usize) Iterator {
+        var fw_iter = Iterator.initAtIndex(wb, string, index);
+        return fw_iter.reverseIterator();
     }
 
     /// Returns the previous word segment, without advancing.
