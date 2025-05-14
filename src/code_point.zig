@@ -15,6 +15,14 @@ pub const CodePoint = struct {
     pub inline fn bytes(cp: CodePoint, str: []const u8) []const u8 {
         return str[cp.offset..][0..cp.len];
     }
+
+    pub fn format(cp: CodePoint, _: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+        try writer.print("CodePoint '{u}' .{{ ", .{cp.code});
+        try writer.print(
+            ".code = 0x{x}, .offset = {d}, .len = {d} }}",
+            .{ cp.code, cp.offset, cp.len },
+        );
+    }
 };
 
 /// This function is deprecated and will be removed in a later release.
@@ -171,7 +179,7 @@ pub const Iterator = struct {
 
     /// Create a backward iterator at this point.  It will repeat
     /// the last CodePoint seen.
-    pub fn reverseIterator(iter: *Iterator) ReverseIterator {
+    pub fn reverseIterator(iter: *const Iterator) ReverseIterator {
         if (iter.i == iter.bytes.len) {
             return .init(iter.bytes);
         }
@@ -283,7 +291,7 @@ pub const ReverseIterator = struct {
 
     /// Create a forward iterator at this point.  It will repeat the
     /// last CodePoint seen.
-    pub fn forwardIterator(iter: *ReverseIterator) Iterator {
+    pub fn forwardIterator(iter: *const ReverseIterator) Iterator {
         if (iter.i) |i| {
             var fwd: Iterator = .{ .i = i, .bytes = iter.bytes };
             _ = fwd.next();
