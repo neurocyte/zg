@@ -224,6 +224,7 @@ test "Segmentation Word Iterator" {
         }
         {
             var iter = wb.iterator(all_bytes.items);
+            var peeked: ?Word = iter.peek();
 
             // Check.
             for (want.items, 1..) |want_word, i| {
@@ -235,11 +236,21 @@ test "Segmentation Word Iterator" {
                     debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, i });
                     return err;
                 };
+                std.testing.expectEqualStrings(
+                    peeked.?.bytes(all_bytes.items),
+                    got_word.bytes(all_bytes.items),
+                ) catch |err| {
+                    debug.print("Peek != word on line {d} #{d}\n", .{ line_iter.line, i });
+                    return err;
+                };
+                peeked = iter.peek();
             }
         }
         {
             var r_iter = wb.reverseIterator(all_bytes.items);
+            var peeked: ?Word = r_iter.peek();
             var idx = want.items.len - 1;
+
             while (true) : (idx -= 1) {
                 const want_word = want.items[idx];
                 const got_word = r_iter.prev().?;
@@ -251,6 +262,14 @@ test "Segmentation Word Iterator" {
                     debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, idx + 1 });
                     return err;
                 };
+                std.testing.expectEqualStrings(
+                    peeked.?.bytes(all_bytes.items),
+                    got_word.bytes(all_bytes.items),
+                ) catch |err| {
+                    debug.print("Peek != word on line {d} #{d}\n", .{ line_iter.line, idx + 1 });
+                    return err;
+                };
+                peeked = r_iter.peek();
                 if (idx == 0) break;
             }
         }
