@@ -1,3 +1,9 @@
+//! Unicode Code Point module
+//!
+//! Provides a decoder and iterator over a UTF-8 encoded string.
+//! Represents invalid data according to the Replacement of Maximal
+//! Subparts algorithm.
+
 /// `CodePoint` represents a Unicode code point by its code,
 /// length, and offset in the source bytes.
 pub const CodePoint = struct {
@@ -6,67 +12,144 @@ pub const CodePoint = struct {
     offset: u32,
 };
 
-/// given a small slice of a string, decode the corresponding codepoint
+/// This function is deprecated and will be removed in a later release.
+/// Use `decodeAtIndex` or `decodeAtCursor`.
 pub fn decode(bytes: []const u8, offset: u32) ?CodePoint {
-    // EOS fast path
-    if (bytes.len == 0) {
-        return null;
+    var off: u32 = 0;
+    var maybe_code = decodeAtCursor(bytes, &off);
+    if (maybe_code) |*code| {
+        code.offset = offset;
+        return code.*;
     }
+    return null;
+}
 
-    // ASCII fast path
-    if (bytes[0] < 128) {
-        return .{
-            .code = bytes[0],
-            .len = 1,
-            .offset = offset,
-        };
-    }
+/// Decode the CodePoint, if any, at `bytes[idx]`.
+pub fn decodeAtIndex(bytes: []const u8, idx: u32) ?CodePoint {
+    var off = idx;
+    return decodeAtCursor(bytes, &off);
+}
 
-    var cp = CodePoint{
-        .code = undefined,
-        .len = switch (bytes[0]) {
-            0b1100_0000...0b1101_1111 => 2,
-            0b1110_0000...0b1110_1111 => 3,
-            0b1111_0000...0b1111_0111 => 4,
-            else => {
-                // unicode replacement code point.
-                return .{
-                    .code = 0xfffd,
-                    .len = 1,
-                    .offset = offset,
-                };
-            },
-        },
-        .offset = offset,
+/// Decode the CodePoint, if any, at `bytes[cursor.*]`.  After, the
+/// cursor will point at the next potential codepoint index.
+pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
+    // EOS
+    if (cursor.* >= bytes.len) return null;
+
+    const this_off = cursor.*;
+    cursor.* += 1;
+
+    // ASCII
+    var byte = bytes[this_off];
+    if (byte < 0x80) return .{
+        .code = byte,
+        .offset = this_off,
+        .len = 1,
     };
+    // Multibyte
 
-    // Return replacement if we don' have a complete codepoint remaining. Consumes only one byte
-    if (cp.len > bytes.len) {
-        // Unicode replacement code point.
+    // Second:
+    var class: u4 = @intCast(u8dfa[byte]);
+    var st: u32 = state_dfa[class];
+    if (st == RUNE_REJECT or cursor.* == bytes.len) {
+        @branchHint(.cold);
+        // First one is never a truncation
         return .{
             .code = 0xfffd,
             .len = 1,
-            .offset = offset,
+            .offset = this_off,
         };
     }
-
-    const cp_bytes = bytes[0..cp.len];
-    cp.code = switch (cp.len) {
-        2 => (@as(u21, (cp_bytes[0] & 0b00011111)) << 6) | (cp_bytes[1] & 0b00111111),
-
-        3 => (((@as(u21, (cp_bytes[0] & 0b00001111)) << 6) |
-            (cp_bytes[1] & 0b00111111)) << 6) |
-            (cp_bytes[2] & 0b00111111),
-
-        4 => (((((@as(u21, (cp_bytes[0] & 0b00000111)) << 6) |
-            (cp_bytes[1] & 0b00111111)) << 6) |
-            (cp_bytes[2] & 0b00111111)) << 6) |
-            (cp_bytes[3] & 0b00111111),
-
-        else => @panic("CodePointIterator.next invalid code point length."),
+    var rune: u32 = byte & class_mask[class];
+    byte = bytes[cursor.*];
+    class = @intCast(u8dfa[byte]);
+    st = state_dfa[st + class];
+    rune = (byte & 0x3f) | (rune << 6);
+    cursor.* += 1;
+    if (st == RUNE_ACCEPT) {
+        return .{
+            .code = @intCast(rune),
+            .len = 2,
+            .offset = this_off,
+        };
+    }
+    if (st == RUNE_REJECT or cursor.* == bytes.len) {
+        @branchHint(.cold);
+        // Check for valid start at cursor:
+        if (state_dfa[@intCast(u8dfa[byte])] == RUNE_REJECT) {
+            return .{
+                .code = 0xfffd,
+                .len = 2,
+                .offset = this_off,
+            };
+        } else {
+            // Truncation.
+            cursor.* -= 1;
+            return .{
+                .code = 0xfffe,
+                .len = 1,
+                .offset = this_off,
+            };
+        }
+    }
+    // Third
+    byte = bytes[cursor.*];
+    class = @intCast(u8dfa[byte]);
+    st = state_dfa[st + class];
+    rune = (byte & 0x3f) | (rune << 6);
+    cursor.* += 1;
+    if (st == RUNE_ACCEPT) {
+        return .{
+            .code = @intCast(rune),
+            .len = 3,
+            .offset = this_off,
+        };
+    }
+    if (st == RUNE_REJECT or cursor.* == bytes.len) {
+        @branchHint(.cold);
+        if (state_dfa[@intCast(u8dfa[byte])] == RUNE_REJECT) {
+            return .{
+                .code = 0xfffd,
+                .len = 3,
+                .offset = this_off,
+            };
+        } else {
+            cursor.* -= 1;
+            return .{
+                .code = 0xfffd,
+                .len = 2,
+                .offset = this_off,
+            };
+        }
+    }
+    byte = bytes[cursor.*];
+    class = @intCast(u8dfa[byte]);
+    st = state_dfa[st + class];
+    rune = (byte & 0x3f) | (rune << 6);
+    cursor.* += 1;
+    if (st == RUNE_REJECT) {
+        @branchHint(.cold);
+        if (state_dfa[@intCast(u8dfa[byte])] == RUNE_REJECT) {
+            return .{
+                .code = 0xfffd,
+                .len = 4,
+                .offset = this_off,
+            };
+        } else {
+            cursor.* -= 1;
+            return .{
+                .code = 0xfffd,
+                .len = 3,
+                .offset = this_off,
+            };
+        }
+    }
+    assert(st == RUNE_ACCEPT);
+    return .{
+        .code = @intCast(rune),
+        .len = 4,
+        .offset = this_off,
     };
-
-    return cp;
 }
 
 /// `Iterator` iterates a string one `CodePoint` at-a-time.
@@ -75,14 +158,7 @@ pub const Iterator = struct {
     i: u32 = 0,
 
     pub fn next(self: *Iterator) ?CodePoint {
-        if (self.i >= self.bytes.len) return null;
-
-        const res = decode(self.bytes[self.i..], self.i);
-        if (res) |cp| {
-            self.i += cp.len;
-        }
-
-        return res;
+        return decodeAtCursor(self.bytes, &self.i);
     }
 
     pub fn peek(self: *Iterator) ?CodePoint {
@@ -90,6 +166,74 @@ pub const Iterator = struct {
         defer self.i = saved_i;
         return self.next();
     }
+};
+
+// A fast DFA decoder for UTF-8
+//
+// The algorithm used aims to be optimal, without involving SIMD, this
+// strikes a balance between portability and efficiency.  That is done
+// by using a DFA, represented as a few lookup tables, to track state,
+// encoding valid transitions between bytes, arriving at 0 each time a
+// codepoint is decoded.  In the process it builds up the value of the
+// codepoint in question.
+//
+// The virtue of such an approach is low branching factor, achieved at
+// a modest cost of storing the tables.  An embedded system might want
+// to use a more familiar decision graph based on switches, but modern
+// hosted environments can well afford the space, and may appreciate a
+// speed increase in exchange.
+//
+// Credit for the algorithm goes to Björn Höhrmann, who wrote it up at
+// https://bjoern.hoehrmann.de/utf-8/decoder/dfa/ .  The original
+// license may be found in the ./credits folder.
+//
+
+/// Successful codepoint parse
+const RUNE_ACCEPT = 0;
+
+/// Error state
+const RUNE_REJECT = 12;
+
+/// Byte transitions: value to class
+const u8dfa: [256]u8 = .{
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 00..1f
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 20..3f
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 40..5f
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 60..7f
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, // 80..9f
+    7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, // a0..bf
+    8, 8, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, // c0..df
+    0xa, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x3, 0x4, 0x3, 0x3, // e0..ef
+    0xb, 0x6, 0x6, 0x6, 0x5, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, 0x8, // f0..ff
+};
+
+/// State transition: state + class = new state
+const state_dfa: [108]u8 = .{
+    0, 12, 24, 36, 60, 96, 84, 12, 12, 12, 48, 72, // 0  (RUNE_ACCEPT)
+    12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, // 12 (RUNE_REJECT)
+    12, 0, 12, 12, 12, 12, 12, 0, 12, 0, 12, 12, // 24
+    12, 24, 12, 12, 12, 12, 12, 24, 12, 24, 12, 12, // 32
+    12, 12, 12, 12, 12, 12, 12, 24, 12, 12, 12, 12, // 48
+    12, 24, 12, 12, 12, 12, 12, 12, 12, 24, 12, 12, // 60
+    12, 12, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12, // 72
+    12, 36, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12, // 84
+    12, 36, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, // 96
+};
+
+/// State masks
+const class_mask: [12]u8 = .{
+    0xff,
+    0,
+    0b0011_1111,
+    0b0001_1111,
+    0b0000_1111,
+    0b0000_0111,
+    0b0000_0011,
+    0,
+    0,
+    0,
+    0,
+    0,
 };
 
 test "decode" {
@@ -120,8 +264,8 @@ test "overlongs" {
     const bytes = "\xC0\xAF";
     const res = decode(bytes, 0);
     if (res) |cp| {
-        try testing.expectEqual(@as(u21, '/'), cp.code);
-        try testing.expectEqual(2, cp.len);
+        try testing.expectEqual(0xfffd, cp.code);
+        try testing.expectEqual(1, cp.len);
     } else {
         try testing.expect(false);
     }
@@ -129,3 +273,4 @@ test "overlongs" {
 
 const std = @import("std");
 const testing = std.testing;
+const assert = std.debug.assert;
