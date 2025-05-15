@@ -222,32 +222,58 @@ test "Segmentation Word Iterator" {
             try want.append(Word{ .len = gc_len, .offset = bytes_index });
             bytes_index += cp_index;
         }
+        const this_str = all_bytes.items;
+
         {
-            var iter = wb.iterator(all_bytes.items);
+            var iter = wb.iterator(this_str);
             var peeked: ?Word = iter.peek();
 
             // Check.
-            for (want.items, 1..) |want_word, i| {
+            for (want.items, 1..) |want_word, idx| {
                 const got_word = (iter.next()).?;
                 std.testing.expectEqualStrings(
-                    want_word.bytes(all_bytes.items),
-                    got_word.bytes(all_bytes.items),
+                    want_word.bytes(this_str),
+                    got_word.bytes(this_str),
                 ) catch |err| {
-                    debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, i });
+                    debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, idx });
                     return err;
                 };
                 std.testing.expectEqualStrings(
-                    peeked.?.bytes(all_bytes.items),
-                    got_word.bytes(all_bytes.items),
+                    peeked.?.bytes(this_str),
+                    got_word.bytes(this_str),
                 ) catch |err| {
-                    debug.print("Peek != word on line {d} #{d}\n", .{ line_iter.line, i });
+                    debug.print("Peek != word on line {d} #{d}\n", .{ line_iter.line, idx });
                     return err;
                 };
+                var r_iter = iter.reverseIterator();
+                const if_r_word = r_iter.prev();
+                if (if_r_word) |r_word| {
+                    std.testing.expectEqualStrings(
+                        want_word.bytes(this_str),
+                        r_word.bytes(this_str),
+                    ) catch |err| {
+                        debug.print("Reversal Error on line {d}, #{d}\n", .{ line_iter.line, idx });
+                        return err;
+                    };
+                } else {
+                    try testing.expect(false);
+                }
+                for (got_word.offset..got_word.offset + got_word.len) |i| {
+                    const this_word = wb.wordAtIndex(this_str, i);
+                    std.testing.expectEqualSlices(
+                        u8,
+                        got_word.bytes(this_str),
+                        this_word.bytes(this_str),
+                    ) catch |err| {
+                        debug.print("Wrong word on line {d} #{d} offset {d}\n", .{ line_iter.line, idx + 1, i });
+                        return err;
+                    };
+                }
                 peeked = iter.peek();
             }
         }
         {
-            var r_iter = wb.reverseIterator(all_bytes.items);
+            var r_iter = wb.reverseIterator(this_str);
             var peeked: ?Word = r_iter.peek();
             var idx = want.items.len - 1;
 
@@ -256,19 +282,43 @@ test "Segmentation Word Iterator" {
                 const got_word = r_iter.prev().?;
                 std.testing.expectEqualSlices(
                     u8,
-                    want_word.bytes(all_bytes.items),
-                    got_word.bytes(all_bytes.items),
+                    want_word.bytes(this_str),
+                    got_word.bytes(this_str),
                 ) catch |err| {
                     debug.print("Error on line {d}, #{d}\n", .{ line_iter.line, idx + 1 });
                     return err;
                 };
                 std.testing.expectEqualStrings(
-                    peeked.?.bytes(all_bytes.items),
-                    got_word.bytes(all_bytes.items),
+                    peeked.?.bytes(this_str),
+                    got_word.bytes(this_str),
                 ) catch |err| {
                     debug.print("Peek != word on line {d} #{d}\n", .{ line_iter.line, idx + 1 });
                     return err;
                 };
+                var f_iter = r_iter.forwardIterator();
+                const if_f_word = f_iter.next();
+                if (if_f_word) |f_word| {
+                    std.testing.expectEqualStrings(
+                        want_word.bytes(this_str),
+                        f_word.bytes(this_str),
+                    ) catch |err| {
+                        debug.print("Reversal Error on line {d}, #{d}\n", .{ line_iter.line, idx });
+                        return err;
+                    };
+                } else {
+                    try testing.expect(false);
+                }
+                for (got_word.offset..got_word.offset + got_word.len) |i| {
+                    const this_word = wb.wordAtIndex(this_str, i);
+                    std.testing.expectEqualSlices(
+                        u8,
+                        got_word.bytes(this_str),
+                        this_word.bytes(this_str),
+                    ) catch |err| {
+                        debug.print("Wrong word on line {d} #{d} offset {d}\n", .{ line_iter.line, idx + 1, i });
+                        return err;
+                    };
+                }
                 peeked = r_iter.peek();
                 if (idx == 0) break;
             }

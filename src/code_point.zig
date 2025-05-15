@@ -272,7 +272,6 @@ pub const ReverseIterator = struct {
 
         while (i_prev > 0) : (i_prev -= 1) {
             if (!followbyte(iter.bytes[i_prev])) break;
-            if (i_prev == 0) break;
         }
 
         if (i_prev > 0)
