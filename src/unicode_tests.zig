@@ -175,6 +175,80 @@ test "Segmentation GraphemeIterator" {
     }
 }
 
+test "Segmentation ReverseGraphemeIterator" {
+    const allocator = std.testing.allocator;
+    var file = try std.fs.cwd().openFile("data/unicode/auxiliary/GraphemeBreakTest.txt", .{});
+    defer file.close();
+    var buf_reader = std.io.bufferedReader(file.reader());
+    var input_stream = buf_reader.reader();
+
+    const data = try Graphemes.init(allocator);
+    defer data.deinit(allocator);
+
+    var buf: [4096]u8 = undefined;
+    var line_no: usize = 1;
+
+    while (try input_stream.readUntilDelimiterOrEof(&buf, '\n')) |raw| : (line_no += 1) {
+        // Skip comments or empty lines.
+        if (raw.len == 0 or raw[0] == '#' or raw[0] == '@') continue;
+
+        // Clean up.
+        var line = std.mem.trimLeft(u8, raw, "÷ ");
+        if (std.mem.indexOf(u8, line, " ÷\t#")) |octo| {
+            line = line[0..octo];
+        }
+        // Iterate over fields.
+        var want = std.ArrayList(Grapheme).init(allocator);
+        defer want.deinit();
+
+        var all_bytes = std.ArrayList(u8).init(allocator);
+        defer all_bytes.deinit();
+
+        var graphemes = std.mem.splitSequence(u8, line, " ÷ ");
+        var bytes_index: u32 = 0;
+
+        while (graphemes.next()) |field| {
+            var code_points = std.mem.splitScalar(u8, field, ' ');
+            var cp_buf: [4]u8 = undefined;
+            var cp_index: u32 = 0;
+            var gc_len: u8 = 0;
+
+            while (code_points.next()) |code_point| {
+                if (std.mem.eql(u8, code_point, "×")) continue;
+                const cp: u21 = try std.fmt.parseInt(u21, code_point, 16);
+                const len = try unicode.utf8Encode(cp, &cp_buf);
+                try all_bytes.appendSlice(cp_buf[0..len]);
+                cp_index += len;
+                gc_len += len;
+            }
+
+            try want.append(Grapheme{ .len = gc_len, .offset = bytes_index });
+            bytes_index += cp_index;
+        }
+
+        // std.debug.print("\nline {}: {s}\n", .{ line_no, all_bytes.items });
+        var iter = data.reverseIterator(all_bytes.items);
+
+        // Check.
+        var i: usize = want.items.len;
+        while (i > 0) {
+            i -= 1;
+            const want_gc = want.items[i];
+            const got_gc = iter.prev() orelse {
+                std.debug.print("line {d} grapheme {d}: expected {any} found null\n", .{ line_no, i, want_gc });
+                return error.TestExpectedEqual;
+            };
+            std.testing.expectEqualStrings(
+                want_gc.bytes(all_bytes.items),
+                got_gc.bytes(all_bytes.items),
+            ) catch |err| {
+                std.debug.print("line {d} grapheme {d}: expected {any} found {any}\n", .{ line_no, i, want_gc, got_gc });
+                return err;
+            };
+        }
+    }
+}
+
 test "Segmentation Word Iterator" {
     const allocator = std.testing.allocator;
     var file = try std.fs.cwd().openFile("data/unicode/auxiliary/WordBreakTest.txt", .{});
