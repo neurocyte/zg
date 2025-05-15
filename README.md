@@ -82,6 +82,7 @@ test "Code point iterator" {
             // The `offset` field is the byte offset in the
             // source string.
             try expect(cp.offset == 3);
+            try expectEqual(code_point.CodePoint, code_point.decodeAtIndex(str, cp.offset));
 
             // The `len` field is the length in bytes of the
             // code point in the source string.
