@@ -37,7 +37,7 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
     if (cursor.* >= bytes.len) return null;
 
     const this_off = cursor.*;
-    cursor.* += 1;
+    cursor.* += 1; // +1
 
     // ASCII
     var byte = bytes[this_off];
@@ -65,7 +65,7 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
     class = @intCast(u8dfa[byte]);
     st = state_dfa[st + class];
     rune = (byte & 0x3f) | (rune << 6);
-    cursor.* += 1;
+    cursor.* += 1; // +2
     if (st == RUNE_ACCEPT) {
         return .{
             .code = @intCast(rune),
@@ -75,29 +75,20 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
     }
     if (st == RUNE_REJECT or cursor.* == bytes.len) {
         @branchHint(.cold);
-        // Check for valid start at cursor:
-        if (state_dfa[@intCast(u8dfa[byte])] == RUNE_REJECT) {
-            return .{
-                .code = 0xfffd,
-                .len = 2,
-                .offset = this_off,
-            };
-        } else {
-            // Truncation.
-            cursor.* -= 1;
-            return .{
-                .code = 0xfffe,
-                .len = 1,
-                .offset = this_off,
-            };
-        }
+        // Truncation and other bad bytes the same here:
+        cursor.* -= 1; // + 1
+        return .{
+            .code = 0xfffd,
+            .len = 1,
+            .offset = this_off,
+        };
     }
     // Third
     byte = bytes[cursor.*];
     class = @intCast(u8dfa[byte]);
     st = state_dfa[st + class];
     rune = (byte & 0x3f) | (rune << 6);
-    cursor.* += 1;
+    cursor.* += 1; // +3
     if (st == RUNE_ACCEPT) {
         return .{
             .code = @intCast(rune),
@@ -108,13 +99,14 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
     if (st == RUNE_REJECT or cursor.* == bytes.len) {
         @branchHint(.cold);
         if (state_dfa[@intCast(u8dfa[byte])] == RUNE_REJECT) {
+            cursor.* -= 2; // +1
             return .{
                 .code = 0xfffd,
-                .len = 3,
+                .len = 1,
                 .offset = this_off,
             };
         } else {
-            cursor.* -= 1;
+            cursor.* -= 1; // +2
             return .{
                 .code = 0xfffd,
                 .len = 2,
@@ -126,17 +118,18 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
     class = @intCast(u8dfa[byte]);
     st = state_dfa[st + class];
     rune = (byte & 0x3f) | (rune << 6);
-    cursor.* += 1;
+    cursor.* += 1; // +4
     if (st == RUNE_REJECT) {
         @branchHint(.cold);
         if (state_dfa[@intCast(u8dfa[byte])] == RUNE_REJECT) {
+            cursor.* -= 3; // +1
             return .{
                 .code = 0xfffd,
-                .len = 4,
+                .len = 1,
                 .offset = this_off,
             };
         } else {
-            cursor.* -= 1;
+            cursor.* -= 1; // +3
             return .{
                 .code = 0xfffd,
                 .len = 3,
@@ -156,6 +149,10 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
 pub const Iterator = struct {
     bytes: []const u8,
     i: u32 = 0,
+
+    pub fn init(bytes: []const u8) Iterator {
+        return .{ .bytes = bytes, .i = 0 };
+    }
 
     pub fn next(self: *Iterator) ?CodePoint {
         return decodeAtCursor(self.bytes, &self.i);
@@ -252,25 +249,105 @@ test "decode" {
 test "peek" {
     var iter = Iterator{ .bytes = "Hi" };
 
-    try std.testing.expectEqual(@as(u21, 'H'), iter.next().?.code);
-    try std.testing.expectEqual(@as(u21, 'i'), iter.peek().?.code);
-    try std.testing.expectEqual(@as(u21, 'i'), iter.next().?.code);
-    try std.testing.expectEqual(@as(?CodePoint, null), iter.peek());
-    try std.testing.expectEqual(@as(?CodePoint, null), iter.next());
+    try expectEqual(@as(u21, 'H'), iter.next().?.code);
+    try expectEqual(@as(u21, 'i'), iter.peek().?.code);
+    try expectEqual(@as(u21, 'i'), iter.next().?.code);
+    try expectEqual(@as(?CodePoint, null), iter.peek());
+    try expectEqual(@as(?CodePoint, null), iter.next());
 }
 
 test "overlongs" {
-    // Should not pass!
-    const bytes = "\xC0\xAF";
-    const res = decode(bytes, 0);
-    if (res) |cp| {
-        try testing.expectEqual(0xfffd, cp.code);
-        try testing.expectEqual(1, cp.len);
-    } else {
-        try testing.expect(false);
+    // None of these should equal `/`, all should be byte-for-byte
+    // handled as replacement characters.
+    {
+        const bytes = "\xc0\xaf";
+        var iter: Iterator = .init(bytes);
+        const first = iter.next().?;
+        try expect('/' != first.code);
+        try expectEqual(0xfffd, first.code);
+        try testing.expectEqual(1, first.len);
+        const second = iter.next().?;
+        try expectEqual(0xfffd, second.code);
+        try testing.expectEqual(1, second.len);
+    }
+    {
+        const bytes = "\xe0\x80\xaf";
+        var iter: Iterator = .init(bytes);
+        const first = iter.next().?;
+        try expect('/' != first.code);
+        try expectEqual(0xfffd, first.code);
+        try testing.expectEqual(1, first.len);
+        const second = iter.next().?;
+        try expectEqual(0xfffd, second.code);
+        try testing.expectEqual(1, second.len);
+        const third = iter.next().?;
+        try expectEqual(0xfffd, third.code);
+        try testing.expectEqual(1, third.len);
+    }
+    {
+        const bytes = "\xf0\x80\x80\xaf";
+        var iter: Iterator = .init(bytes);
+        const first = iter.next().?;
+        try expect('/' != first.code);
+        try expectEqual(0xfffd, first.code);
+        try testing.expectEqual(1, first.len);
+        const second = iter.next().?;
+        try expectEqual(0xfffd, second.code);
+        try testing.expectEqual(1, second.len);
+        const third = iter.next().?;
+        try expectEqual(0xfffd, third.code);
+        try testing.expectEqual(1, third.len);
+        const fourth = iter.next().?;
+        try expectEqual(0xfffd, fourth.code);
+        try testing.expectEqual(1, fourth.len);
+    }
+}
+
+test "surrogates" {
+    // Substitution of Maximal Subparts dictates a
+    // replacement character for each byte of a surrogate.
+    {
+        const bytes = "\xed\xad\xbf";
+        var iter: Iterator = .init(bytes);
+        const first = iter.next().?;
+        try expectEqual(0xfffd, first.code);
+        try testing.expectEqual(1, first.len);
+        const second = iter.next().?;
+        try expectEqual(0xfffd, second.code);
+        try testing.expectEqual(1, second.len);
+        const third = iter.next().?;
+        try expectEqual(0xfffd, third.code);
+        try testing.expectEqual(1, third.len);
+    }
+}
+
+test "truncation" {
+    // Truncation must return one (1) replacement
+    // character for each stem of a valid UTF-8 codepoint
+    // Sample from Table 3-11 of the Unicode Standard 16.0.0
+    {
+        const bytes = "\xe1\x80\xe2\xf0\x91\x92\xf1\xbf\x41";
+        var iter: Iterator = .init(bytes);
+        const first = iter.next().?;
+        try expectEqual(0xfffd, first.code);
+        try testing.expectEqual(2, first.len);
+        const second = iter.next().?;
+        try expectEqual(0xfffd, second.code);
+        try testing.expectEqual(1, second.len);
+        const third = iter.next().?;
+        try expectEqual(0xfffd, third.code);
+        try testing.expectEqual(3, third.len);
+        const fourth = iter.next().?;
+        try expectEqual(0xfffd, fourth.code);
+        try testing.expectEqual(2, fourth.len);
+        const fifth = iter.next().?;
+        try expectEqual(0x41, fifth.code);
+        try testing.expectEqual(1, fifth.len);
     }
 }
 
 const std = @import("std");
 const testing = std.testing;
+const expect = testing.expect;
+const expectEqual = testing.expectEqual;
 const assert = std.debug.assert;
