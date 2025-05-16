@@ -52,9 +52,9 @@ UTF-8 into codepoints.  Concerningly, this interpreted overlong
 sequences, which has been forbidden by Unicode for more than 20 years
 due to the security risks involved.
 
-This has been replaced with a DFA decoder based on the work of [Björn
-Höhrmann][UTF], which has proven itself fast[^1] and reliable.  This is
-a breaking change; sequences such as `"\xc0\xaf"` will no longer
+This has been replaced with a DFA decoder based on the work of
+[Björn Höhrmann][UTF], which has proven itself fast[^1] and reliable.
+This is a breaking change; sequences such as `"\xc0\xaf"` will no longer
 produce the code `'/'`, nor will surrogates return their codepoint
 value.
 

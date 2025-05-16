@@ -151,7 +151,8 @@ pub const Iterator = struct {
     }
 
     /// Returns a reverse iterator from the point this iterator is paused
-    /// at.  Usually, calling `prev()` will return the word just seen.
+    /// at.  Usually, and always when using the API to create iterators,
+    /// calling `prev()` will return the word just seen.
     pub fn reverseIterator(iter: *Iterator) ReverseIterator {
         var cp_it = iter.cp_iter.reverseIterator();
         if (iter.that) |_|
@@ -333,7 +334,8 @@ pub const ReverseIterator = struct {
     }
 
     /// Return a forward iterator from where this iterator paused.  Usually,
-    /// calling `next()` will return the word just seen.
+    /// and always when using the API to create iterators, calling `next()`
+    /// will return the word just seen.
     pub fn forwardIterator(iter: *ReverseIterator) Iterator {
         var cp_it = iter.cp_iter.forwardIterator();
         if (iter.before) |_|
@@ -508,9 +510,10 @@ pub const ReverseIterator = struct {
 
 //| Implementation Details
 
-/// Initialize a ReverseIterator at the provided index. Used in wordAtIndex.
+/// Initialize a ReverseIterator at the provided index. Used in `wordAtIndex`.
 fn initAtIndex(wb: *const WordBreak, string: []const u8, index: usize) ReverseIterator {
     var idx: u32 = @intCast(index);
+    // Find the next lead byte:
     while (idx < string.len and 0x80 <= string[idx] and string[idx] <= 0xBf) : (idx += 1) {}
     if (idx == string.len) return wb.reverseIterator(string);
     var iter: ReverseIterator = undefined;
@@ -630,8 +633,6 @@ test "Word Break Properties" {
     try testing.expectEqual(.LF, wb.breakProperty('\n'));
     try testing.expectEqual(.Hebrew_Letter, wb.breakProperty('ש'));
     try testing.expectEqual(.Katakana, wb.breakProperty('\u{30ff}'));
-    var iter = wb.iterator("xxx");
-    _ = iter.peek();
 }
 
 test "ext_pict" {
