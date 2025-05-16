@@ -18,8 +18,7 @@ pub fn main() !void {
     );
     defer allocator.free(input);
 
-    const width_data = try DisplayWidth.DisplayWidthData.init(allocator);
-    const display_width = DisplayWidth{ .data = &width_data };
+    const display_width = try DisplayWidth.init(allocator);
 
     var iter = std.mem.splitScalar(u8, input, '\n');
     var result: usize = 0;

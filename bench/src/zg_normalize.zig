@@ -18,9 +18,7 @@ pub fn main() !void {
     );
     defer allocator.free(input);
 
-    var norm_data: Normalize.NormData = undefined;
-    try Normalize.NormData.init(&norm_data, allocator);
-    const normalize = Normalize{ .norm_data = &norm_data };
+    const normalize = try Normalize.init(allocator);
 
     var iter = std.mem.splitScalar(u8, input, '\n');
     var result: usize = 0;

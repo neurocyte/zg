@@ -6,140 +6,133 @@ const expectEqualStrings = testing.expectEqualStrings;
 
 const allocator = testing.allocator;
 
-const GenCatData = @import("GenCatData");
+const GeneralCategories = @import("GeneralCategories");
 
-test "General Category" {
-    const gcd = try GenCatData.init(allocator);
-    defer gcd.deinit();
+test GeneralCategories {
+    const gen_cat = try GeneralCategories.init(allocator);
+    defer gen_cat.deinit(allocator);
 
-    try expect(gcd.gc('A') == .Lu); // Lu: uppercase letter
-    try expect(gcd.gc('3') == .Nd); // Nd: Decimal number
-    try expect(gcd.isControl(0));
-    try expect(gcd.isLetter('z'));
-    try expect(gcd.isMark('\u{301}'));
-    try expect(gcd.isNumber('3'));
-    try expect(gcd.isPunctuation('['));
-    try expect(gcd.isSeparator(' '));
-    try expect(gcd.isSymbol('©'));
+    try expect(gen_cat.gc('A') == .Lu); // Lu: uppercase letter
+    try expect(gen_cat.gc('3') == .Nd); // Nd: Decimal number
+    try expect(gen_cat.isControl(0));
+    try expect(gen_cat.isLetter('z'));
+    try expect(gen_cat.isMark('\u{301}'));
+    try expect(gen_cat.isNumber('3'));
+    try expect(gen_cat.isPunctuation('['));
+    try expect(gen_cat.isSeparator(' '));
+    try expect(gen_cat.isSymbol('©'));
 }
 
-const PropsData = @import("PropsData");
+const Properties = @import("Properties");
 
-test "Properties" {
-    const pd = try PropsData.init(allocator);
-    defer pd.deinit();
+test Properties {
+    const props = try Properties.init(allocator);
+    defer props.deinit(allocator);
 
-    try expect(pd.isMath('+'));
-    try expect(pd.isAlphabetic('Z'));
-    try expect(pd.isWhitespace(' '));
-    try expect(pd.isHexDigit('f'));
-    try expect(!pd.isHexDigit('z'));
+    try expect(props.isMath('+'));
+    try expect(props.isAlphabetic('Z'));
+    try expect(props.isWhitespace(' '));
+    try expect(props.isHexDigit('f'));
+    try expect(!props.isHexDigit('z'));
 
-    try expect(pd.isDiacritic('\u{301}'));
-    try expect(pd.isIdStart('Z')); // Identifier start character
-    try expect(!pd.isIdStart('1'));
-    try expect(pd.isIdContinue('1'));
-    try expect(pd.isXidStart('\u{b33}')); // Extended identifier start character
-    try expect(pd.isXidContinue('\u{e33}'));
-    try expect(!pd.isXidStart('1'));
+    try expect(props.isDiacritic('\u{301}'));
+    try expect(props.isIdStart('Z')); // Identifier start character
+    try expect(!props.isIdStart('1'));
+    try expect(props.isIdContinue('1'));
+    try expect(props.isXidStart('\u{b33}')); // Extended identifier start character
+    try expect(props.isXidContinue('\u{e33}'));
+    try expect(!props.isXidStart('1'));
 
     // Note surprising Unicode numeric types!
-    try expect(pd.isNumeric('\u{277f}'));
-    try expect(!pd.isNumeric('3'));
-    try expect(pd.isDigit('\u{2070}'));
-    try expect(!pd.isDigit('3'));
-    try expect(pd.isDecimal('3'));
+    try expect(props.isNumeric('\u{277f}'));
+    try expect(!props.isNumeric('3'));
+    try expect(props.isDigit('\u{2070}'));
+    try expect(!props.isDigit('3'));
+    try expect(props.isDecimal('3'));
 }
 
-const CaseData = @import("CaseData");
+const LetterCasing = @import("LetterCasing");
 
-test "Case" {
-    const cd = try CaseData.init(allocator);
-    defer cd.deinit();
+test LetterCasing {
+    const case = try LetterCasing.init(allocator);
+    defer case.deinit(allocator);
 
-    try expect(cd.isUpper('A'));
-    try expect('A' == cd.toUpper('a'));
-    try expect(cd.isLower('a'));
-    try expect('a' == cd.toLower('A'));
+    try expect(case.isUpper('A'));
+    try expect('A' == case.toUpper('a'));
+    try expect(case.isLower('a'));
+    try expect('a' == case.toLower('A'));
 
-    try expect(cd.isCased('É'));
-    try expect(!cd.isCased('3'));
+    try expect(case.isCased('É'));
+    try expect(!case.isCased('3'));
 
-    try expect(cd.isUpperStr("HELLO 123!"));
-    const ucased = try cd.toUpperStr(allocator, "hello 123");
+    try expect(case.isUpperStr("HELLO 123!"));
+    const ucased = try case.toUpperStr(allocator, "hello 123");
     defer allocator.free(ucased);
     try expectEqualStrings("HELLO 123", ucased);
 
-    try expect(cd.isLowerStr("hello 123!"));
-    const lcased = try cd.toLowerStr(allocator, "HELLO 123");
+    try expect(case.isLowerStr("hello 123!"));
+    const lcased = try case.toLowerStr(allocator, "HELLO 123");
     defer allocator.free(lcased);
     try expectEqualStrings("hello 123", lcased);
 }
 
 const Normalize = @import("Normalize");
 
-test "Normalization" {
-    var norm_data = try Normalize.NormData.init(allocator);
-    defer norm_data.deinit();
-    const n = Normalize{ .norm_data = &norm_data };
+test Normalize {
+    const normalize = try Normalize.init(allocator);
+    defer normalize.deinit(allocator);
 
     // NFD: Canonical decomposition
-    const nfd_result = try n.nfd(allocator, "Héllo World! \u{3d3}");
-    defer nfd_result.deinit();
+    const nfd_result = try normalize.nfd(allocator, "Héllo World! \u{3d3}");
+    defer nfd_result.deinit(allocator);
     try expectEqualStrings("He\u{301}llo World! \u{3d2}\u{301}", nfd_result.slice);
 
     // NFKD: Compatibility decomposition
-    const nfkd_result = try n.nfkd(allocator, "Héllo World! \u{3d3}");
-    defer nfkd_result.deinit();
+    const nfkd_result = try normalize.nfkd(allocator, "Héllo World! \u{3d3}");
+    defer nfkd_result.deinit(allocator);
     try expectEqualStrings("He\u{301}llo World! \u{3a5}\u{301}", nfkd_result.slice);
 
     // NFC: Canonical composition
-    const nfc_result = try n.nfc(allocator, "Complex char: \u{3D2}\u{301}");
-    defer nfc_result.deinit();
+    const nfc_result = try normalize.nfc(allocator, "Complex char: \u{3D2}\u{301}");
+    defer nfc_result.deinit(allocator);
     try expectEqualStrings("Complex char: \u{3D3}", nfc_result.slice);
 
     // NFKC: Compatibility composition
-    const nfkc_result = try n.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
-    defer nfkc_result.deinit();
+    const nfkc_result = try normalize.nfkc(allocator, "Complex char: \u{03A5}\u{0301}");
+    defer nfkc_result.deinit(allocator);
     try expectEqualStrings("Complex char: \u{038E}", nfkc_result.slice);
 
     // Test for equality of two strings after normalizing to NFC.
-    try expect(try n.eql(allocator, "foé", "foe\u{0301}"));
-    try expect(try n.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
+    try expect(try normalize.eql(allocator, "foé", "foe\u{0301}"));
+    try expect(try normalize.eql(allocator, "foϓ", "fo\u{03D2}\u{0301}"));
 }
 
-const CaseFold = @import("CaseFold");
+const CaseFolding = @import("CaseFolding");
 
-test "Caseless matching" {
-    var norm_data = try Normalize.NormData.init(allocator);
-    defer norm_data.deinit();
-    const n = Normalize{ .norm_data = &norm_data };
-
-    const cfd = try CaseFold.FoldData.init(allocator);
-    defer cfd.deinit();
-    const cf = CaseFold{ .fold_data = &cfd };
+test CaseFolding {
+    const case_fold = try CaseFolding.init(allocator);
+    defer case_fold.deinit(allocator);
 
     // compatCaselessMatch provides the deepest level of caseless
     // matching because it decomposes and composes fully to NFKC.
     const a = "Héllo World! \u{3d3}";
     const b = "He\u{301}llo World! \u{3a5}\u{301}";
-    try expect(try cf.compatCaselessMatch(allocator, &n, a, b));
+    try expect(try case_fold.compatCaselessMatch(allocator, a, b));
 
     const c = "He\u{301}llo World! \u{3d2}\u{301}";
-    try expect(try cf.compatCaselessMatch(allocator, &n, a, c));
+    try expect(try case_fold.compatCaselessMatch(allocator, a, c));
 
     // canonCaselessMatch isn't as comprehensive as compatCaselessMatch
     // because it only decomposes and composes to NFC. But it's faster.
-    try expect(!try cf.canonCaselessMatch(allocator, &n, a, b));
-    try expect(try cf.canonCaselessMatch(allocator, &n, a, c));
+    try expect(!try case_fold.canonCaselessMatch(allocator, a, b));
+    try expect(try case_fold.canonCaselessMatch(allocator, a, c));
 }
 
 const DisplayWidth = @import("DisplayWidth");
 
-test "Display width" {
-    const dwd = try DisplayWidth.DisplayWidthData.init(allocator);
-    defer dwd.deinit();
-    const dw = DisplayWidth{ .data = &dwd };
+test DisplayWidth {
+    const dw = try DisplayWidth.init(allocator);
+    defer dw.deinit(allocator);
 
     // String display width
     try expectEqual(@as(usize, 5), dw.strWidth("Hello\r\n"));
@@ -197,13 +190,13 @@ test "Code point iterator" {
     }
 }
 
-const grapheme = @import("grapheme");
+const Graphemes = @import("Graphemes");
 
 test "Grapheme cluster iterator" {
-    const gd = try grapheme.GraphemeData.init(allocator);
-    defer gd.deinit();
+    const graphemes = try Graphemes.init(allocator);
+    defer graphemes.deinit(allocator);
     const str = "He\u{301}"; // Hé
-    var iter = grapheme.Iterator.init(str, &gd);
+    var iter = graphemes.iterator(str);
     var i: usize = 0;
 
     while (iter.next()) |gc| : (i += 1) {
@@ -217,13 +210,13 @@ test "Grapheme cluster iterator" {
     }
 }
 
-const ScriptsData = @import("ScriptsData");
+const Scripts = @import("Scripts");
 
-test "Scripts" {
-    const sd = try ScriptsData.init(allocator);
-    defer sd.deinit();
+test Scripts {
+    const scripts = try Scripts.init(allocator);
+    defer scripts.deinit(allocator);
 
-    try expect(sd.script('A') == .Latin);
-    try expect(sd.script('Ω') == .Greek);
-    try expect(sd.script('צ') == .Hebrew);
+    try expect(scripts.script('A') == .Latin);
+    try expect(scripts.script('Ω') == .Greek);
+    try expect(scripts.script('צ') == .Hebrew);
 }

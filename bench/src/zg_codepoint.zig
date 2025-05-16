@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const CodePointIterator = @import("code_point").Iterator;
+const code_point = @import("code_point");
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -18,7 +18,7 @@ pub fn main() !void {
     );
     defer allocator.free(input);
 
-    var iter = CodePointIterator{ .bytes = input };
+    var iter = code_point.Iterator{ .bytes = input };
     var result: usize = 0;
     var timer = try std.time.Timer.start();
 
