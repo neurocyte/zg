@@ -154,7 +154,7 @@ In your code:
 ```zig
 const GeneralCategories = @import("GeneralCategories");
 
-test "General Category" {
+test "General Categories" {
     const gen_cat = try GeneralCategories.init(allocator);
     defer gen_cat.deinit(allocator);
 
@@ -246,7 +246,7 @@ In your code:
 ```zig
 const LetterCasing = @import("LetterCasing");
 
-test "Case" {
+test "LetterCasing" {
     const case = try LetterCasing.init(allocator);
     defer case.deinit(allocator);
 
@@ -309,7 +309,7 @@ In your code:
 ```zig
 const Normalize = @import("Normalize");
 
-test "Normalization" {
+test "Normalize" {
     const normalize = try Normalize.init(allocator);
     defer normalize.deinit(allocator);
 
@@ -377,15 +377,15 @@ test "Caseless matching" {
     // matching because it decomposes fully to NFKD.
     const a = "Héllo World! \u{3d3}";
     const b = "He\u{301}llo World! \u{3a5}\u{301}";
-    try expect(try case_fold.compatCaselessMatch(allocator, &n, a, b));
+    try expect(try case_fold.compatCaselessMatch(allocator, a, b));
 
     const c = "He\u{301}llo World! \u{3d2}\u{301}";
-    try expect(try case_fold.compatCaselessMatch(allocator, &n, a, c));
+    try expect(try case_fold.compatCaselessMatch(allocator, a, c));
 
     // `canonCaselessMatch` isn't as comprehensive as `compatCaselessMatch`
     // because it only decomposes to NFD. Naturally, it's faster because of this.
-    try expect(!try case_fold.canonCaselessMatch(allocator, &n, a, b));
-    try expect(try case_fold.canonCaselessMatch(allocator, &n, a, c));
+    try expect(!try case_fold.canonCaselessMatch(allocator, a, b));
+    try expect(try case_fold.canonCaselessMatch(allocator, a, c));
 }
 ```
 Case folding needs to use the `Normalize` module in order to produce the compatibility
@@ -536,61 +536,61 @@ Benchmarks demonstrate the above stated goals have been met:
 ```plain
 Binary sizes =======
 
-149K ziglyph_case
-87K zg_case
+172K ziglyph_case
+109K zg_case
 
-275K ziglyph_caseless
-168K zg_caseless
+299K ziglyph_caseless
+175K zg_caseless
 
-68K ziglyph_codepoint
-68K zg_codepoint
+91K ziglyph_codepoint
+91K zg_codepoint
 
-101K ziglyph_grapheme
-86K zg_grapheme
+108K ziglyph_grapheme
+109K zg_grapheme
 
-185K ziglyph_normalizer
-152K zg_normalize
+208K ziglyph_normalizer
+175K zg_normalize
 
-101K ziglyph_width
-86K zg_width
+124K ziglyph_width
+109K zg_width
 
 Benchmarks ==========
 
-Ziglyph toUpperStr/toLowerStr: result: 7911596, took: 80
+Ziglyph toUpperStr/toLowerStr: result: 7756580, took: 74
 Ziglyph isUpperStr/isLowerStr: result: 110959, took: 17
-zg toUpperStr/toLowerStr: result: 7911596, took: 62
-zg isUpperStr/isLowerStr: result: 110959, took: 7
+zg toUpperStr/toLowerStr: result: 7756580, took: 58
+zg isUpperStr/isLowerStr: result: 110959, took: 11
 
-Ziglyph Normalizer.eqlCaseless: result: 625, took: 500
-zg CaseFold.canonCaselessMatch: result: 625, took: 385
-zg CaseFold.compatCaselessMatch: result: 625, took: 593
+Ziglyph Normalizer.eqlCaseless: result: 626, took: 479
+zg CaseFolding.canonCaselessMatch: result: 626, took: 296
+zg CaseFolding.compatCaselessMatch: result: 626, took: 604
 
-Ziglyph CodePointIterator: result: 3769314, took: 2
-zg CodePointIterator: result: 3769314, took: 3
+Ziglyph CodePointIterator: result: 3691806, took: 2.5
+zg code_point.Iterator: result: 3691806, took: 3.3
 
-Ziglyph GraphemeIterator: result: 3691806, took: 48
-zg GraphemeIterator: result: 3691806, took: 16
+Ziglyph GraphemeIterator: result: 3691806, took: 78
+zg Graphemes.Iterator: result: 3691806, took: 31
 
-Ziglyph Normalizer.nfkc: result: 3934162, took: 416
-zg Normalize.nfkc: result: 3934162, took: 182
+Ziglyph Normalizer.nfkc: result: 3856654, took: 411
+zg Normalize.nfkc: result: 3856654, took: 208
 
-Ziglyph Normalizer.nfc: result: 3955798, took: 57
-zg Normalize.nfc: result: 3955798, took: 28
+Ziglyph Normalizer.nfc: result: 3878290, took: 56
+zg Normalize.nfc: result: 3878290, took: 31
 
-Ziglyph Normalizer.nfkd: result: 4006398, took: 172
-zg Normalize.nfkd: result: 4006398, took: 104
+Ziglyph Normalizer.nfkd: result: 3928890, took: 163
+zg Normalize.nfkd: result: 3928890, took: 101
 
-Ziglyph Normalizer.nfd: result: 4028034, took: 169
-zg Normalize.nfd: result: 4028034, took: 104
+Ziglyph Normalizer.nfd: result: 3950526, took: 160
+zg Normalize.nfd: result: 3950526, took: 101
 
-Ziglyph Normalizer.eql: result: 625, took: 337
-Zg Normalize.eql: result: 625, took: 53
+Ziglyph Normalizer.eql: result: 626, took: 321
+Zg Normalize.eql: result: 626, took: 60
 
-Ziglyph display_width.strWidth: result: 3700914, took: 71
-zg DisplayWidth.strWidth: result: 3700914, took: 24
+Ziglyph display_width.strWidth: result: 3700914, took: 89
+zg DisplayWidth.strWidth: result: 3700914, took: 46
 ```
 
-These results were obtained on an M1 Mac with 16 GiB of RAM.
+These results were obtained on a MacBook Pro (2021) with M1 Pro and 16 GiB of RAM.
 
 In contrast to Ziglyph, zg does not have:
 
