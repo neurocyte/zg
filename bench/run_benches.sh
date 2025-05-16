@@ -1,6 +1,9 @@
 #!/bin/sh
 
-zig build -Doptimize=ReleaseSafe
+if ! zig build -Doptimize=ReleaseSafe; then
+  exit 1
+fi
+
 cd zig-out/bin/
 
 echo "\nBinary sizes ======="

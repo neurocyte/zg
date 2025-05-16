@@ -1,7 +1,6 @@
 const std = @import("std");
 
-const GraphemeData = @import("grapheme").GraphemeData;
-const GraphemeIterator = @import("grapheme").Iterator;
+const Graphemes = @import("Graphemes");
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -19,11 +18,11 @@ pub fn main() !void {
     );
     defer allocator.free(input);
 
-    const grapheme_data = try GraphemeData.init(allocator);
-    var iter = GraphemeIterator.init(input, &grapheme_data);
+    const graphemes = try Graphemes.init(allocator);
+    var iter = graphemes.iterator(input);
     var result: usize = 0;
     var timer = try std.time.Timer.start();
 
     while (iter.next()) |_| result += 1;
-    std.debug.print("zg GraphemeIterator: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
+    std.debug.print("zg Graphemes.Iterator: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }

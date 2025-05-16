@@ -73,7 +73,7 @@ pub fn build(b: *std.Build) !void {
             .name = "zg_caseless",
             .src = "src/zg_caseless.zig",
             .imports = &.{
-                .{ .name = "CaseFold", .module = zg.module("CaseFold") },
+                .{ .name = "CaseFolding", .module = zg.module("CaseFolding") },
                 .{ .name = "Normalize", .module = zg.module("Normalize") },
             },
         },
@@ -88,7 +88,7 @@ pub fn build(b: *std.Build) !void {
             .name = "zg_grapheme",
             .src = "src/zg_grapheme.zig",
             .imports = &.{
-                .{ .name = "grapheme", .module = zg.module("grapheme") },
+                .{ .name = "Graphemes", .module = zg.module("Graphemes") },
             },
         },
         .{
@@ -102,7 +102,7 @@ pub fn build(b: *std.Build) !void {
             .name = "zg_case",
             .src = "src/zg_case.zig",
             .imports = &.{
-                .{ .name = "CaseData", .module = zg.module("CaseData") },
+                .{ .name = "LetterCasing", .module = zg.module("LetterCasing") },
             },
         },
     };
@@ -129,15 +129,15 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    unit_tests.root_module.addImport("GenCatData", zg.module("GenCatData"));
-    unit_tests.root_module.addImport("PropsData", zg.module("PropsData"));
-    unit_tests.root_module.addImport("CaseData", zg.module("CaseData"));
+    unit_tests.root_module.addImport("GeneralCategories", zg.module("GeneralCategories"));
+    unit_tests.root_module.addImport("Properties", zg.module("Properties"));
+    unit_tests.root_module.addImport("LetterCasing", zg.module("LetterCasing"));
     unit_tests.root_module.addImport("Normalize", zg.module("Normalize"));
-    unit_tests.root_module.addImport("CaseFold", zg.module("CaseFold"));
+    unit_tests.root_module.addImport("CaseFolding", zg.module("CaseFolding"));
     unit_tests.root_module.addImport("DisplayWidth", zg.module("DisplayWidth"));
     unit_tests.root_module.addImport("code_point", zg.module("code_point"));
-    unit_tests.root_module.addImport("grapheme", zg.module("grapheme"));
-    unit_tests.root_module.addImport("ScriptsData", zg.module("ScriptsData"));
+    unit_tests.root_module.addImport("Graphemes", zg.module("Graphemes"));
+    unit_tests.root_module.addImport("Scripts", zg.module("Scripts"));
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

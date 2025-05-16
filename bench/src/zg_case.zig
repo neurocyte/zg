@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const CaseData = @import("CaseData");
+const LetterCasing = @import("LetterCasing");
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -18,15 +18,15 @@ pub fn main() !void {
     );
     defer allocator.free(input);
 
-    const case_data = try CaseData.init(allocator);
+    const case = try LetterCasing.init(allocator);
 
     var iter = std.mem.splitScalar(u8, input, '\n');
     var result: usize = 0;
     var timer = try std.time.Timer.start();
 
     while (iter.next()) |line| {
-        const upper = try case_data.toUpperStr(allocator, line);
-        const lower = try case_data.toLowerStr(allocator, line);
+        const upper = try case.toUpperStr(allocator, line);
+        const lower = try case.toLowerStr(allocator, line);
         result += upper.len + lower.len;
     }
     std.debug.print("zg toUpperStr/toLowerStr: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
@@ -36,8 +36,8 @@ pub fn main() !void {
     timer.reset();
 
     while (iter.next()) |line| {
-        if (case_data.isUpperStr(line)) result += 1;
-        if (case_data.isLowerStr(line)) result += 2;
+        if (case.isUpperStr(line)) result += 1;
+        if (case.isLowerStr(line)) result += 2;
     }
     std.debug.print("zg isUpperStr/isLowerStr: result: {}, took: {}\n", .{ result, std.fmt.fmtDuration(timer.lap()) });
 }
