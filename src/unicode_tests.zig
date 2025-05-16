@@ -211,7 +211,7 @@ test "Segmentation Word Iterator" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var input_stream = buf_reader.reader();
 
-    const wb = try WordBreak.init(allocator);
+    const wb = try Words.init(allocator);
     defer wb.deinit(allocator);
 
     var buf: [4096]u8 = undefined;
@@ -392,5 +392,5 @@ const Graphemes = @import("Graphemes");
 const GraphemeIterator = @import("Graphemes").Iterator;
 const Normalize = @import("Normalize");
 
-const WordBreak = @import("WordBreak");
-const Word = WordBreak.Word;
+const Words = @import("Words");
+const Word = Words.Word;

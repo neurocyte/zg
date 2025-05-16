@@ -25,15 +25,15 @@ const WordBreakProperty = enum(u5) {
 s1: []u16 = undefined,
 s2: []u5 = undefined,
 
-const WordBreak = @This();
+const Words = @This();
 
-pub fn init(allocator: Allocator) Allocator.Error!WordBreak {
-    var wb: WordBreak = undefined;
+pub fn init(allocator: Allocator) Allocator.Error!Words {
+    var wb: Words = undefined;
     try wb.setup(allocator);
     return wb;
 }
 
-pub fn setup(wb: *WordBreak, allocator: Allocator) Allocator.Error!void {
+pub fn setup(wb: *Words, allocator: Allocator) Allocator.Error!void {
     wb.setupImpl(allocator) catch |err| {
         switch (err) {
             error.OutOfMemory => |e| return e,
@@ -42,7 +42,7 @@ pub fn setup(wb: *WordBreak, allocator: Allocator) Allocator.Error!void {
     };
 }
 
-pub fn deinit(wordbreak: *const WordBreak, allocator: mem.Allocator) void {
+pub fn deinit(wordbreak: *const Words, allocator: mem.Allocator) void {
     allocator.free(wordbreak.s1);
     allocator.free(wordbreak.s2);
 }
@@ -60,19 +60,19 @@ pub const Word = struct {
 };
 
 /// Returns the word break property type for `cp`.
-pub fn breakProperty(wordbreak: *const WordBreak, cp: u21) WordBreakProperty {
+pub fn breakProperty(wordbreak: *const Words, cp: u21) WordBreakProperty {
     return @enumFromInt(wordbreak.s2[wordbreak.s1[cp >> 8] + (cp & 0xff)]);
 }
 
 /// Convenience function for working with CodePoints
-fn breakProp(wb: *const WordBreak, point: CodePoint) WordBreakProperty {
+fn breakProp(wb: *const Words, point: CodePoint) WordBreakProperty {
     return @enumFromInt(wb.s2[wb.s1[point.code >> 8] + (point.code & 0xff)]);
 }
 
 /// Returns the Word at the given index.  Asserts that the index is less than
 /// `string.len`, and that the string is not empty. Always returns a word.
 /// The index does not have to be the start of a codepoint in the word.
-pub fn wordAtIndex(wordbreak: *const WordBreak, string: []const u8, index: usize) Word {
+pub fn wordAtIndex(wordbreak: *const Words, string: []const u8, index: usize) Word {
     assert(index < string.len and string.len > 0);
     var iter_back: ReverseIterator = initAtIndex(wordbreak, string, index);
     const first_back = iter_back.prev();
@@ -118,12 +118,12 @@ pub fn wordAtIndex(wordbreak: *const WordBreak, string: []const u8, index: usize
 }
 
 /// Returns an iterator over words in `slice`.
-pub fn iterator(wordbreak: *const WordBreak, slice: []const u8) Iterator {
+pub fn iterator(wordbreak: *const Words, slice: []const u8) Iterator {
     return Iterator.init(wordbreak, slice);
 }
 
 /// Returns a reverse iterator over the words in `slice`.
-pub fn reverseIterator(wordbreak: *const WordBreak, slice: []const u8) ReverseIterator {
+pub fn reverseIterator(wordbreak: *const Words, slice: []const u8) ReverseIterator {
     return ReverseIterator.init(wordbreak, slice);
 }
 
@@ -132,10 +132,10 @@ pub const Iterator = struct {
     this: ?CodePoint = null,
     that: ?CodePoint = null,
     cp_iter: CodepointIterator,
-    wb: *const WordBreak,
+    wb: *const Words,
 
     /// Assumes `str` is valid UTF-8.
-    pub fn init(wb: *const WordBreak, str: []const u8) Iterator {
+    pub fn init(wb: *const Words, str: []const u8) Iterator {
         var wb_iter: Iterator = .{ .cp_iter = .init(str), .wb = wb };
         wb_iter.advance();
         return wb_iter;
@@ -314,11 +314,11 @@ pub const ReverseIterator = struct {
     after: ?CodePoint = null,
     before: ?CodePoint = null,
     cp_iter: ReverseCodepointIterator,
-    wb: *const WordBreak,
+    wb: *const Words,
     flags: usize = 0,
 
     /// Assumes `str` is valid UTF-8.
-    pub fn init(wb: *const WordBreak, str: []const u8) ReverseIterator {
+    pub fn init(wb: *const Words, str: []const u8) ReverseIterator {
         var wb_iter: ReverseIterator = .{ .cp_iter = .init(str), .wb = wb };
         wb_iter.advance();
         return wb_iter;
@@ -511,7 +511,7 @@ pub const ReverseIterator = struct {
 //| Implementation Details
 
 /// Initialize a ReverseIterator at the provided index. Used in `wordAtIndex`.
-fn initAtIndex(wb: *const WordBreak, string: []const u8, index: usize) ReverseIterator {
+fn initAtIndex(wb: *const Words, string: []const u8, index: usize) ReverseIterator {
     var idx: u32 = @intCast(index);
     // Find the next lead byte:
     while (idx < string.len and 0x80 <= string[idx] and string[idx] <= 0xBf) : (idx += 1) {}
@@ -536,7 +536,7 @@ fn sneaky(iter: *const ReverseIterator) SneakIterator {
 
 const SneakIterator = struct {
     cp_iter: ReverseCodepointIterator,
-    wb: *const WordBreak,
+    wb: *const Words,
 
     fn peek(iter: *SneakIterator) ?CodePoint {
         const save_cp = iter.cp_iter;
@@ -570,7 +570,7 @@ const SneakIterator = struct {
     }
 };
 
-inline fn setupImpl(wb: *WordBreak, allocator: Allocator) !void {
+inline fn setupImpl(wb: *Words, allocator: Allocator) !void {
     const decompressor = compress.flate.inflate.decompressor;
     const in_bytes = @embedFile("wbp");
     var in_fbs = std.io.fixedBufferStream(in_bytes);
@@ -627,7 +627,7 @@ inline fn isExtensible(wbp: WordBreakProperty) bool {
 }
 
 test "Word Break Properties" {
-    const wb = try WordBreak.init(testing.allocator);
+    const wb = try Words.init(testing.allocator);
     defer wb.deinit(testing.allocator);
     try testing.expectEqual(.CR, wb.breakProperty('\r'));
     try testing.expectEqual(.LF, wb.breakProperty('\n'));
@@ -641,7 +641,7 @@ test "ext_pict" {
 }
 
 test wordAtIndex {
-    const wb = try WordBreak.init(testing.allocator);
+    const wb = try Words.init(testing.allocator);
     defer wb.deinit(testing.allocator);
     const t_string = "first second third";
     const second = wb.wordAtIndex(t_string, 8);
@@ -663,7 +663,7 @@ test wordAtIndex {
 const testr = "don't a:ka fin!";
 
 test "reversal" {
-    const wb = try WordBreak.init(testing.allocator);
+    const wb = try Words.init(testing.allocator);
     defer wb.deinit(testing.allocator);
     {
         var fwd = wb.iterator(testr);
@@ -696,7 +696,7 @@ test "reversal" {
 }
 
 fn testAllocations(allocator: Allocator) !void {
-    const wb = try WordBreak.init(allocator);
+    const wb = try Words.init(allocator);
     wb.deinit(allocator);
 }
 

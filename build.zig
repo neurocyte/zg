@@ -226,21 +226,21 @@ pub fn build(b: *std.Build) void {
     const grapheme_tr = b.addRunArtifact(grapheme_t);
 
     // Word Breaking
-    const word_break = b.addModule("WordBreak", .{
-        .root_source_file = b.path("src/WordBreak.zig"),
+    const words = b.addModule("Words", .{
+        .root_source_file = b.path("src/Words.zig"),
         .target = target,
         .optimize = optimize,
     });
-    word_break.addAnonymousImport("wbp", .{ .root_source_file = wbp_gen_out });
-    word_break.addImport("code_point", code_point);
+    words.addAnonymousImport("wbp", .{ .root_source_file = wbp_gen_out });
+    words.addImport("code_point", code_point);
 
-    const word_break_t = b.addTest(.{
+    const words_t = b.addTest(.{
         .name = "WordBreak",
-        .root_module = word_break,
+        .root_module = words,
         .target = target,
         .optimize = optimize,
     });
-    const word_break_tr = b.addRunArtifact(word_break_t);
+    const words_tr = b.addRunArtifact(words_t);
 
     // ASCII utilities
     const ascii = b.addModule("ascii", .{
@@ -471,7 +471,7 @@ pub fn build(b: *std.Build) void {
     });
     unicode_tests.root_module.addImport("Graphemes", graphemes);
     unicode_tests.root_module.addImport("Normalize", norm);
-    unicode_tests.root_module.addImport("WordBreak", word_break);
+    unicode_tests.root_module.addImport("Words", words);
 
     const run_unicode_tests = b.addRunArtifact(unicode_tests);
 
@@ -480,7 +480,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&code_point_tr.step);
     test_step.dependOn(&display_width_tr.step);
     test_step.dependOn(&grapheme_tr.step);
-    test_step.dependOn(&word_break_tr.step);
+    test_step.dependOn(&words_tr.step);
     test_step.dependOn(&ascii_tr.step);
     test_step.dependOn(&ccc_data_tr.step);
     test_step.dependOn(&canon_data_tr.step);
