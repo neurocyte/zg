@@ -287,6 +287,25 @@ test "Segmentation Word Iterator" {
                 } else {
                     try testing.expect(false);
                 }
+                var peek_iter = wb.iterateAfter(this_str, got_word);
+                const peek_1 = peek_iter.next();
+                if (peek_1) |p1| {
+                    const peek_2 = iter.peek();
+                    if (peek_2) |p2| {
+                        std.testing.expectEqualSlices(
+                            u8,
+                            p1.bytes(this_str),
+                            p2.bytes(this_str),
+                        ) catch |err| {
+                            debug.print("Bad peek on line {d} #{d} offset {d}\n", .{ line_iter.line, idx + 1, idx });
+                            return err;
+                        };
+                    } else {
+                        try testing.expect(false);
+                    }
+                } else {
+                    try testing.expectEqual(null, iter.peek());
+                }
                 for (got_word.offset..got_word.offset + got_word.len) |i| {
                     const this_word = wb.wordAtIndex(this_str, i);
                     std.testing.expectEqualSlices(
@@ -336,6 +355,25 @@ test "Segmentation Word Iterator" {
                     };
                 } else {
                     try testing.expect(false);
+                }
+                var peek_iter = wb.iterateBefore(this_str, got_word);
+                const peek_1 = peek_iter.prev();
+                if (peek_1) |p1| {
+                    const peek_2 = r_iter.peek();
+                    if (peek_2) |p2| {
+                        std.testing.expectEqualSlices(
+                            u8,
+                            p1.bytes(this_str),
+                            p2.bytes(this_str),
+                        ) catch |err| {
+                            debug.print("Bad peek on line {d} #{d} offset {d}\n", .{ line_iter.line, idx + 1, idx });
+                            return err;
+                        };
+                    } else {
+                        try testing.expect(false);
+                    }
+                } else {
+                    try testing.expectEqual(null, r_iter.peek());
                 }
                 for (got_word.offset..got_word.offset + got_word.len) |i| {
                     const this_word = wb.wordAtIndex(this_str, i);

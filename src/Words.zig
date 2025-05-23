@@ -1,4 +1,7 @@
 //! Word Breaking Algorithm.
+//!
+//! https://www.unicode.org/reports/tr29/#Word_Boundaries
+//!
 
 const WordBreakProperty = enum(u5) {
     none,
@@ -42,9 +45,9 @@ pub fn setup(wb: *Words, allocator: Allocator) Allocator.Error!void {
     };
 }
 
-pub fn deinit(wordbreak: *const Words, allocator: mem.Allocator) void {
-    allocator.free(wordbreak.s1);
-    allocator.free(wordbreak.s2);
+pub fn deinit(words: *const Words, allocator: mem.Allocator) void {
+    allocator.free(words.s1);
+    allocator.free(words.s2);
 }
 
 /// Represents a Unicode word span, as an offset into the source string
@@ -54,51 +57,44 @@ pub const Word = struct {
     len: u32,
 
     /// Returns a slice of the word given the source string.
-    pub fn bytes(self: Word, src: []const u8) []const u8 {
-        return src[self.offset..][0..self.len];
+    pub fn bytes(word: Word, src: []const u8) []const u8 {
+        return src[word.offset..][0..word.len];
     }
 };
 
 /// Returns the word break property type for `cp`.
-pub fn breakProperty(wordbreak: *const Words, cp: u21) WordBreakProperty {
-    return @enumFromInt(wordbreak.s2[wordbreak.s1[cp >> 8] + (cp & 0xff)]);
+pub fn breakProperty(words: *const Words, cp: u21) WordBreakProperty {
+    return @enumFromInt(words.s2[words.s1[cp >> 8] + (cp & 0xff)]);
 }
 
 /// Convenience function for working with CodePoints
-fn breakProp(wb: *const Words, point: CodePoint) WordBreakProperty {
-    return @enumFromInt(wb.s2[wb.s1[point.code >> 8] + (point.code & 0xff)]);
+fn breakProp(words: *const Words, point: CodePoint) WordBreakProperty {
+    return @enumFromInt(words.s2[words.s1[point.code >> 8] + (point.code & 0xff)]);
 }
 
 /// Returns the Word at the given index.  Asserts that the index is less than
 /// `string.len`, and that the string is not empty. Always returns a word.
 /// The index does not have to be the start of a codepoint in the word.
-pub fn wordAtIndex(wordbreak: *const Words, string: []const u8, index: usize) Word {
+pub fn wordAtIndex(words: *const Words, string: []const u8, index: usize) Word {
     assert(index < string.len and string.len > 0);
-    var iter_back: ReverseIterator = initAtIndex(wordbreak, string, index);
+    var iter_back: ReverseIterator = reverseFromIndex(words, string, index);
     const first_back = iter_back.prev();
     if (first_back) |back| {
         if (back.offset == 0) {
-            var iter_fwd = wordbreak.iterator(string);
+            var iter_fwd = words.iterator(string);
             while (iter_fwd.next()) |word| {
                 if (word.offset <= index and index < word.offset + word.len)
                     return word;
             }
         }
     } else {
-        var iter_fwd = wordbreak.iterator(string);
+        var iter_fwd = words.iterator(string);
         while (iter_fwd.next()) |word| {
             if (word.offset <= index and index < word.offset + word.len)
                 return word;
         }
     }
-    const second_back = iter_back.prev();
-    if (second_back) |back| if (back.offset == 0) {
-        var iter_fwd = wordbreak.iterator(string);
-        while (iter_fwd.next()) |word| {
-            if (word.offset <= index and index < word.offset + word.len)
-                return word;
-        }
-    };
+    _ = iter_back.prev();
     // There's sometimes flags:
     if (iter_back.flags > 0) {
         while (iter_back.flags > 0) {
@@ -118,13 +114,23 @@ pub fn wordAtIndex(wordbreak: *const Words, string: []const u8, index: usize) Wo
 }
 
 /// Returns an iterator over words in `slice`.
-pub fn iterator(wordbreak: *const Words, slice: []const u8) Iterator {
-    return Iterator.init(wordbreak, slice);
+pub fn iterator(words: *const Words, slice: []const u8) Iterator {
+    return Iterator.init(words, slice);
 }
 
 /// Returns a reverse iterator over the words in `slice`.
-pub fn reverseIterator(wordbreak: *const Words, slice: []const u8) ReverseIterator {
-    return ReverseIterator.init(wordbreak, slice);
+pub fn reverseIterator(words: *const Words, slice: []const u8) ReverseIterator {
+    return ReverseIterator.init(words, slice);
+}
+
+/// Returns an iterator after the `word` in `slice`.
+pub fn iterateAfter(words: *const Words, slice: []const u8, word: Word) Iterator {
+    return forwardFromIndex(words, slice, word.offset + word.len);
+}
+
+/// Returns a reverse iterator before the `word` in `slice`.
+pub fn iterateBefore(words: *const Words, slice: []const u8, word: Word) ReverseIterator {
+    return reverseFromIndex(words, slice, word.offset);
 }
 
 /// An iterator, forward, over all words in a provided string.
@@ -135,8 +141,8 @@ pub const Iterator = struct {
     wb: *const Words,
 
     /// Assumes `str` is valid UTF-8.
-    pub fn init(wb: *const Words, str: []const u8) Iterator {
-        var wb_iter: Iterator = .{ .cp_iter = .init(str), .wb = wb };
+    pub fn init(words: *const Words, str: []const u8) Iterator {
+        var wb_iter: Iterator = .{ .cp_iter = .init(str), .wb = words };
         wb_iter.advance();
         return wb_iter;
     }
@@ -318,8 +324,8 @@ pub const ReverseIterator = struct {
     flags: usize = 0,
 
     /// Assumes `str` is valid UTF-8.
-    pub fn init(wb: *const Words, str: []const u8) ReverseIterator {
-        var wb_iter: ReverseIterator = .{ .cp_iter = .init(str), .wb = wb };
+    pub fn init(words: *const Words, str: []const u8) ReverseIterator {
+        var wb_iter: ReverseIterator = .{ .cp_iter = .init(str), .wb = words };
         wb_iter.advance();
         return wb_iter;
     }
@@ -511,13 +517,13 @@ pub const ReverseIterator = struct {
 //| Implementation Details
 
 /// Initialize a ReverseIterator at the provided index. Used in `wordAtIndex`.
-fn initAtIndex(wb: *const Words, string: []const u8, index: usize) ReverseIterator {
+fn reverseFromIndex(words: *const Words, string: []const u8, index: usize) ReverseIterator {
     var idx: u32 = @intCast(index);
     // Find the next lead byte:
     while (idx < string.len and 0x80 <= string[idx] and string[idx] <= 0xBf) : (idx += 1) {}
-    if (idx == string.len) return wb.reverseIterator(string);
+    if (idx == string.len) return words.reverseIterator(string);
     var iter: ReverseIterator = undefined;
-    iter.wb = wb;
+    iter.wb = words;
     iter.flags = 0;
     // We need to populate the CodePoints, and the codepoint iterator.
     // Consider "abc| def" with the cursor as |.
@@ -526,6 +532,34 @@ fn initAtIndex(wb: *const Words, string: []const u8, index: usize) ReverseIterat
     var cp_iter: ReverseCodepointIterator = .{ .bytes = string, .i = idx };
     iter.after = cp_iter.prev();
     iter.before = cp_iter.prev();
+    iter.cp_iter = cp_iter;
+    return iter;
+}
+
+fn forwardFromIndex(words: *const Words, string: []const u8, index: usize) Iterator {
+    var idx: u32 = @intCast(index);
+    if (idx == string.len) {
+        return .{
+            .cp_iter = .{ .bytes = string, .i = idx },
+            .this = null,
+            .that = null,
+            .wb = words,
+        };
+    }
+    while (idx > 0 and 0x80 <= string[idx] and string[idx] <= 0xBf) : (idx -= 1) {}
+    if (idx == 0) return words.iterator(string);
+    var iter: Iterator = undefined;
+    iter.wb = words;
+    // We need to populate the CodePoints, and the codepoint iterator.
+    // Consider "abc |def" with the cursor as |.
+    // We need `this` to be ` ` and `that` to be 'd',
+    // and `cp_iter.next()` to be `d`.
+    idx -= 1;
+    while (idx > 0 and 0x80 <= string[idx] and string[idx] <= 0xBf) : (idx -= 1) {}
+    // "abc| def"
+    var cp_iter: CodepointIterator = .{ .bytes = string, .i = idx };
+    iter.this = cp_iter.next();
+    iter.that = cp_iter.next();
     iter.cp_iter = cp_iter;
     return iter;
 }
