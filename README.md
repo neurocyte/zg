@@ -519,3 +519,24 @@ test "Scripts" {
     try expect(scripts.script('צ') == .Hebrew);
 }
 ```
+
+## Limits
+
+Iterators, and fragment types such as `CodePoint`, `Grapheme` and `Word`, use a
+`u32` to store the offset into a string, and the length of the fragment
+(`CodePoint` uses a `u3` for length, actually).
+
+4GiB is a lot of string.  There are a few reasons to work with that much
+string, log files primarily, but fewer to bring it all into memory at once, and
+practically no reason at all to do anything to such a string without breaking
+it into smaller piece to work with.
+
+Also, Zig compiles on 32 bit systems, where `usize` is 32.  Code running on
+such systems has no choice but to handle slices in smaller pieces.  In general,
+if you want code to perform correctly when encountering multi- gigabyte
+strings, you'll need to code for that, at a level one or two steps above that
+in which you'll want to, for example, iterate some graphemes of that string.
+
+That all said, `zg` modules can be passed the Boolean config option
+`fat_offset`, which will make all of those data structures use a `u64` instead.
+You don't actually want to do this.  But you can.

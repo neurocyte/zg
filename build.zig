@@ -14,7 +14,7 @@ pub fn build(b: *std.Build) void {
     //| Options
 
     // Display width
-    const cjk = b.option(bool, "cjk", "Ambiguous code points are wide (display width: 2).") orelse false;
+    const cjk = b.option(bool, "cjk", "Ambiguous code points are wide (display width: 2)") orelse false;
     const dwp_options = b.addOptions();
     dwp_options.addOption(bool, "cjk", cjk);
 
@@ -33,7 +33,7 @@ pub fn build(b: *std.Build) void {
     dwp_options.addOption(?i4, "c1_width", c1_width);
 
     //| Offset size
-    const fat_offset = b.option(bool, "fat_offset", "Offsets in Iterators and data structures will be u64") orelse false;
+    const fat_offset = b.option(bool, "fat_offset", "Offsets in iterators and data structures will be u64") orelse false;
     const size_config = b.addOptions();
     size_config.addOption(bool, "fat_offset", fat_offset);
 
