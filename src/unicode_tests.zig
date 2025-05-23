@@ -141,12 +141,12 @@ test "Segmentation GraphemeIterator" {
         defer all_bytes.deinit();
 
         var graphemes = std.mem.splitSequence(u8, line, " ÷ ");
-        var bytes_index: u32 = 0;
+        var bytes_index: uoffset = 0;
 
         while (graphemes.next()) |field| {
             var code_points = std.mem.splitScalar(u8, field, ' ');
             var cp_buf: [4]u8 = undefined;
-            var cp_index: u32 = 0;
+            var cp_index: uoffset = 0;
             var gc_len: u8 = 0;
 
             while (code_points.next()) |code_point| {
@@ -231,12 +231,12 @@ test "Segmentation Word Iterator" {
         defer all_bytes.deinit();
 
         var words = std.mem.splitSequence(u8, line, " ÷ ");
-        var bytes_index: u32 = 0;
+        var bytes_index: uoffset = 0;
 
         while (words.next()) |field| {
             var code_points = std.mem.splitScalar(u8, field, ' ');
             var cp_buf: [4]u8 = undefined;
-            var cp_index: u32 = 0;
+            var cp_index: uoffset = 0;
             var gc_len: u8 = 0;
 
             while (code_points.next()) |code_point| {
@@ -424,6 +424,8 @@ const mem = std.mem;
 const debug = std.debug;
 const testing = std.testing;
 const unicode = std.unicode;
+
+const uoffset = @FieldType(Word, "offset");
 
 const Grapheme = @import("Graphemes").Grapheme;
 const Graphemes = @import("Graphemes");

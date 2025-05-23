@@ -53,8 +53,8 @@ pub fn deinit(words: *const Words, allocator: mem.Allocator) void {
 /// Represents a Unicode word span, as an offset into the source string
 /// and the length of the word.
 pub const Word = struct {
-    offset: u32,
-    len: u32,
+    offset: uoffset,
+    len: uoffset,
 
     /// Returns a slice of the word given the source string.
     pub fn bytes(word: Word, src: []const u8) []const u8 {
@@ -183,7 +183,7 @@ pub const Iterator = struct {
         if (iter.that == null) return Word{ .len = iter.this.?.len, .offset = iter.this.?.offset };
 
         const word_start = iter.this.?.offset;
-        var word_len: u32 = 0;
+        var word_len: uoffset = 0;
 
         // State variables.
         var last_p: WordBreakProperty = .none;
@@ -364,7 +364,7 @@ pub const ReverseIterator = struct {
         if (iter.before == null) return Word{ .len = iter.after.?.len, .offset = 0 };
 
         const word_end = iter.after.?.offset + iter.after.?.len;
-        var word_len: u32 = 0;
+        var word_len: uoffset = 0;
 
         // State variables.
         var last_p: WordBreakProperty = .none;
@@ -518,7 +518,7 @@ pub const ReverseIterator = struct {
 
 /// Initialize a ReverseIterator at the provided index. Used in `wordAtIndex`.
 fn reverseFromIndex(words: *const Words, string: []const u8, index: usize) ReverseIterator {
-    var idx: u32 = @intCast(index);
+    var idx: uoffset = @intCast(index);
     // Find the next lead byte:
     while (idx < string.len and 0x80 <= string[idx] and string[idx] <= 0xBf) : (idx += 1) {}
     if (idx == string.len) return words.reverseIterator(string);
@@ -537,7 +537,7 @@ fn reverseFromIndex(words: *const Words, string: []const u8, index: usize) Rever
 }
 
 fn forwardFromIndex(words: *const Words, string: []const u8, index: usize) Iterator {
-    var idx: u32 = @intCast(index);
+    var idx: uoffset = @intCast(index);
     if (idx == string.len) {
         return .{
             .cp_iter = .{ .bytes = string, .i = idx },
@@ -745,6 +745,8 @@ const mem = std.mem;
 const Allocator = mem.Allocator;
 const assert = std.debug.assert;
 const testing = std.testing;
+
+const uoffset = code_point.uoffset;
 
 const code_point = @import("code_point");
 const CodepointIterator = code_point.Iterator;

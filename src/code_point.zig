@@ -4,12 +4,14 @@
 //! Represents invalid data according to the Replacement of Maximal
 //! Subparts algorithm.
 
+pub const uoffset = if (@import("config").fat_offset) u64 else u32;
+
 /// `CodePoint` represents a Unicode code point by its code,
 /// length, and offset in the source bytes.
 pub const CodePoint = struct {
     code: u21,
     len: u3,
-    offset: u32,
+    offset: uoffset,
 
     /// Return the slice of this codepoint, given the original string.
     pub inline fn bytes(cp: CodePoint, str: []const u8) []const u8 {
@@ -27,8 +29,8 @@ pub const CodePoint = struct {
 
 /// This function is deprecated and will be removed in a later release.
 /// Use `decodeAtIndex` or `decodeAtCursor`.
-pub fn decode(bytes: []const u8, offset: u32) ?CodePoint {
-    var off: u32 = 0;
+pub fn decode(bytes: []const u8, offset: uoffset) ?CodePoint {
+    var off: uoffset = 0;
     var maybe_code = decodeAtCursor(bytes, &off);
     if (maybe_code) |*code| {
         code.offset = offset;
@@ -38,14 +40,14 @@ pub fn decode(bytes: []const u8, offset: u32) ?CodePoint {
 }
 
 /// Decode the CodePoint, if any, at `bytes[idx]`.
-pub fn decodeAtIndex(bytes: []const u8, idx: u32) ?CodePoint {
+pub fn decodeAtIndex(bytes: []const u8, idx: uoffset) ?CodePoint {
     var off = idx;
     return decodeAtCursor(bytes, &off);
 }
 
 /// Decode the CodePoint, if any, at `bytes[cursor.*]`.  After, the
 /// cursor will point at the next potential codepoint index.
-pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
+pub fn decodeAtCursor(bytes: []const u8, cursor: *uoffset) ?CodePoint {
     // EOS
     if (cursor.* >= bytes.len) return null;
 
@@ -161,7 +163,7 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *u32) ?CodePoint {
 /// `Iterator` iterates a string one `CodePoint` at-a-time.
 pub const Iterator = struct {
     bytes: []const u8,
-    i: u32 = 0,
+    i: uoffset = 0,
 
     pub fn init(bytes: []const u8) Iterator {
         return .{ .bytes = bytes, .i = 0 };
@@ -257,7 +259,7 @@ const class_mask: [12]u8 = .{
 
 pub const ReverseIterator = struct {
     bytes: []const u8,
-    i: ?u32,
+    i: ?uoffset,
 
     pub fn init(str: []const u8) ReverseIterator {
         var r_iter: ReverseIterator = undefined;

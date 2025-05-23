@@ -5,9 +5,11 @@ const Allocator = mem.Allocator;
 const compress = std.compress;
 const unicode = std.unicode;
 
-const CodePoint = @import("code_point").CodePoint;
-const CodePointIterator = @import("code_point").Iterator;
-const CodePointReverseIterator = @import("code_point").ReverseIterator;
+const code_point = @import("code_point");
+const CodePoint = code_point.CodePoint;
+const CodePointIterator = code_point.Iterator;
+const CodePointReverseIterator = code_point.ReverseIterator;
+const uoffset = code_point.uoffset;
 
 s1: []u16 = undefined,
 s2: []u16 = undefined,
@@ -104,8 +106,8 @@ pub const Gbp = enum {
 
 /// `Grapheme` represents a Unicode grapheme cluster by its length and offset in the source bytes.
 pub const Grapheme = struct {
-    len: u32,
-    offset: u32,
+    len: uoffset,
+    offset: uoffset,
 
     /// `bytes` returns the slice of bytes that correspond to
     /// this grapheme cluster in `src`.
@@ -199,7 +201,7 @@ pub const ReverseIterator = struct {
         /// Count of pending RI codepoints, it is an even number
         ri_count: usize,
         /// End of (Extend* ZWJ) sequence pending from failed GB11: !Emoji Extend* ZWJ x Emoji
-        extend_end: u32,
+        extend_end: uoffset,
     };
 
     const Self = @This();
@@ -219,7 +221,7 @@ pub const ReverseIterator = struct {
     pub fn prev(self: *Self) ?Grapheme {
         if (self.buf[1] == null) return null;
 
-        const grapheme_end: u32 = end: {
+        const grapheme_end: uoffset = end: {
             const codepoint = self.buf[1].?;
 
             switch (self.pending) {
@@ -270,7 +272,7 @@ pub const ReverseIterator = struct {
             if (!state.hasIndic()) {
 
                 // BUF: [?Any, Extend | Linker] Consonant
-                var indic_offset: u32 = self.buf[1].?.offset + self.buf[1].?.len;
+                var indic_offset: uoffset = self.buf[1].?.offset + self.buf[1].?.len;
 
                 indic: while (true) {
                     if (self.buf[0] == null) {
@@ -321,7 +323,7 @@ pub const ReverseIterator = struct {
 
             if (!state.hasXpic()) {
                 // BUF: [?Any, ZWJ] Emoji
-                var emoji_offset: u32 = self.buf[1].?.offset + self.buf[1].?.len;
+                var emoji_offset: uoffset = self.buf[1].?.offset + self.buf[1].?.len;
 
                 // Look for previous Emoji
                 emoji: while (true) {
