@@ -124,12 +124,12 @@ pub fn reverseIterator(words: *const Words, slice: []const u8) ReverseIterator {
 }
 
 /// Returns an iterator after the `word` in `slice`.
-pub fn iterateAfter(words: *const Words, slice: []const u8, word: Word) Iterator {
+pub fn iterateAfterWord(words: *const Words, slice: []const u8, word: Word) Iterator {
     return forwardFromIndex(words, slice, word.offset + word.len);
 }
 
 /// Returns a reverse iterator before the `word` in `slice`.
-pub fn iterateBefore(words: *const Words, slice: []const u8, word: Word) ReverseIterator {
+pub fn iterateBeforeWord(words: *const Words, slice: []const u8, word: Word) ReverseIterator {
     return reverseFromIndex(words, slice, word.offset);
 }
 

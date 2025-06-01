@@ -39,9 +39,17 @@ pub fn decode(bytes: []const u8, offset: uoffset) ?CodePoint {
     return null;
 }
 
+/// Return the codepoint at `index`, even if `index` is in the middle
+/// of that codepoint.
+pub fn codepointAtIndex(bytes: []const u8, index: uoffset) ?CodePoint {
+    var idx = index;
+    while (idx > 0 and 0x80 <= bytes[idx] and bytes[idx] <= 0xbf) : (idx -= 1) {}
+    return decodeAtIndex(bytes, idx);
+}
+
 /// Decode the CodePoint, if any, at `bytes[idx]`.
-pub fn decodeAtIndex(bytes: []const u8, idx: uoffset) ?CodePoint {
-    var off = idx;
+pub fn decodeAtIndex(bytes: []const u8, index: uoffset) ?CodePoint {
+    var off = index;
     return decodeAtCursor(bytes, &off);
 }
 
@@ -329,6 +337,54 @@ test Iterator {
     try expectEqual(@as(?CodePoint, null), iter.next());
 }
 
+const code_point = @This();
+
+// Keep this in sync with the README
+test "Code point iterator" {
+    const str = "Hi 😊";
+    var iter: code_point.Iterator = .init(str);
+    var i: usize = 0;
+
+    while (iter.next()) |cp| : (i += 1) {
+        // The `code` field is the actual code point scalar as a `u21`.
+        if (i == 0) try expect(cp.code == 'H');
+        if (i == 1) try expect(cp.code == 'i');
+        if (i == 2) try expect(cp.code == ' ');
+
+        if (i == 3) {
+            try expect(cp.code == '😊');
+            // The `offset` field is the byte offset in the
+            // source string.
+            try expect(cp.offset == 3);
+            try expectEqual(cp, code_point.decodeAtIndex(str, cp.offset).?);
+            // The `len` field is the length in bytes of the
+            // code point in the source string.
+            try expect(cp.len == 4);
+            // There is also a 'cursor' decode, like so:
+            {
+                var cursor = cp.offset;
+                try expectEqual(cp, code_point.decodeAtCursor(str, &cursor).?);
+                // Which advances the cursor variable to the next possible
+                // offset, in this case, `str.len`.  Don't forget to account
+                // for this possibility!
+                try expectEqual(cp.offset + cp.len, cursor);
+            }
+            // There's also this, for when you aren't sure if you have the
+            // correct start for a code point:
+            try expectEqual(cp, code_point.codepointAtIndex(str, cp.offset + 1).?);
+        }
+        // Reverse iteration is also an option:
+        var r_iter: code_point.ReverseIterator = .init(str);
+        // Both iterators can be peeked:
+        try expectEqual('😊', r_iter.peek().?.code);
+        try expectEqual('😊', r_iter.prev().?.code);
+        // Both kinds of iterators can be reversed:
+        var fwd_iter = r_iter.forwardIterator(); // or iter.reverseIterator();
+        // This will always return the last codepoint from
+        // the prior iterator, _if_ it yielded one:
+        try expectEqual('😊', fwd_iter.next().?.code);
+    }
+}
 test "overlongs" {
     // None of these should equal `/`, all should be byte-for-byte
     // handled as replacement characters.

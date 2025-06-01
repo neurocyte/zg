@@ -1,15 +1,7 @@
-const std = @import("std");
-const builtin = @import("builtin");
-const mem = std.mem;
-const Allocator = mem.Allocator;
-const compress = std.compress;
-const unicode = std.unicode;
-
-const code_point = @import("code_point");
-const CodePoint = code_point.CodePoint;
-const CodePointIterator = code_point.Iterator;
-const CodePointReverseIterator = code_point.ReverseIterator;
-const uoffset = code_point.uoffset;
+//! Graphemes Module
+//!
+//! Code for handling graphemes: fragments of string which should be
+//! treated as one unit.  Like Farmer Bob here: 👨🏻‍🌾
 
 s1: []u16 = undefined,
 s2: []u16 = undefined,
@@ -69,10 +61,12 @@ pub fn isEmoji(graphemes: Graphemes, cp: u21) bool {
     return graphemes.s3[graphemes.s2[graphemes.s1[cp >> 8] + (cp & 0xff)]] & 1 == 1;
 }
 
+/// Returns an iterator over the graphemes in `string`.
 pub fn iterator(graphemes: *const Graphemes, string: []const u8) Iterator {
     return Iterator.init(string, graphemes);
 }
 
+/// Returns a reverse iterator over the graphemes in `string`.
 pub fn reverseIterator(graphemes: *const Graphemes, string: []const u8) ReverseIterator {
     return ReverseIterator.init(string, graphemes);
 }
@@ -116,6 +110,96 @@ pub const Grapheme = struct {
     }
 };
 
+// NOTE: graphemeAtIndex is, probably, not in an optimal form.  It has the advantage
+// of being composed of other parts, but the constant factor can _probably_ be improved
+// by a bespoke implmentation using graphemes.graphemeBreak directly.  There's a limit
+// to how much cycle-bumming I'm willing to do at any given moment; that limit has been
+// reached.  Perhaps you, Dear Reader, might pick up the torch?
+
+/// Returns the `Grapheme` at `string[index]`, which does not have to be a
+/// valid start of a codepoint.  Asserts the string is not empty.  Index must be
+/// less than `string.len`.  Always returns a `Grapheme`.
+pub fn graphemeAtIndex(graphemes: *const Graphemes, string: []const u8, index: usize) Grapheme {
+    assert(string.len != 0);
+    if (index == 0 or (index > 0 and
+        string[index] < 0x80 and
+        string[index - 1] < 0x80) and
+        (string[index - 1] != '\r' and string[index] != '\n'))
+    {
+        // There's always a grapheme break between two ASCII code points (except CRLF)
+        var iter = graphemes.iterator(string[index..]);
+        const next = iter.next().?;
+        return Grapheme{
+            .len = next.len,
+            .offset = @as(u32, @intCast(index)) + next.offset,
+        };
+    } // Otherwise it gets hairy.
+    const idx: uoffset = code_point.codepointAtIndex(string, @intCast(index)).?.offset;
+    if (idx == string.len) {
+        var iter = graphemes.reverseIterator(string);
+        return iter.prev().?;
+    }
+    // We're on a valid codepoint boundary, we go back from here
+    var r_iter = graphemes.reverseIterAtIndex(string, idx);
+    if (r_iter.prev()) |g| {
+        if (g.offset == 0) {
+            var iter = graphemes.iterator(string);
+            while (iter.next()) |g2| {
+                if (g2.offset <= idx and idx < g2.offset + g2.len) return g2;
+            }
+        }
+    }
+    // We need to toss one, because otherwise we might not be pending when
+    // we in fact need to be.
+    _ = r_iter.prev();
+    while (r_iter.pending != .none) : (_ = r_iter.prev()) {}
+    var iter = graphemes.iterAtIndex(string, r_iter.cp_iter.i orelse 0);
+    while (iter.next()) |g| {
+        if (g.offset <= idx and idx < g.offset + g.len) return g;
+    }
+    unreachable;
+}
+
+/// Return a (forward) iterator of `string` after `grapheme`.
+pub fn iterateAfterGrapheme(graphemes: *const Graphemes, string: []const u8, grapheme: Grapheme) Iterator {
+    return graphemes.iterAtIndex(string, grapheme.offset + grapheme.len);
+}
+
+/// Return a reverse iterator of `string` before `grapheme`.
+pub fn iterateBeforeGrapheme(graphemes: *const Graphemes, string: []const u8, grapheme: Grapheme) ReverseIterator {
+    // This bit of weirdness is because reverse iterators are "advance last",
+    // while forward iterators are "advance first".  This leaves some room for
+    // further optimization, if anyone dares.
+    var r_iter = graphemes.reverseIterAtIndex(string, grapheme.offset + grapheme.len - 1);
+    _ = r_iter.prev();
+    return r_iter;
+}
+
+fn reverseIterAtIndex(graphemes: *const Graphemes, string: []const u8, idx: uoffset) ReverseIterator {
+    var r_iter: ReverseIterator = undefined;
+    r_iter.data = graphemes;
+    var rcp_iter: CodePointReverseIterator = .{ .bytes = string, .i = idx };
+    r_iter.buf[1] = rcp_iter.prev();
+    r_iter.buf[0] = rcp_iter.prev();
+    r_iter.pending = .none;
+    r_iter.cp_iter = rcp_iter;
+    return r_iter;
+}
+
+fn iterAtIndex(graphemes: *const Graphemes, string: []const u8, idx: uoffset) Iterator {
+    var iter: Iterator = undefined;
+    iter.data = graphemes;
+    iter.buf[0] = first: {
+        if (idx == string.len) break :first null;
+        var r_cp_iter: CodePointReverseIterator = .{ .bytes = string, .i = idx };
+        break :first r_cp_iter.prev();
+    };
+    var cp_iter: CodePointIterator = .{ .bytes = string, .i = idx };
+    iter.buf[1] = cp_iter.next();
+    iter.cp_iter = cp_iter;
+    return iter;
+}
+
 /// `Iterator` iterates a sting of UTF-8 encoded bytes one grapheme cluster at-a-time.
 pub const Iterator = struct {
     buf: [2]?CodePoint = .{ null, null },
@@ -150,7 +234,7 @@ pub const Iterator = struct {
 
         const gc_start = self.buf[0].?.offset;
         var gc_len: u8 = self.buf[0].?.len;
-        var state = State{};
+        var state = IterState{};
 
         if (graphemeBreak(
             self.buf[0].?.code,
@@ -189,12 +273,13 @@ pub const Iterator = struct {
     }
 };
 
+/// Iterate a string backward by Grapheme.
 pub const ReverseIterator = struct {
     buf: [2]?CodePoint = .{ null, null },
     cp_iter: CodePointReverseIterator,
     data: *const Graphemes,
     /// Codepoint read from `cp_iter` but not returned by `previous`
-    pending: Pending = .{ .none = {} },
+    pending: Pending = .none,
 
     const Pending = union(enum) {
         none: void,
@@ -216,6 +301,12 @@ pub const ReverseIterator = struct {
     fn advance(self: *Self) void {
         self.buf[1] = self.buf[0];
         self.buf[0] = self.cp_iter.prev();
+    }
+
+    pub fn peek(self: *Self) ?Grapheme {
+        const cache = .{ self.buf, self.cp_iter, self.pending };
+        defer self.buf, self.cp_iter, self.pending = cache;
+        return self.prev();
     }
 
     pub fn prev(self: *Self) ?Grapheme {
@@ -255,10 +346,10 @@ pub const ReverseIterator = struct {
         };
 
         while (self.buf[0] != null) {
-            var state: State = .{};
-            state.setXpic();
-            state.unsetRegional();
-            state.setIndic();
+            var state: IterState = .{};
+            state.xpic = true;
+            state.regional = false;
+            state.indic = true;
 
             if (graphemeBreak(
                 self.buf[0].?.code,
@@ -269,7 +360,7 @@ pub const ReverseIterator = struct {
 
             self.advance();
 
-            if (!state.hasIndic()) {
+            if (!state.indic) {
 
                 // BUF: [?Any, Extend | Linker] Consonant
                 var indic_offset: uoffset = self.buf[1].?.offset + self.buf[1].?.len;
@@ -296,11 +387,11 @@ pub const ReverseIterator = struct {
                             self.advance();
 
                             if (self.buf[0]) |cp1| {
-                                state.setIndic();
+                                state.indic = true;
 
                                 if (graphemeBreak(cp1.code, self.buf[1].?.code, self.data, &state)) break;
 
-                                if (!state.hasIndic()) {
+                                if (!state.indic) {
                                     continue :indic;
                                 } else {
                                     break :indic;
@@ -321,7 +412,7 @@ pub const ReverseIterator = struct {
                 }
             }
 
-            if (!state.hasXpic()) {
+            if (!state.xpic) {
                 // BUF: [?Any, ZWJ] Emoji
                 var emoji_offset: uoffset = self.buf[1].?.offset + self.buf[1].?.len;
 
@@ -370,7 +461,7 @@ pub const ReverseIterator = struct {
                 }
             }
 
-            if (state.hasRegional()) {
+            if (state.regional) {
                 var ri_count: usize = 0;
                 while (self.buf[0] != null and
                     self.data.gbp(self.buf[0].?.code) == .Regional_Indicator)
@@ -404,50 +495,19 @@ pub const ReverseIterator = struct {
     }
 };
 
+/// Grapheme Iterator state.
+pub const IterState = packed struct(u3) {
+    xpic: bool = false,
+    regional: bool = false,
+    indic: bool = false,
+};
+
 // Predicates
 fn isBreaker(cp: u21, data: *const Graphemes) bool {
     // Extract relevant properties.
     const cp_gbp_prop = data.gbp(cp);
     return cp == '\x0d' or cp == '\x0a' or cp_gbp_prop == .Control;
 }
-
-// Grapheme break state.
-pub const State = struct {
-    bits: u3 = 0,
-
-    // Extended Pictographic (emoji)
-    fn hasXpic(self: State) bool {
-        return self.bits & 1 == 1;
-    }
-    fn setXpic(self: *State) void {
-        self.bits |= 1;
-    }
-    fn unsetXpic(self: *State) void {
-        self.bits &= ~@as(u3, 1);
-    }
-
-    // Regional Indicatior (flags)
-    fn hasRegional(self: State) bool {
-        return self.bits & 2 == 2;
-    }
-    fn setRegional(self: *State) void {
-        self.bits |= 2;
-    }
-    fn unsetRegional(self: *State) void {
-        self.bits &= ~@as(u3, 2);
-    }
-
-    // Indic Conjunct
-    fn hasIndic(self: State) bool {
-        return self.bits & 4 == 4;
-    }
-    fn setIndic(self: *State) void {
-        self.bits |= 4;
-    }
-    fn unsetIndic(self: *State) void {
-        self.bits &= ~@as(u3, 4);
-    }
-};
 
 /// `graphemeBreak` returns true only if a grapheme break point is required
 /// between `cp1` and `cp2`. `state` should start out as 0. If calling
@@ -459,7 +519,7 @@ pub fn graphemeBreak(
     cp1: u21,
     cp2: u21,
     data: *const Graphemes,
-    state: *State,
+    state: *IterState,
 ) bool {
     // Extract relevant properties.
     const cp1_gbp_prop = data.gbp(cp1);
@@ -471,9 +531,9 @@ pub fn graphemeBreak(
     const cp2_is_emoji = data.isEmoji(cp2);
 
     // GB11: Emoji Extend* ZWJ x Emoji
-    if (!state.hasXpic() and cp1_is_emoji) state.setXpic();
+    if (!state.xpic and cp1_is_emoji) state.xpic = true;
     // GB9c: Indic Conjunct Break
-    if (!state.hasIndic() and cp1_indic_prop == .Consonant) state.setIndic();
+    if (!state.indic and cp1_indic_prop == .Consonant) state.indic = true;
 
     // GB3: CR x LF
     if (cp1 == '\r' and cp2 == '\n') return false;
@@ -482,11 +542,11 @@ pub fn graphemeBreak(
     if (isBreaker(cp1, data)) return true;
 
     // GB11: Emoji Extend* ZWJ x Emoji
-    if (state.hasXpic() and
+    if (state.xpic and
         cp1_gbp_prop == .ZWJ and
         cp2_is_emoji)
     {
-        state.unsetXpic();
+        state.xpic = false;
         return false;
     }
 
@@ -501,11 +561,11 @@ pub fn graphemeBreak(
 
     // GB12, GB13: RI x RI
     if (cp1_gbp_prop == .Regional_Indicator and cp2_gbp_prop == .Regional_Indicator) {
-        if (state.hasRegional()) {
-            state.unsetRegional();
+        if (state.regional) {
+            state.regional = false;
             return true;
         } else {
-            state.setRegional();
+            state.regional = true;
             return false;
         }
     }
@@ -530,25 +590,25 @@ pub fn graphemeBreak(
     }
 
     // GB9c: Indic Conjunct Break
-    if (state.hasIndic() and
+    if (state.indic and
         cp1_indic_prop == .Consonant and
         (cp2_indic_prop == .Extend or cp2_indic_prop == .Linker))
     {
         return false;
     }
 
-    if (state.hasIndic() and
+    if (state.indic and
         cp1_indic_prop == .Extend and
         cp2_indic_prop == .Linker)
     {
         return false;
     }
 
-    if (state.hasIndic() and
+    if (state.indic and
         (cp1_indic_prop == .Linker or cp1_gbp_prop == .ZWJ) and
         cp2_indic_prop == .Consonant)
     {
-        state.unsetIndic();
+        state.indic = false;
         return false;
     }
 
@@ -608,3 +668,17 @@ test "Iterator.peek" {
     try std.testing.expectEqual(null, iter.peek());
     try std.testing.expectEqual(iter.peek(), iter.next());
 }
+
+const std = @import("std");
+const builtin = @import("builtin");
+const assert = std.debug.assert;
+const mem = std.mem;
+const Allocator = mem.Allocator;
+const compress = std.compress;
+const unicode = std.unicode;
+
+const code_point = @import("code_point");
+const CodePoint = code_point.CodePoint;
+const CodePointIterator = code_point.Iterator;
+const CodePointReverseIterator = code_point.ReverseIterator;
+const uoffset = code_point.uoffset;

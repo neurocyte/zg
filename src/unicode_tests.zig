@@ -162,20 +162,51 @@ test "Segmentation GraphemeIterator" {
             bytes_index += cp_index;
         }
 
+        const this_str = all_bytes.items;
+
         {
-            var iter = graph.iterator(all_bytes.items);
+            var iter = graph.iterator(this_str);
 
             // Check.
-            for (want.items) |want_gc| {
+            for (want.items, 1..) |want_gc, idx| {
                 const got_gc = (iter.next()).?;
                 try std.testing.expectEqualStrings(
-                    want_gc.bytes(all_bytes.items),
-                    got_gc.bytes(all_bytes.items),
+                    want_gc.bytes(this_str),
+                    got_gc.bytes(this_str),
                 );
+                for (got_gc.offset..got_gc.offset + got_gc.len) |i| {
+                    const this_gc = graph.graphemeAtIndex(this_str, i);
+                    std.testing.expectEqualSlices(
+                        u8,
+                        got_gc.bytes(this_str),
+                        this_gc.bytes(this_str),
+                    ) catch |err| {
+                        debug.print("Wrong grapheme on line {d} #{d} offset {d}\n", .{ line_iter.line, idx, i });
+                        return err;
+                    };
+                }
+                var after_iter = graph.iterateAfterGrapheme(this_str, got_gc);
+                if (after_iter.next()) |next_gc| {
+                    if (iter.peek()) |next_peek| {
+                        std.testing.expectEqualSlices(
+                            u8,
+                            next_gc.bytes(this_str),
+                            next_peek.bytes(this_str),
+                        ) catch |err| {
+                            debug.print("Peeks differ on line {d} #{d} \n", .{ line_iter.line, idx });
+                            return err;
+                        };
+                    } else {
+                        debug.print("Mismatch: peek missing, next found, line {d} #{d}\n", .{ line_iter.line, idx });
+                        try testing.expect(false);
+                    }
+                } else {
+                    try testing.expectEqual(null, iter.peek());
+                }
             }
         }
         {
-            var iter = graph.reverseIterator(all_bytes.items);
+            var iter = graph.reverseIterator(this_str);
 
             // Check.
             var i: usize = want.items.len;
@@ -190,8 +221,8 @@ test "Segmentation GraphemeIterator" {
                     return error.TestExpectedEqual;
                 };
                 std.testing.expectEqualStrings(
-                    want_gc.bytes(all_bytes.items),
-                    got_gc.bytes(all_bytes.items),
+                    want_gc.bytes(this_str),
+                    got_gc.bytes(this_str),
                 ) catch |err| {
                     std.debug.print(
                         "line {d} grapheme {d}: expected {any} found {any}\n",
@@ -199,6 +230,24 @@ test "Segmentation GraphemeIterator" {
                     );
                     return err;
                 };
+                var before_iter = graph.iterateBeforeGrapheme(this_str, got_gc);
+                if (before_iter.prev()) |prev_gc| {
+                    if (iter.peek()) |prev_peek| {
+                        std.testing.expectEqualSlices(
+                            u8,
+                            prev_gc.bytes(this_str),
+                            prev_peek.bytes(this_str),
+                        ) catch |err| {
+                            debug.print("Peeks differ on line {d} #{d} \n", .{ line_iter.line, i });
+                            return err;
+                        };
+                    } else {
+                        debug.print("Mismatch: peek missing, prev found, line {d} #{d}\n", .{ line_iter.line, i });
+                        try testing.expect(false);
+                    }
+                } else {
+                    try testing.expectEqual(null, iter.peek());
+                }
             }
         }
     }
@@ -287,7 +336,7 @@ test "Segmentation Word Iterator" {
                 } else {
                     try testing.expect(false);
                 }
-                var peek_iter = wb.iterateAfter(this_str, got_word);
+                var peek_iter = wb.iterateAfterWord(this_str, got_word);
                 const peek_1 = peek_iter.next();
                 if (peek_1) |p1| {
                     const peek_2 = iter.peek();
@@ -313,7 +362,7 @@ test "Segmentation Word Iterator" {
                         got_word.bytes(this_str),
                         this_word.bytes(this_str),
                     ) catch |err| {
-                        debug.print("Wrong word on line {d} #{d} offset {d}\n", .{ line_iter.line, idx + 1, i });
+                        debug.print("Wrong word on line {d} #{d} offset {d}\n", .{ line_iter.line, idx, i });
                         return err;
                     };
                 }
@@ -356,7 +405,7 @@ test "Segmentation Word Iterator" {
                 } else {
                     try testing.expect(false);
                 }
-                var peek_iter = wb.iterateBefore(this_str, got_word);
+                var peek_iter = wb.iterateBeforeWord(this_str, got_word);
                 const peek_1 = peek_iter.prev();
                 if (peek_1) |p1| {
                     const peek_2 = r_iter.peek();
