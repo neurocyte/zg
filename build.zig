@@ -4,6 +4,14 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Unicode data files
+    const UnicodeData = b.createModule(.{ .root_source_file = b.path("data/unicode/UnicodeData.txt") });
+    const DerivedCoreProperties = b.createModule(.{ .root_source_file = b.path("data/unicode/DerivedCoreProperties.txt") });
+    const DerivedEastAsianWidth = b.createModule(.{ .root_source_file = b.path("data/unicode/extracted/DerivedEastAsianWidth.txt") });
+    const GraphemeBreakProperty = b.createModule(.{ .root_source_file = b.path("data/unicode/auxiliary/GraphemeBreakProperty.txt") });
+    const @"emoji-data" = b.createModule(.{ .root_source_file = b.path("data/unicode/emoji/emoji-data.txt") });
+    const DerivedGeneralCategory = b.createModule(.{ .root_source_file = b.path("data/unicode/extracted/DerivedGeneralCategory.txt") });
+
     // 'magic' module
     const magic = b.createModule(.{
         .root_source_file = b.path("src/magic_numbers.zig"),
@@ -19,6 +27,9 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         .optimize = .Debug,
     });
+    gbp_gen_exe.root_module.addImport("DerivedCoreProperties", DerivedCoreProperties);
+    gbp_gen_exe.root_module.addImport("GraphemeBreakProperty", GraphemeBreakProperty);
+    gbp_gen_exe.root_module.addImport("emoji-data", @"emoji-data");
     const run_gbp_gen_exe = b.addRunArtifact(gbp_gen_exe);
     const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.bin.z");
 
@@ -47,6 +58,8 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         .optimize = .Debug,
     });
+    dwp_gen_exe.root_module.addImport("DerivedEastAsianWidth", DerivedEastAsianWidth);
+    dwp_gen_exe.root_module.addImport("DerivedGeneralCategory", DerivedGeneralCategory);
     dwp_gen_exe.root_module.addOptions("options", options);
     const run_dwp_gen_exe = b.addRunArtifact(dwp_gen_exe);
     const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.bin.z");
@@ -132,6 +145,7 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         .optimize = .Debug,
     });
+    case_prop_gen_exe.root_module.addImport("DerivedCoreProperties", DerivedCoreProperties);
     const run_case_prop_gen_exe = b.addRunArtifact(case_prop_gen_exe);
     const case_prop_gen_out = run_case_prop_gen_exe.addOutputFileArg("case_prop.bin.z");
 
@@ -142,6 +156,7 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         .optimize = .Debug,
     });
+    upper_gen_exe.root_module.addImport("UnicodeData", UnicodeData);
     const run_upper_gen_exe = b.addRunArtifact(upper_gen_exe);
     const upper_gen_out = run_upper_gen_exe.addOutputFileArg("upper.bin.z");
 
@@ -152,6 +167,7 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         .optimize = .Debug,
     });
+    lower_gen_exe.root_module.addImport("UnicodeData", UnicodeData);
     const run_lower_gen_exe = b.addRunArtifact(lower_gen_exe);
     const lower_gen_out = run_lower_gen_exe.addOutputFileArg("lower.bin.z");
 

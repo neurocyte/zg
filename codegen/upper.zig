@@ -7,9 +7,7 @@ pub fn main() !void {
     const allocator = arena.allocator();
 
     // Process UnicodeData.txt
-    var in_file = try std.fs.cwd().openFile("data/unicode/UnicodeData.txt", .{});
-    defer in_file.close();
-    var in_buf = std.io.bufferedReader(in_file.reader());
+    var in_buf = std.io.fixedBufferStream(@embedFile("UnicodeData"));
     const in_reader = in_buf.reader();
 
     var args_iter = try std.process.argsWithAllocator(allocator);

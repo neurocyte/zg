@@ -34,9 +34,7 @@ pub fn main() !void {
     var line_buf: [4096]u8 = undefined;
 
     // Process DerivedEastAsianWidth.txt
-    var deaw_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedEastAsianWidth.txt", .{});
-    defer deaw_file.close();
-    var deaw_buf = std.io.bufferedReader(deaw_file.reader());
+    var deaw_buf = std.io.fixedBufferStream(@embedFile("DerivedEastAsianWidth"));
     const deaw_reader = deaw_buf.reader();
 
     while (try deaw_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
@@ -91,9 +89,7 @@ pub fn main() !void {
     }
 
     // Process DerivedGeneralCategory.txt
-    var dgc_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedGeneralCategory.txt", .{});
-    defer dgc_file.close();
-    var dgc_buf = std.io.bufferedReader(dgc_file.reader());
+    var dgc_buf = std.io.fixedBufferStream(@embedFile("DerivedGeneralCategory"));
     const dgc_reader = dgc_buf.reader();
 
     while (try dgc_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
