@@ -29,15 +29,13 @@ pub fn main() !void {
     var flat_map = std.AutoHashMap(u21, u8).init(allocator);
     defer flat_map.deinit();
 
-    var line_buf: [4096]u8 = undefined;
-
     // Process DerivedCombiningClass.txt
-    var cc_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedCombiningClass.txt", .{});
-    defer cc_file.close();
-    var cc_buf = std.io.bufferedReader(cc_file.reader());
-    const cc_reader = cc_buf.reader();
+    var cc_reader: std.io.Reader = .fixed(@embedFile("DerivedCombiningClass"));
 
-    while (try cc_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+    while (cc_reader.takeDelimiterExclusive('\n') catch |e| switch (e) {
+        error.EndOfStream => null,
+        else => |e_| return e_,
+    }) |line| {
         if (line.len == 0 or line[0] == '#') continue;
         const no_comment = if (std.mem.indexOfScalar(u8, line, '#')) |octo| line[0..octo] else line;
 
@@ -110,7 +108,7 @@ pub fn main() !void {
     const compressor = std.compress.flate.deflate.compressor;
     var out_file = try std.fs.cwd().createFile(output_path, .{});
     defer out_file.close();
-    var out_comp = try compressor(.raw, out_file.writer(), .{ .level = .best });
+    var out_comp = try compressor(.raw, out_file.deprecatedWriter(), .{ .level = .best });
     const writer = out_comp.writer();
 
     const endian = builtin.cpu.arch.endian();

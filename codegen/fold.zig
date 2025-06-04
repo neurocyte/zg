@@ -8,17 +8,15 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     // Process DerivedCoreProperties.txt
-    var props_file = try std.fs.cwd().openFile("data/unicode/DerivedCoreProperties.txt", .{});
-    defer props_file.close();
-    var props_buf = std.io.bufferedReader(props_file.reader());
-    const props_reader = props_buf.reader();
+    var props_reader: std.io.Reader = .fixed(@embedFile("DerivedCoreProperties"));
 
     var props_map = std.AutoHashMap(u21, void).init(allocator);
     defer props_map.deinit();
 
-    var line_buf: [4096]u8 = undefined;
-
-    props_lines: while (try props_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+    props_lines: while (props_reader.takeDelimiterExclusive('\n') catch |e| switch (e) {
+        error.EndOfStream => null,
+        else => |e_| return e_,
+    }) |line| {
         if (line.len == 0 or line[0] == '#') continue;
 
         const no_comment = if (std.mem.indexOfScalar(u8, line, '#')) |octo| line[0..octo] else line;
@@ -55,12 +53,12 @@ pub fn main() !void {
     defer codepoint_mapping.deinit();
 
     // Process CaseFolding.txt
-    var cp_file = try std.fs.cwd().openFile("data/unicode/CaseFolding.txt", .{});
-    defer cp_file.close();
-    var cp_buf = std.io.bufferedReader(cp_file.reader());
-    const cp_reader = cp_buf.reader();
+    var cp_reader: std.io.Reader = .fixed(@embedFile("CaseFolding"));
 
-    while (try cp_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+    while (cp_reader.takeDelimiterExclusive('\n') catch |e| switch (e) {
+        error.EndOfStream => null,
+        else => |e_| return e_,
+    }) |line| {
         if (line.len == 0 or line[0] == '#') continue;
 
         var field_it = std.mem.splitScalar(u8, line, ';');
@@ -224,7 +222,7 @@ pub fn main() !void {
         const compressor = std.compress.flate.deflate.compressor;
         var out_file = try std.fs.cwd().createFile(output_path, .{});
         defer out_file.close();
-        var out_comp = try compressor(.raw, out_file.writer(), .{ .level = .best });
+        var out_comp = try compressor(.raw, out_file.deprecatedWriter(), .{ .level = .best });
         const writer = out_comp.writer();
 
         const endian = builtin.cpu.arch.endian();

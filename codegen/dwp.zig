@@ -31,15 +31,13 @@ pub fn main() !void {
     var flat_map = std.AutoHashMap(u21, i4).init(allocator);
     defer flat_map.deinit();
 
-    var line_buf: [4096]u8 = undefined;
-
     // Process DerivedEastAsianWidth.txt
-    var deaw_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedEastAsianWidth.txt", .{});
-    defer deaw_file.close();
-    var deaw_buf = std.io.bufferedReader(deaw_file.reader());
-    const deaw_reader = deaw_buf.reader();
+    var deaw_reader: std.io.Reader = .fixed(@embedFile("DerivedEastAsianWidth"));
 
-    while (try deaw_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+    while (deaw_reader.takeDelimiterExclusive('\n') catch |e| switch (e) {
+        error.EndOfStream => null,
+        else => |e_| return e_,
+    }) |line| {
         if (line.len == 0) continue;
 
         // @missing ranges
@@ -91,12 +89,12 @@ pub fn main() !void {
     }
 
     // Process DerivedGeneralCategory.txt
-    var dgc_file = try std.fs.cwd().openFile("data/unicode/extracted/DerivedGeneralCategory.txt", .{});
-    defer dgc_file.close();
-    var dgc_buf = std.io.bufferedReader(dgc_file.reader());
-    const dgc_reader = dgc_buf.reader();
+    var dgc_reader: std.io.Reader = .fixed(@embedFile("DerivedGeneralCategory"));
 
-    while (try dgc_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+    while (dgc_reader.takeDelimiterExclusive('\n') catch |e| switch (e) {
+        error.EndOfStream => null,
+        else => |e_| return e_,
+    }) |line| {
         if (line.len == 0 or line[0] == '#') continue;
         const no_comment = if (std.mem.indexOfScalar(u8, line, '#')) |octo| line[0..octo] else line;
 
@@ -230,7 +228,7 @@ pub fn main() !void {
     const compressor = std.compress.flate.deflate.compressor;
     var out_file = try std.fs.cwd().createFile(output_path, .{});
     defer out_file.close();
-    var out_comp = try compressor(.raw, out_file.writer(), .{ .level = .best });
+    var out_comp = try compressor(.raw, out_file.deprecatedWriter(), .{ .level = .best });
     const writer = out_comp.writer();
 
     const endian = builtin.cpu.arch.endian();

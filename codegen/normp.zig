@@ -29,15 +29,13 @@ pub fn main() !void {
     var flat_map = std.AutoHashMap(u21, u3).init(allocator);
     defer flat_map.deinit();
 
-    var line_buf: [4096]u8 = undefined;
-
     // Process DerivedNormalizationProps.txt
-    var in_file = try std.fs.cwd().openFile("data/unicode/DerivedNormalizationProps.txt", .{});
-    defer in_file.close();
-    var in_buf = std.io.bufferedReader(in_file.reader());
-    const in_reader = in_buf.reader();
+    var in_reader: std.io.Reader = .fixed(@embedFile("DerivedNormalizationProps"));
 
-    while (try in_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+    while (in_reader.takeDelimiterExclusive('\n') catch |e| switch (e) {
+        error.EndOfStream => null,
+        else => |e_| return e_,
+    }) |line| {
         if (line.len == 0 or line[0] == '#') continue;
 
         const no_comment = if (std.mem.indexOfScalar(u8, line, '#')) |octo| line[0..octo] else line;
@@ -120,7 +118,7 @@ pub fn main() !void {
     const compressor = std.compress.flate.deflate.compressor;
     var out_file = try std.fs.cwd().createFile(output_path, .{});
     defer out_file.close();
-    var out_comp = try compressor(.raw, out_file.writer(), .{ .level = .best });
+    var out_comp = try compressor(.raw, out_file.deprecatedWriter(), .{ .level = .best });
     const writer = out_comp.writer();
 
     const endian = builtin.cpu.arch.endian();

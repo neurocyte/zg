@@ -7,10 +7,7 @@ pub fn main() !void {
     const allocator = arena.allocator();
 
     // Process UnicodeData.txt
-    var in_file = try std.fs.cwd().openFile("data/unicode/UnicodeData.txt", .{});
-    defer in_file.close();
-    var in_buf = std.io.bufferedReader(in_file.reader());
-    const in_reader = in_buf.reader();
+    var in_reader: std.io.Reader = .fixed(@embedFile("UnicodeData"));
 
     var args_iter = try std.process.argsWithAllocator(allocator);
     defer args_iter.deinit();
@@ -20,13 +17,15 @@ pub fn main() !void {
     const compressor = std.compress.flate.deflate.compressor;
     var out_file = try std.fs.cwd().createFile(output_path, .{});
     defer out_file.close();
-    var out_comp = try compressor(.raw, out_file.writer(), .{ .level = .best });
+    var out_comp = try compressor(.raw, out_file.deprecatedWriter(), .{ .level = .best });
     const writer = out_comp.writer();
 
     const endian = builtin.cpu.arch.endian();
-    var line_buf: [4096]u8 = undefined;
 
-    lines: while (try in_reader.readUntilDelimiterOrEof(&line_buf, '\n')) |line| {
+    lines: while (in_reader.takeDelimiterExclusive('\n') catch |e| switch (e) {
+        error.EndOfStream => null,
+        else => |e_| return e_,
+    }) |line| {
         if (line.len == 0) continue;
 
         var field_iter = std.mem.splitScalar(u8, line, ';');

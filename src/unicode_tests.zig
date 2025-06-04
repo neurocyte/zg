@@ -10,15 +10,14 @@ test "Unicode normalization tests" {
 
     var file = try fs.cwd().openFile("data/unicode/NormalizationTest.txt", .{});
     defer file.close();
-    var buf_reader = io.bufferedReader(file.reader());
-    var input_stream = buf_reader.reader();
+    var read_buffer: [1024 * 64]u8 = undefined;
+    var buf_reader = file.reader(&read_buffer);
 
-    var buf: [4096]u8 = undefined;
     var cp_buf: [4]u8 = undefined;
 
-    var line_iter: IterRead = .{ .read = &input_stream };
+    var line_iter: IterRead = .{ .read = &buf_reader.interface };
 
-    while (try line_iter.next(&buf)) |line| {
+    while (try line_iter.next()) |line| {
         // Iterate over fields.
         var fields = mem.splitScalar(u8, line, ';');
         var field_index: usize = 0;
@@ -118,16 +117,15 @@ test "Segmentation GraphemeIterator" {
     const allocator = std.testing.allocator;
     var file = try std.fs.cwd().openFile("data/unicode/auxiliary/GraphemeBreakTest.txt", .{});
     defer file.close();
-    var buf_reader = std.io.bufferedReader(file.reader());
-    var input_stream = buf_reader.reader();
+    var read_buffer: [1024 * 64]u8 = undefined;
+    var buf_reader = file.reader(&read_buffer);
 
     const graph = try Graphemes.init(allocator);
     defer graph.deinit(allocator);
 
-    var buf: [4096]u8 = undefined;
-    var line_iter: IterRead = .{ .read = &input_stream };
+    var line_iter: IterRead = .{ .read = &buf_reader.interface };
 
-    while (try line_iter.next(&buf)) |raw| {
+    while (try line_iter.next()) |raw| {
         // Clean up.
         var line = std.mem.trimLeft(u8, raw, "÷ ");
         if (std.mem.indexOf(u8, line, " ÷\t")) |final| {
@@ -257,16 +255,15 @@ test "Segmentation Word Iterator" {
     const allocator = std.testing.allocator;
     var file = try std.fs.cwd().openFile("data/unicode/auxiliary/WordBreakTest.txt", .{});
     defer file.close();
-    var buf_reader = std.io.bufferedReader(file.reader());
-    var input_stream = buf_reader.reader();
+    var read_buffer: [1024 * 64]u8 = undefined;
+    var buf_reader = file.reader(&read_buffer);
 
     const wb = try Words.init(allocator);
     defer wb.deinit(allocator);
 
-    var buf: [4096]u8 = undefined;
-    var line_iter: IterRead = .{ .read = &input_stream };
+    var line_iter: IterRead = .{ .read = &buf_reader.interface };
 
-    while (try line_iter.next(&buf)) |raw| {
+    while (try line_iter.next()) |raw| {
         // Clean up.
         var line = std.mem.trimLeft(u8, raw, "÷ ");
         if (std.mem.indexOf(u8, line, " ÷\t")) |final| {
@@ -443,23 +440,27 @@ test "Segmentation Word Iterator" {
 }
 
 const IterRead = struct {
-    read: *Reader,
+    read: *std.io.Reader,
     line: usize = 0,
 
-    pub fn next(iter: *IterRead, buf: []u8) !?[]const u8 {
+    pub fn next(iter: *IterRead) !?[]const u8 {
         defer iter.line += 1;
-        const maybe_line = try iter.read.readUntilDelimiterOrEof(buf, '#');
-        if (maybe_line) |this_line| {
-            try iter.read.skipUntilDelimiterOrEof('\n');
-            if (this_line.len == 0 or this_line[0] == '@') {
-                // comment, next line
-                return iter.next(buf);
-            } else {
-                return this_line;
-            }
-        } else {
-            return null;
-        }
+
+        const line = iter.read.takeDelimiterExclusive('\n') catch |e| switch (e) {
+            error.EndOfStream => return null,
+            else => |e_| return e_,
+        };
+        var line_reader: std.io.Reader = .fixed(line);
+
+        const this_line = line_reader.takeDelimiterExclusive('#') catch |e| switch (e) {
+            error.EndOfStream => return null,
+            else => |e_| return e_,
+        };
+
+        return if (this_line.len == 0 or this_line[0] == '@')
+            iter.next()
+        else
+            this_line;
     }
 };
 
