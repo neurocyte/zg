@@ -121,6 +121,9 @@ pub fn decodeAtCursor(bytes: []const u8, cursor: *uoffset) ?CodePoint {
     }
     if (st == RUNE_REJECT or cursor.* == bytes.len) {
         @branchHint(.cold);
+        // This, and the branch below, detect truncation, the
+        // only invalid state handled differently by the Maximal
+        // Subparts algorithm.
         if (state_dfa[@intCast(u8dfa[byte])] == RUNE_REJECT) {
             cursor.* -= 2; // +1
             return .{

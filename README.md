@@ -2,13 +2,16 @@
 
 zg provides Unicode text processing for Zig projects.
 
+
 ## Unicode Version
 
 The Unicode version supported by zg is `16.0.0`.
 
+
 ## Zig Version
 
 The minimum Zig version required is `0.14`.
+
 
 ## Integrating zg into your Zig Project
 
@@ -16,7 +19,7 @@ You first need to add zg as a dependency in your `build.zig.zon` file. In your
 Zig project's root directory, run:
 
 ```plain
-zig fetch --save https://codeberg.org/atman/zg/archive/v0.14.0-rc1.tar.gz
+zig fetch --save https://codeberg.org/atman/zg/archive/v0.14.1.tar.gz
 ```
 
 Then instantiate the dependency in your `build.zig`:
@@ -25,11 +28,13 @@ Then instantiate the dependency in your `build.zig`:
 const zg = b.dependency("zg", .{});
 ```
 
+
 ## A Modular Approach
 
 zg is a modular library. This approach minimizes binary file size and memory
 requirements by only including the Unicode data required for the specified module.
 The following sections describe the various modules and their specific use case.
+
 
 ### Init and Setup
 
@@ -67,7 +72,7 @@ const code_point = @import("code_point");
 
 test "Code point iterator" {
     const str = "Hi 😊";
-    var iter = code_point.Iterator{ .bytes = str };
+    var iter: code_point.Iterator = .init(str);
     var i: usize = 0;
 
     while (iter.next()) |cp| : (i += 1) {
@@ -78,25 +83,60 @@ test "Code point iterator" {
 
         if (i == 3) {
             try expect(cp.code == '😊');
-
             // The `offset` field is the byte offset in the
             // source string.
             try expect(cp.offset == 3);
-            try expectEqual(code_point.CodePoint, code_point.decodeAtIndex(str, cp.offset));
-
+            try expectEqual(cp, code_point.decodeAtIndex(str, cp.offset).?);
             // The `len` field is the length in bytes of the
             // code point in the source string.
             try expect(cp.len == 4);
+            // There is also a 'cursor' decode, like so:
+            {
+                var cursor = cp.offset;
+                try expectEqual(cp, code_point.decodeAtCursor(str, &cursor).?);
+                // Which advances the cursor variable to the next possible
+                // offset, in this case, `str.len`.  Don't forget to account
+                // for this possibility!
+                try expectEqual(cp.offset + cp.len, cursor);
+            }
+            // There's also this, for when you aren't sure if you have the
+            // correct start for a code point:
+            try expectEqual(cp, code_point.codepointAtIndex(str, cp.offset + 1).?);
         }
+        // Reverse iteration is also an option:
+        var r_iter: code_point.ReverseIterator = .init(str);
+        // Both iterators can be peeked:
+        try expectEqual('😊', r_iter.peek().?.code);
+        try expectEqual('😊', r_iter.prev().?.code);
+        // Both kinds of iterators can be reversed:
+        var fwd_iter = r_iter.forwardIterator(); // or iter.reverseIterator();
+        // This will always return the last codepoint from
+        // the prior iterator, _if_ it yielded one:
+        try expectEqual('😊', fwd_iter.next().?.code);
     }
 }
 ```
 
+Note that it's safe to call CodePoint functions on invalid
+UTF-8. Iterators and decode functions will return the Unicode
+Replacement Character `U+FFFD`, according to the Substitution of Maximal
+Subparts algorithm, for any invalid code unit sequences encountered.
+
+
 ## Grapheme Clusters
 
-Many characters are composed from more than one code point. These are known as
-Grapheme Clusters, and the `Graphemes` module has a data structure to represent
-them, `Grapheme`, and an `Iterator` to iterate over them in a string.
+Many characters are composed from more than one code point. These
+are known as Grapheme Clusters, and the `Graphemes` module has a
+data structure to represent them, `Grapheme`, and an `Iterator` and
+`ReverseIterator` to iterate over them in a string.
+
+There is also `graphemeAtIndex`, which returns whatever grapheme
+belongs to the index; this does not have to be on a valid grapheme
+or codepoint boundary, but it is illegal to call on an empty string.
+Last, `iterateAfterGrapheme` or `iterateBeforeGrapheme` will provide
+forward or backward grapheme iterators of the string, from the grapheme
+provided.  Thus, given an index, you can begin forward or backward
+iteration at that index without needing to slice the string.
 
 In your `build.zig`:
 
@@ -136,6 +176,56 @@ test "Grapheme cluster iterator" {
             try expectEqualStrings("e\u{301}", gc.bytes(str));
         }
     }
+}
+```
+
+
+## Words
+
+Unicode has a standard word segmentation algorithm, which gives good
+results for most languages.  Some languages, such as Thai, require a
+dictionary to find the boundary between words; these cases are not
+handled by the standard algorithm.
+
+`zg` implements that algorithm in the `Words` module.  As a note,
+the iterators and functions provided here will yield segments which
+are not a "word" in the conventional sense, but word _boundaries_.
+Specifically, the iterators in this module will return every segment of
+a string, ensuring that words are kept whole when encountered.  If the
+word breaks are of primary interest, you'll want to use the `.offset`
+field of each iterated value, and handle `string.len` as the final case
+when the iteration returns `null`.
+
+The API is congruent with `Graphemes`: forward and backward iterators,
+`wordAtIndex`, and `iterateAfter` and before.
+
+In your `build.zig`:
+
+```zig
+exe.root_module.addImport("Words", zg.module("Words"));
+```
+
+In your code:
+
+```zig
+const Words = @import("Words");
+
+test "Words" {
+    const wb = try Words.init(testing.allocator);
+    defer wb.deinit(testing.allocator);
+    const word_str = "Metonym   Μετωνύμιο メトニム";
+    var w_iter = wb.iterator(word_str);
+    try testing.expectEqualStrings("Metonym", w_iter.next().?.bytes(word_str));
+    // Spaces are "words" too!
+    try testing.expectEqualStrings("   ", w_iter.next().?.bytes(word_str));
+    const in_greek = w_iter.next().?;
+    // wordAtIndex doesn't care if the index is valid for a codepoint:
+    for (in_greek.offset..in_greek.offset + in_greek.len) |i| {
+        const at_index = wb.wordAtIndex(word_str, i).bytes(word_str);
+        try testing.expectEqualStrings("Μετωνύμιο", at_index);
+    }
+    _ = w_iter.next();
+    try testing.expectEqualStrings("メトニム", w_iter.next().?.bytes(word_str));
 }
 ```
 
@@ -279,24 +369,24 @@ Unicode normalization is the process of converting a string into a uniform
 representation that can guarantee a known structure by following a strict set
 of rules. There are four normalization forms:
 
-Canonical Composition (NFC)
+**Canonical Composition (NFC)**
 : The most compact representation obtained by first
 decomposing to Canonical Decomposition and then composing to NFC.
 
-Compatibility Composition (NFKC)
+**Compatibility Composition (NFKC)**
 : The most comprehensive composition obtained
 by first decomposing to Compatibility Decomposition and then composing to NFKC.
 
-Canonical Decomposition (NFD)
+**Canonical Decomposition (NFD)**
 : Only code points with canonical decompositions
 are decomposed. This is a more compact and faster decomposition but will not
 provide the most comprehensive normalization possible.
 
-Compatibility Decomposition (NFKD)
+**Compatibility Decomposition (NFKD)**
 : The most comprehensive decomposition method
 where both canonical and compatibility decompositions are performed recursively.
 
-zg has methods to produce all four normalization forms in the `Normalize` module.
+`zg` has methods to produce all four normalization forms in the `Normalize` module.
 
 In your `build.zig`:
 
@@ -493,7 +583,7 @@ in the same fashion as shown for `CaseFolding` and `Normalize`.
 
 ## Scripts
 
-Unicode categorizes code points by the Script in which they belong. A Script
+Unicode categorizes code points by the Script in which they belong.  A Script
 collects letters and other symbols that belong to a particular writing system.
 You can detect the Script for a code point with the `Scripts` module.
 
@@ -522,21 +612,33 @@ test "Scripts" {
 
 ## Limits
 
-Iterators, and fragment types such as `CodePoint`, `Grapheme` and `Word`, use a
-`u32` to store the offset into a string, and the length of the fragment
-(`CodePoint` uses a `u3` for length, actually).
+Iterators, and fragment types such as `CodePoint`, `Grapheme` and
+`Word`, use a `u32` to store the offset into a string, and the length of
+the fragment (`CodePoint` uses a `u3` for length, actually).
 
 4GiB is a lot of string.  There are a few reasons to work with that much
-string, log files primarily, but fewer to bring it all into memory at once, and
-practically no reason at all to do anything to such a string without breaking
-it into smaller piece to work with.
+string, log files primarily, but fewer to bring it all into memory at
+once, and practically no reason at all to do anything to such a string
+without breaking it into smaller piece to work with.
 
-Also, Zig compiles on 32 bit systems, where `usize` is 32.  Code running on
-such systems has no choice but to handle slices in smaller pieces.  In general,
-if you want code to perform correctly when encountering multi- gigabyte
-strings, you'll need to code for that, at a level one or two steps above that
-in which you'll want to, for example, iterate some graphemes of that string.
+Also, Zig compiles on 32 bit systems, where `usize` is a `u32`.  Code
+running on such systems has no choice but to handle slices in smaller
+pieces.  In general, if you want code to perform correctly when
+encountering multi-gigabyte strings, you'll need to code for that, at a
+level one or two steps above that in which you'll want to, for example,
+iterate some graphemes of that string.
 
 That all said, `zg` modules can be passed the Boolean config option
-`fat_offset`, which will make all of those data structures use a `u64` instead.
-You don't actually want to do this.  But you can.
+`fat_offset`, which will make all of those data structures use a `u64`
+instead.  I added this option not because you should use it, which you
+should not, but to encourage awareness that code operating on strings
+needs to pay attention to the size of those strings, and have a plan for
+when sizes get out of specification.  What would your code do with a
+1MiB region of string with no newline?  There are many questions of this
+nature, and robust code must detect when data is out of the expected
+envelope, so it can respond accordingly.
+
+Code which does pay attention to these questions has no need for `u64`
+sized offsets, and code which does not will not be helped by them.  But
+perhaps yours is an exception, in which case, by all means, configure
+accordingly.

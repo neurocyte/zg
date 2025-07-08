@@ -674,6 +674,23 @@ test "ext_pict" {
     try testing.expect(ext_pict.isMatch("\u{2701}"));
 }
 
+test "Words" {
+    const wb = try Words.init(testing.allocator);
+    defer wb.deinit(testing.allocator);
+    const word_str = "Metonym   Μετωνύμιο メトニム";
+    var w_iter = wb.iterator(word_str);
+    try testing.expectEqualStrings("Metonym", w_iter.next().?.bytes(word_str));
+    // Spaces are "words" too!
+    try testing.expectEqualStrings("   ", w_iter.next().?.bytes(word_str));
+    const in_greek = w_iter.next().?;
+    for (in_greek.offset..in_greek.offset + in_greek.len) |i| {
+        const at_index = wb.wordAtIndex(word_str, i).bytes(word_str);
+        try testing.expectEqualStrings("Μετωνύμιο", at_index);
+    }
+    _ = w_iter.next();
+    try testing.expectEqualStrings("メトニム", w_iter.next().?.bytes(word_str));
+}
+
 test wordAtIndex {
     const wb = try Words.init(testing.allocator);
     defer wb.deinit(testing.allocator);
