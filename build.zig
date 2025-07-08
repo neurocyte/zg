@@ -11,7 +11,34 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Code generation
+    //| Options
+
+    // Display width
+    const cjk = b.option(bool, "cjk", "Ambiguous code points are wide (display width: 2)") orelse false;
+    const dwp_options = b.addOptions();
+    dwp_options.addOption(bool, "cjk", cjk);
+
+    // Visible Controls
+    const c0_width = b.option(
+        i4,
+        "c0_width",
+        "C0 controls have this width (default: 0, <BS> <Del> default -1)",
+    );
+    dwp_options.addOption(?i4, "c0_width", c0_width);
+    const c1_width = b.option(
+        i4,
+        "c1_width",
+        "C1 controls have this width (default: 0)",
+    );
+    dwp_options.addOption(?i4, "c1_width", c1_width);
+
+    //| Offset size
+    const fat_offset = b.option(bool, "fat_offset", "Offsets in iterators and data structures will be u64") orelse false;
+    const size_config = b.addOptions();
+    size_config.addOption(bool, "fat_offset", fat_offset);
+
+    //| Code generation
+
     // Grapheme break
     const gbp_gen_exe = b.addExecutable(.{
         .name = "gbp",
@@ -22,24 +49,14 @@ pub fn build(b: *std.Build) void {
     const run_gbp_gen_exe = b.addRunArtifact(gbp_gen_exe);
     const gbp_gen_out = run_gbp_gen_exe.addOutputFileArg("gbp.bin.z");
 
-    // Display width
-    const cjk = b.option(bool, "cjk", "Ambiguous code points are wide (display width: 2).") orelse false;
-    const options = b.addOptions();
-    options.addOption(bool, "cjk", cjk);
-
-    // Visible Controls
-    const c0_width = b.option(
-        i4,
-        "c0_width",
-        "C0 controls have this width (default: 0, <BS> <Del> default -1)",
-    );
-    options.addOption(?i4, "c0_width", c0_width);
-    const c1_width = b.option(
-        i4,
-        "c1_width",
-        "C1 controls have this width (default: 0)",
-    );
-    options.addOption(?i4, "c1_width", c1_width);
+    const wbp_gen_exe = b.addExecutable(.{
+        .name = "wbp",
+        .root_source_file = b.path("codegen/wbp.zig"),
+        .target = b.graph.host,
+        .optimize = .Debug,
+    });
+    const run_wbp_gen_exe = b.addRunArtifact(wbp_gen_exe);
+    const wbp_gen_out = run_wbp_gen_exe.addOutputFileArg("wbp.bin.z");
 
     const dwp_gen_exe = b.addExecutable(.{
         .name = "dwp",
@@ -47,7 +64,7 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         .optimize = .Debug,
     });
-    dwp_gen_exe.root_module.addOptions("options", options);
+    dwp_gen_exe.root_module.addOptions("options", dwp_options);
     const run_dwp_gen_exe = b.addRunArtifact(dwp_gen_exe);
     const dwp_gen_out = run_dwp_gen_exe.addOutputFileArg("dwp.bin.z");
 
@@ -183,12 +200,14 @@ pub fn build(b: *std.Build) void {
     const props_gen_out = run_props_gen_exe.addOutputFileArg("props.bin.z");
 
     // Modules we provide
+
     // Code points
     const code_point = b.addModule("code_point", .{
         .root_source_file = b.path("src/code_point.zig"),
         .target = target,
         .optimize = optimize,
     });
+    code_point.addOptions("config", size_config);
 
     const code_point_t = b.addTest(.{
         .name = "code_point",
@@ -206,6 +225,7 @@ pub fn build(b: *std.Build) void {
     });
     graphemes.addAnonymousImport("gbp", .{ .root_source_file = gbp_gen_out });
     graphemes.addImport("code_point", code_point);
+    graphemes.addOptions("config", size_config);
 
     const grapheme_t = b.addTest(.{
         .name = "Graphemes",
@@ -214,6 +234,23 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const grapheme_tr = b.addRunArtifact(grapheme_t);
+
+    // Word Breaking
+    const words = b.addModule("Words", .{
+        .root_source_file = b.path("src/Words.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    words.addAnonymousImport("wbp", .{ .root_source_file = wbp_gen_out });
+    words.addImport("code_point", code_point);
+
+    const words_t = b.addTest(.{
+        .name = "WordBreak",
+        .root_module = words,
+        .target = target,
+        .optimize = optimize,
+    });
+    const words_tr = b.addRunArtifact(words_t);
 
     // ASCII utilities
     const ascii = b.addModule("ascii", .{
@@ -240,7 +277,7 @@ pub fn build(b: *std.Build) void {
     display_width.addImport("ascii", ascii);
     display_width.addImport("code_point", code_point);
     display_width.addImport("Graphemes", graphemes);
-    display_width.addOptions("options", options); // For testing
+    display_width.addOptions("options", dwp_options); // For testing
 
     const display_width_t = b.addTest(.{
         .name = "display_width",
@@ -444,6 +481,7 @@ pub fn build(b: *std.Build) void {
     });
     unicode_tests.root_module.addImport("Graphemes", graphemes);
     unicode_tests.root_module.addImport("Normalize", norm);
+    unicode_tests.root_module.addImport("Words", words);
 
     const run_unicode_tests = b.addRunArtifact(unicode_tests);
 
@@ -452,6 +490,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&code_point_tr.step);
     test_step.dependOn(&display_width_tr.step);
     test_step.dependOn(&grapheme_tr.step);
+    test_step.dependOn(&words_tr.step);
     test_step.dependOn(&ascii_tr.step);
     test_step.dependOn(&ccc_data_tr.step);
     test_step.dependOn(&canon_data_tr.step);
